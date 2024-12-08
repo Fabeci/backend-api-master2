@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Activation de votre compte</title>
+</head>
+<body>
+    <p>Bonjour {{ user.nom }},</p>
+    <p>Merci de vous être inscrit sur notre plateforme. Pour activer votre compte, veuillez cliquer sur le lien ci-dessous :</p>
+    <p><a href="http://{{ domain }}/activate/{{ activation_token }}">Activer mon compte</a></p>
+    <p>Si vous n'avez pas créé de compte, ignorez cet e-mail.</p>
+    <p>Merci,</p>
+    <p>L'équipe de [Nom de votre plateforme]</p>
+</body>
+</html>
