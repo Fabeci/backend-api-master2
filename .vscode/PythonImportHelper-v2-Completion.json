@@ -416,7 +416,63 @@
         "documentation": {}
     },
     {
+        "label": "migrations",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
         "label": "models",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "migrations",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "migrations",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "transaction",
         "importPath": "django.db",
         "description": "django.db",
         "isExtraImport": true,
@@ -738,6 +794,22 @@
     },
     {
         "label": "serializers",
+        "importPath": "rest_framework",
+        "description": "rest_framework",
+        "isExtraImport": true,
+        "detail": "rest_framework",
+        "documentation": {}
+    },
+    {
+        "label": "status",
+        "importPath": "rest_framework",
+        "description": "rest_framework",
+        "isExtraImport": true,
+        "detail": "rest_framework",
+        "documentation": {}
+    },
+    {
+        "label": "generics",
         "importPath": "rest_framework",
         "description": "rest_framework",
         "isExtraImport": true,
@@ -1201,7 +1273,23 @@
         "documentation": {}
     },
     {
+        "label": "reverse",
+        "importPath": "django.urls",
+        "description": "django.urls",
+        "isExtraImport": true,
+        "detail": "django.urls",
+        "documentation": {}
+    },
+    {
         "label": "path",
+        "importPath": "django.urls",
+        "description": "django.urls",
+        "isExtraImport": true,
+        "detail": "django.urls",
+        "documentation": {}
+    },
+    {
+        "label": "reverse",
         "importPath": "django.urls",
         "description": "django.urls",
         "isExtraImport": true,
@@ -1273,7 +1361,7 @@
         "documentation": {}
     },
     {
-        "label": "redirect",
+        "label": "get_object_or_404",
         "importPath": "django.shortcuts",
         "description": "django.shortcuts",
         "isExtraImport": true,
@@ -1329,6 +1417,14 @@
         "documentation": {}
     },
     {
+        "label": "exception_handler",
+        "importPath": "rest_framework.views",
+        "description": "rest_framework.views",
+        "isExtraImport": true,
+        "detail": "rest_framework.views",
+        "documentation": {}
+    },
+    {
         "label": "APIView",
         "importPath": "rest_framework.views",
         "description": "rest_framework.views",
@@ -1342,6 +1438,14 @@
         "description": "rest_framework.views",
         "isExtraImport": true,
         "detail": "rest_framework.views",
+        "documentation": {}
+    },
+    {
+        "label": "Response",
+        "importPath": "rest_framework.response",
+        "description": "rest_framework.response",
+        "isExtraImport": true,
+        "detail": "rest_framework.response",
         "documentation": {}
     },
     {
@@ -1553,6 +1657,22 @@
         "documentation": {}
     },
     {
+        "label": "IsAuthenticated",
+        "importPath": "rest_framework.permissions",
+        "description": "rest_framework.permissions",
+        "isExtraImport": true,
+        "detail": "rest_framework.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "AllowAny",
+        "importPath": "rest_framework.permissions",
+        "description": "rest_framework.permissions",
+        "isExtraImport": true,
+        "detail": "rest_framework.permissions",
+        "documentation": {}
+    },
+    {
         "label": "get_object_or_404",
         "importPath": "rest_framework.generics",
         "description": "rest_framework.generics",
@@ -1699,7 +1819,16 @@
         "documentation": {}
     },
     {
-        "label": "get_user_model",
+        "label": "uuid",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "uuid",
+        "description": "uuid",
+        "detail": "uuid",
+        "documentation": {}
+    },
+    {
+        "label": "authenticate",
         "importPath": "django.contrib.auth",
         "description": "django.contrib.auth",
         "isExtraImport": true,
@@ -1720,6 +1849,254 @@
         "description": "django.contrib.auth",
         "isExtraImport": true,
         "detail": "django.contrib.auth",
+        "documentation": {}
+    },
+    {
+        "label": "get_user_model",
+        "importPath": "django.contrib.auth",
+        "description": "django.contrib.auth",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth",
+        "documentation": {}
+    },
+    {
+        "label": "views",
+        "importPath": "django.contrib.auth",
+        "description": "django.contrib.auth",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth",
+        "documentation": {}
+    },
+    {
+        "label": "get_user_model",
+        "importPath": "django.contrib.auth",
+        "description": "django.contrib.auth",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth",
+        "documentation": {}
+    },
+    {
+        "label": "login",
+        "importPath": "django.contrib.auth",
+        "description": "django.contrib.auth",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth",
+        "documentation": {}
+    },
+    {
+        "label": "get_user_model",
+        "importPath": "django.contrib.auth",
+        "description": "django.contrib.auth",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth",
+        "documentation": {}
+    },
+    {
+        "label": "send_activation_email",
+        "importPath": "users.utils",
+        "description": "users.utils",
+        "isExtraImport": true,
+        "detail": "users.utils",
+        "documentation": {}
+    },
+    {
+        "label": "send_verification_email",
+        "importPath": "users.utils",
+        "description": "users.utils",
+        "isExtraImport": true,
+        "detail": "users.utils",
+        "documentation": {}
+    },
+    {
+        "label": "send_activation_email",
+        "importPath": "users.utils",
+        "description": "users.utils",
+        "isExtraImport": true,
+        "detail": "users.utils",
+        "documentation": {}
+    },
+    {
+        "label": "urlsafe_base64_encode",
+        "importPath": "django.utils.http",
+        "description": "django.utils.http",
+        "isExtraImport": true,
+        "detail": "django.utils.http",
+        "documentation": {}
+    },
+    {
+        "label": "urlsafe_base64_encode",
+        "importPath": "django.utils.http",
+        "description": "django.utils.http",
+        "isExtraImport": true,
+        "detail": "django.utils.http",
+        "documentation": {}
+    },
+    {
+        "label": "urlencode",
+        "importPath": "django.utils.http",
+        "description": "django.utils.http",
+        "isExtraImport": true,
+        "detail": "django.utils.http",
+        "documentation": {}
+    },
+    {
+        "label": "urlsafe_base64_encode",
+        "importPath": "django.utils.http",
+        "description": "django.utils.http",
+        "isExtraImport": true,
+        "detail": "django.utils.http",
+        "documentation": {}
+    },
+    {
+        "label": "urlsafe_base64_encode",
+        "importPath": "django.utils.http",
+        "description": "django.utils.http",
+        "isExtraImport": true,
+        "detail": "django.utils.http",
+        "documentation": {}
+    },
+    {
+        "label": "urlsafe_base64_decode",
+        "importPath": "django.utils.http",
+        "description": "django.utils.http",
+        "isExtraImport": true,
+        "detail": "django.utils.http",
+        "documentation": {}
+    },
+    {
+        "label": "urlsafe_base64_decode",
+        "importPath": "django.utils.http",
+        "description": "django.utils.http",
+        "isExtraImport": true,
+        "detail": "django.utils.http",
+        "documentation": {}
+    },
+    {
+        "label": "default_token_generator",
+        "importPath": "django.contrib.auth.tokens",
+        "description": "django.contrib.auth.tokens",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth.tokens",
+        "documentation": {}
+    },
+    {
+        "label": "default_token_generator",
+        "importPath": "django.contrib.auth.tokens",
+        "description": "django.contrib.auth.tokens",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth.tokens",
+        "documentation": {}
+    },
+    {
+        "label": "default_token_generator",
+        "importPath": "django.contrib.auth.tokens",
+        "description": "django.contrib.auth.tokens",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth.tokens",
+        "documentation": {}
+    },
+    {
+        "label": "default_token_generator",
+        "importPath": "django.contrib.auth.tokens",
+        "description": "django.contrib.auth.tokens",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth.tokens",
+        "documentation": {}
+    },
+    {
+        "label": "default_token_generator",
+        "importPath": "django.contrib.auth.tokens",
+        "description": "django.contrib.auth.tokens",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth.tokens",
+        "documentation": {}
+    },
+    {
+        "label": "default_token_generator",
+        "importPath": "django.contrib.auth.tokens",
+        "description": "django.contrib.auth.tokens",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth.tokens",
+        "documentation": {}
+    },
+    {
+        "label": "settings",
+        "importPath": "django.conf",
+        "description": "django.conf",
+        "isExtraImport": true,
+        "detail": "django.conf",
+        "documentation": {}
+    },
+    {
+        "label": "settings",
+        "importPath": "django.conf",
+        "description": "django.conf",
+        "isExtraImport": true,
+        "detail": "django.conf",
+        "documentation": {}
+    },
+    {
+        "label": "settings",
+        "importPath": "django.conf",
+        "description": "django.conf",
+        "isExtraImport": true,
+        "detail": "django.conf",
+        "documentation": {}
+    },
+    {
+        "label": "settings",
+        "importPath": "django.conf",
+        "description": "django.conf",
+        "isExtraImport": true,
+        "detail": "django.conf",
+        "documentation": {}
+    },
+    {
+        "label": "send_mail",
+        "importPath": "django.core.mail",
+        "description": "django.core.mail",
+        "isExtraImport": true,
+        "detail": "django.core.mail",
+        "documentation": {}
+    },
+    {
+        "label": "send_mail",
+        "importPath": "django.core.mail",
+        "description": "django.core.mail",
+        "isExtraImport": true,
+        "detail": "django.core.mail",
+        "documentation": {}
+    },
+    {
+        "label": "send_mail",
+        "importPath": "django.core.mail",
+        "description": "django.core.mail",
+        "isExtraImport": true,
+        "detail": "django.core.mail",
+        "documentation": {}
+    },
+    {
+        "label": "AuthenticationFailed",
+        "importPath": "rest_framework.exceptions",
+        "description": "rest_framework.exceptions",
+        "isExtraImport": true,
+        "detail": "rest_framework.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "AuthenticationFailed",
+        "importPath": "rest_framework.exceptions",
+        "description": "rest_framework.exceptions",
+        "isExtraImport": true,
+        "detail": "rest_framework.exceptions",
+        "documentation": {}
+    },
+    {
+        "label": "NotAuthenticated",
+        "importPath": "rest_framework.exceptions",
+        "description": "rest_framework.exceptions",
+        "isExtraImport": true,
+        "detail": "rest_framework.exceptions",
         "documentation": {}
     },
     {
@@ -1755,71 +2132,31 @@
         "documentation": {}
     },
     {
-        "label": "default_token_generator",
-        "importPath": "django.contrib.auth.tokens",
-        "description": "django.contrib.auth.tokens",
+        "label": "Token",
+        "importPath": "rest_framework.authtoken.models",
+        "description": "rest_framework.authtoken.models",
         "isExtraImport": true,
-        "detail": "django.contrib.auth.tokens",
+        "detail": "rest_framework.authtoken.models",
         "documentation": {}
     },
     {
-        "label": "default_token_generator",
-        "importPath": "django.contrib.auth.tokens",
-        "description": "django.contrib.auth.tokens",
+        "label": "Token",
+        "importPath": "rest_framework.authtoken.models",
+        "description": "rest_framework.authtoken.models",
         "isExtraImport": true,
-        "detail": "django.contrib.auth.tokens",
+        "detail": "rest_framework.authtoken.models",
         "documentation": {}
     },
     {
-        "label": "urlsafe_base64_encode",
-        "importPath": "django.utils.http",
-        "description": "django.utils.http",
+        "label": "force_str",
+        "importPath": "django.utils.encoding",
+        "description": "django.utils.encoding",
         "isExtraImport": true,
-        "detail": "django.utils.http",
+        "detail": "django.utils.encoding",
         "documentation": {}
     },
     {
-        "label": "urlsafe_base64_encode",
-        "importPath": "django.utils.http",
-        "description": "django.utils.http",
-        "isExtraImport": true,
-        "detail": "django.utils.http",
-        "documentation": {}
-    },
-    {
-        "label": "urlsafe_base64_decode",
-        "importPath": "django.utils.http",
-        "description": "django.utils.http",
-        "isExtraImport": true,
-        "detail": "django.utils.http",
-        "documentation": {}
-    },
-    {
-        "label": "send_mail",
-        "importPath": "django.core.mail",
-        "description": "django.core.mail",
-        "isExtraImport": true,
-        "detail": "django.core.mail",
-        "documentation": {}
-    },
-    {
-        "label": "send_mail",
-        "importPath": "django.core.mail",
-        "description": "django.core.mail",
-        "isExtraImport": true,
-        "detail": "django.core.mail",
-        "documentation": {}
-    },
-    {
-        "label": "settings",
-        "importPath": "django.conf",
-        "description": "django.conf",
-        "isExtraImport": true,
-        "detail": "django.conf",
-        "documentation": {}
-    },
-    {
-        "label": "JsonResponse",
+        "label": "HttpResponse",
         "importPath": "django.http",
         "description": "django.http",
         "isExtraImport": true,
@@ -3145,7 +3482,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "BASE_DIR = Path(__file__).resolve().parent.parent\n# Quick-start development settings - unsuitable for production\n# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/\n# SECURITY WARNING: keep the secret key used in production secret!\nSECRET_KEY = 'django-insecure-$s4b+_ug=(xi0ul0(8u-^-8pxn@z=t08y@-e&5_3g#1tam2wl6'\n# SECURITY WARNING: don't run with debug turned on in production!\nDEBUG = True\nALLOWED_HOSTS = []\n# Application definition\nINSTALLED_APPS = [",
+        "peekOfCode": "BASE_DIR = Path(__file__).resolve().parent.parent\n# Quick-start development settings - unsuitable for production\n# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/\n# SECURITY WARNING: keep the secret key used in production secret!\nSECRET_KEY = 'django-insecure-$s4b+_ug=(xi0ul0(8u-^-8pxn@z=t08y@-e&5_3g#1tam2wl6'\n# SECURITY WARNING: don't run with debug turned on in production!\nDEBUG = True\nALLOWED_HOSTS = ['127.0.0.1', 'localhost']\n# Application definition\nINSTALLED_APPS = [",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3154,7 +3491,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "SECRET_KEY = 'django-insecure-$s4b+_ug=(xi0ul0(8u-^-8pxn@z=t08y@-e&5_3g#1tam2wl6'\n# SECURITY WARNING: don't run with debug turned on in production!\nDEBUG = True\nALLOWED_HOSTS = []\n# Application definition\nINSTALLED_APPS = [\n    'django.contrib.admin',\n    'django.contrib.auth',\n    'django.contrib.contenttypes',\n    'django.contrib.sessions',",
+        "peekOfCode": "SECRET_KEY = 'django-insecure-$s4b+_ug=(xi0ul0(8u-^-8pxn@z=t08y@-e&5_3g#1tam2wl6'\n# SECURITY WARNING: don't run with debug turned on in production!\nDEBUG = True\nALLOWED_HOSTS = ['127.0.0.1', 'localhost']\n# Application definition\nINSTALLED_APPS = [\n    \"corsheaders\",\n    'django.contrib.admin',\n    'django.contrib.auth',\n    'django.contrib.contenttypes',",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3163,7 +3500,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "DEBUG = True\nALLOWED_HOSTS = []\n# Application definition\nINSTALLED_APPS = [\n    'django.contrib.admin',\n    'django.contrib.auth',\n    'django.contrib.contenttypes',\n    'django.contrib.sessions',\n    'django.contrib.messages',\n    'django.contrib.staticfiles',",
+        "peekOfCode": "DEBUG = True\nALLOWED_HOSTS = ['127.0.0.1', 'localhost']\n# Application definition\nINSTALLED_APPS = [\n    \"corsheaders\",\n    'django.contrib.admin',\n    'django.contrib.auth',\n    'django.contrib.contenttypes',\n    'django.contrib.sessions',\n    'django.contrib.messages',",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3172,7 +3509,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "ALLOWED_HOSTS = []\n# Application definition\nINSTALLED_APPS = [\n    'django.contrib.admin',\n    'django.contrib.auth',\n    'django.contrib.contenttypes',\n    'django.contrib.sessions',\n    'django.contrib.messages',\n    'django.contrib.staticfiles',\n    'rest_framework',",
+        "peekOfCode": "ALLOWED_HOSTS = ['127.0.0.1', 'localhost']\n# Application definition\nINSTALLED_APPS = [\n    \"corsheaders\",\n    'django.contrib.admin',\n    'django.contrib.auth',\n    'django.contrib.contenttypes',\n    'django.contrib.sessions',\n    'django.contrib.messages',\n    'django.contrib.staticfiles',",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3181,7 +3518,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "INSTALLED_APPS = [\n    'django.contrib.admin',\n    'django.contrib.auth',\n    'django.contrib.contenttypes',\n    'django.contrib.sessions',\n    'django.contrib.messages',\n    'django.contrib.staticfiles',\n    'rest_framework',\n    'rest_framework.authtoken',\n    'dj_rest_auth',",
+        "peekOfCode": "INSTALLED_APPS = [\n    \"corsheaders\",\n    'django.contrib.admin',\n    'django.contrib.auth',\n    'django.contrib.contenttypes',\n    'django.contrib.sessions',\n    'django.contrib.messages',\n    'django.contrib.staticfiles',\n    'rest_framework',\n    'rest_framework.authtoken',",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3190,7 +3527,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "SITE_ID = 1\nMIDDLEWARE = [\n    'django.middleware.security.SecurityMiddleware',\n    'django.contrib.sessions.middleware.SessionMiddleware',\n    'django.middleware.common.CommonMiddleware',\n    'django.middleware.csrf.CsrfViewMiddleware',\n    'django.contrib.auth.middleware.AuthenticationMiddleware',\n    'django.contrib.messages.middleware.MessageMiddleware',\n    'django.middleware.clickjacking.XFrameOptionsMiddleware',\n    'allauth.account.middleware.AccountMiddleware', ",
+        "peekOfCode": "SITE_ID = 1\nMIDDLEWARE = [\n    \"corsheaders.middleware.CorsMiddleware\",\n    'django.middleware.security.SecurityMiddleware',\n    'django.contrib.sessions.middleware.SessionMiddleware',\n    'django.middleware.common.CommonMiddleware',\n    'django.middleware.csrf.CsrfViewMiddleware',\n    'django.contrib.auth.middleware.AuthenticationMiddleware',\n    'django.contrib.messages.middleware.MessageMiddleware',\n    'django.middleware.clickjacking.XFrameOptionsMiddleware',",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3199,7 +3536,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "MIDDLEWARE = [\n    'django.middleware.security.SecurityMiddleware',\n    'django.contrib.sessions.middleware.SessionMiddleware',\n    'django.middleware.common.CommonMiddleware',\n    'django.middleware.csrf.CsrfViewMiddleware',\n    'django.contrib.auth.middleware.AuthenticationMiddleware',\n    'django.contrib.messages.middleware.MessageMiddleware',\n    'django.middleware.clickjacking.XFrameOptionsMiddleware',\n    'allauth.account.middleware.AccountMiddleware', \n]",
+        "peekOfCode": "MIDDLEWARE = [\n    \"corsheaders.middleware.CorsMiddleware\",\n    'django.middleware.security.SecurityMiddleware',\n    'django.contrib.sessions.middleware.SessionMiddleware',\n    'django.middleware.common.CommonMiddleware',\n    'django.middleware.csrf.CsrfViewMiddleware',\n    'django.contrib.auth.middleware.AuthenticationMiddleware',\n    'django.contrib.messages.middleware.MessageMiddleware',\n    'django.middleware.clickjacking.XFrameOptionsMiddleware',\n    'allauth.account.middleware.AccountMiddleware', ",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3208,7 +3545,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "ROOT_URLCONF = 'prograppApi.urls'\nTEMPLATES = [\n    {\n        'BACKEND': 'django.template.backends.django.DjangoTemplates',\n        'DIRS': [],\n        'APP_DIRS': True,\n        'OPTIONS': {\n            'context_processors': [\n                'django.template.context_processors.debug',\n                'django.template.context_processors.request',",
+        "peekOfCode": "ROOT_URLCONF = 'prograppApi.urls'\nTEMPLATES = [\n    {\n        'BACKEND': 'django.template.backends.django.DjangoTemplates',\n        'DIRS': [os.path.join(BASE_DIR, 'templates')],\n        'APP_DIRS': True,\n        'OPTIONS': {\n            'context_processors': [\n                'django.template.context_processors.debug',\n                'django.template.context_processors.request',",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3217,7 +3554,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "TEMPLATES = [\n    {\n        'BACKEND': 'django.template.backends.django.DjangoTemplates',\n        'DIRS': [],\n        'APP_DIRS': True,\n        'OPTIONS': {\n            'context_processors': [\n                'django.template.context_processors.debug',\n                'django.template.context_processors.request',\n                'django.contrib.auth.context_processors.auth',",
+        "peekOfCode": "TEMPLATES = [\n    {\n        'BACKEND': 'django.template.backends.django.DjangoTemplates',\n        'DIRS': [os.path.join(BASE_DIR, 'templates')],\n        'APP_DIRS': True,\n        'OPTIONS': {\n            'context_processors': [\n                'django.template.context_processors.debug',\n                'django.template.context_processors.request',\n                'django.contrib.auth.context_processors.auth',",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3253,7 +3590,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "AUTHENTICATION_BACKENDS = (\n    'django.contrib.auth.backends.ModelBackend',\n    'allauth.account.auth_backends.AuthenticationBackend',\n)\nREST_FRAMEWORK = {\n    'DEFAULT_AUTHENTICATION_CLASSES': [\n        'rest_framework.authentication.SessionAuthentication',\n        'rest_framework.authentication.TokenAuthentication',\n    ],\n    # 'DEFAULT_PERMISSION_CLASSES': [",
+        "peekOfCode": "AUTHENTICATION_BACKENDS = (\n    'django.contrib.auth.backends.ModelBackend',\n    # 'allauth.account.auth_backends.AuthenticationBackend',\n)\nREST_FRAMEWORK = {\n    'DEFAULT_AUTHENTICATION_CLASSES': [\n        # 'rest_framework.authentication.SessionAuthentication',\n        'rest_framework.authentication.TokenAuthentication',\n    ],\n    'EXCEPTION_HANDLER': 'users.utils.custom_exception_handler',",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3262,7 +3599,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "REST_FRAMEWORK = {\n    'DEFAULT_AUTHENTICATION_CLASSES': [\n        'rest_framework.authentication.SessionAuthentication',\n        'rest_framework.authentication.TokenAuthentication',\n    ],\n    # 'DEFAULT_PERMISSION_CLASSES': [\n    #     'rest_framework.permissions.IsAuthenticated',\n    # ],\n}\nEMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'",
+        "peekOfCode": "REST_FRAMEWORK = {\n    'DEFAULT_AUTHENTICATION_CLASSES': [\n        # 'rest_framework.authentication.SessionAuthentication',\n        'rest_framework.authentication.TokenAuthentication',\n    ],\n    'EXCEPTION_HANDLER': 'users.utils.custom_exception_handler',\n}\nEMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'\nEMAIL_HOST = 'smtp.gmail.com'\nEMAIL_PORT = 587",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3271,7 +3608,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'\nEMAIL_HOST = 'smtp.gmail.com'\nEMAIL_PORT = 587\nEMAIL_USE_TLS = True\nEMAIL_HOST_USER = 'fabricedjerabe01@gmail.com'\nEMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'\nFRONTEND_URL = 'http://localhost:4200'\nACCOUNT_EMAIL_REQUIRED = True\nACCOUNT_USERNAME_REQUIRED = False\nACCOUNT_AUTHENTICATION_METHOD = 'email'",
+        "peekOfCode": "EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'\nEMAIL_HOST = 'smtp.gmail.com'\nEMAIL_PORT = 587\nEMAIL_USE_TLS = True\nEMAIL_HOST_USER = 'fabricedjerabe01@gmail.com'\nEMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'\nFRONTEND_BASE_URL = 'http://localhost:4200'\nACCOUNT_EMAIL_REQUIRED = True\nACCOUNT_USERNAME_REQUIRED = False\nACCOUNT_AUTHENTICATION_METHOD = 'email'",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3280,7 +3617,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "EMAIL_HOST = 'smtp.gmail.com'\nEMAIL_PORT = 587\nEMAIL_USE_TLS = True\nEMAIL_HOST_USER = 'fabricedjerabe01@gmail.com'\nEMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'\nFRONTEND_URL = 'http://localhost:4200'\nACCOUNT_EMAIL_REQUIRED = True\nACCOUNT_USERNAME_REQUIRED = False\nACCOUNT_AUTHENTICATION_METHOD = 'email'\nACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # Vérification obligatoire",
+        "peekOfCode": "EMAIL_HOST = 'smtp.gmail.com'\nEMAIL_PORT = 587\nEMAIL_USE_TLS = True\nEMAIL_HOST_USER = 'fabricedjerabe01@gmail.com'\nEMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'\nFRONTEND_BASE_URL = 'http://localhost:4200'\nACCOUNT_EMAIL_REQUIRED = True\nACCOUNT_USERNAME_REQUIRED = False\nACCOUNT_AUTHENTICATION_METHOD = 'email'\nACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # Vérification obligatoire",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3289,7 +3626,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "EMAIL_PORT = 587\nEMAIL_USE_TLS = True\nEMAIL_HOST_USER = 'fabricedjerabe01@gmail.com'\nEMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'\nFRONTEND_URL = 'http://localhost:4200'\nACCOUNT_EMAIL_REQUIRED = True\nACCOUNT_USERNAME_REQUIRED = False\nACCOUNT_AUTHENTICATION_METHOD = 'email'\nACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # Vérification obligatoire\nACCOUNT_LOGOUT_ON_GET = True  # Se déconnecter immédiatement sur demande",
+        "peekOfCode": "EMAIL_PORT = 587\nEMAIL_USE_TLS = True\nEMAIL_HOST_USER = 'fabricedjerabe01@gmail.com'\nEMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'\nFRONTEND_BASE_URL = 'http://localhost:4200'\nACCOUNT_EMAIL_REQUIRED = True\nACCOUNT_USERNAME_REQUIRED = False\nACCOUNT_AUTHENTICATION_METHOD = 'email'\nACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # Vérification obligatoire\nACCOUNT_LOGOUT_ON_GET = True  # Se déconnecter immédiatement sur demande",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3298,7 +3635,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "EMAIL_USE_TLS = True\nEMAIL_HOST_USER = 'fabricedjerabe01@gmail.com'\nEMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'\nFRONTEND_URL = 'http://localhost:4200'\nACCOUNT_EMAIL_REQUIRED = True\nACCOUNT_USERNAME_REQUIRED = False\nACCOUNT_AUTHENTICATION_METHOD = 'email'\nACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # Vérification obligatoire\nACCOUNT_LOGOUT_ON_GET = True  # Se déconnecter immédiatement sur demande\n# REST_AUTH_SERIALIZERS = {",
+        "peekOfCode": "EMAIL_USE_TLS = True\nEMAIL_HOST_USER = 'fabricedjerabe01@gmail.com'\nEMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'\nFRONTEND_BASE_URL = 'http://localhost:4200'\nACCOUNT_EMAIL_REQUIRED = True\nACCOUNT_USERNAME_REQUIRED = False\nACCOUNT_AUTHENTICATION_METHOD = 'email'\nACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # Vérification obligatoire\nACCOUNT_LOGOUT_ON_GET = True  # Se déconnecter immédiatement sur demande\n# REST_AUTH_SERIALIZERS = {",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3307,7 +3644,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "EMAIL_HOST_USER = 'fabricedjerabe01@gmail.com'\nEMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'\nFRONTEND_URL = 'http://localhost:4200'\nACCOUNT_EMAIL_REQUIRED = True\nACCOUNT_USERNAME_REQUIRED = False\nACCOUNT_AUTHENTICATION_METHOD = 'email'\nACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # Vérification obligatoire\nACCOUNT_LOGOUT_ON_GET = True  # Se déconnecter immédiatement sur demande\n# REST_AUTH_SERIALIZERS = {\n#     'USER_DETAILS_SERIALIZER': 'users.serializers.CustomUserSerializer',  # Définissez un serializer personnalisé pour le profil utilisateur.",
+        "peekOfCode": "EMAIL_HOST_USER = 'fabricedjerabe01@gmail.com'\nEMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'\nFRONTEND_BASE_URL = 'http://localhost:4200'\nACCOUNT_EMAIL_REQUIRED = True\nACCOUNT_USERNAME_REQUIRED = False\nACCOUNT_AUTHENTICATION_METHOD = 'email'\nACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # Vérification obligatoire\nACCOUNT_LOGOUT_ON_GET = True  # Se déconnecter immédiatement sur demande\n# REST_AUTH_SERIALIZERS = {\n#     'USER_DETAILS_SERIALIZER': 'users.serializers.CustomUserSerializer',  # Définissez un serializer personnalisé pour le profil utilisateur.",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3316,16 +3653,16 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "EMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'\nFRONTEND_URL = 'http://localhost:4200'\nACCOUNT_EMAIL_REQUIRED = True\nACCOUNT_USERNAME_REQUIRED = False\nACCOUNT_AUTHENTICATION_METHOD = 'email'\nACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # Vérification obligatoire\nACCOUNT_LOGOUT_ON_GET = True  # Se déconnecter immédiatement sur demande\n# REST_AUTH_SERIALIZERS = {\n#     'USER_DETAILS_SERIALIZER': 'users.serializers.CustomUserSerializer',  # Définissez un serializer personnalisé pour le profil utilisateur.\n# }",
+        "peekOfCode": "EMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'\nFRONTEND_BASE_URL = 'http://localhost:4200'\nACCOUNT_EMAIL_REQUIRED = True\nACCOUNT_USERNAME_REQUIRED = False\nACCOUNT_AUTHENTICATION_METHOD = 'email'\nACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # Vérification obligatoire\nACCOUNT_LOGOUT_ON_GET = True  # Se déconnecter immédiatement sur demande\n# REST_AUTH_SERIALIZERS = {\n#     'USER_DETAILS_SERIALIZER': 'users.serializers.CustomUserSerializer',  # Définissez un serializer personnalisé pour le profil utilisateur.\n# }",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
     {
-        "label": "FRONTEND_URL",
+        "label": "FRONTEND_BASE_URL",
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "FRONTEND_URL = 'http://localhost:4200'\nACCOUNT_EMAIL_REQUIRED = True\nACCOUNT_USERNAME_REQUIRED = False\nACCOUNT_AUTHENTICATION_METHOD = 'email'\nACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # Vérification obligatoire\nACCOUNT_LOGOUT_ON_GET = True  # Se déconnecter immédiatement sur demande\n# REST_AUTH_SERIALIZERS = {\n#     'USER_DETAILS_SERIALIZER': 'users.serializers.CustomUserSerializer',  # Définissez un serializer personnalisé pour le profil utilisateur.\n# }\nAUTH_USER_MODEL = 'users.User'",
+        "peekOfCode": "FRONTEND_BASE_URL = 'http://localhost:4200'\nACCOUNT_EMAIL_REQUIRED = True\nACCOUNT_USERNAME_REQUIRED = False\nACCOUNT_AUTHENTICATION_METHOD = 'email'\nACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # Vérification obligatoire\nACCOUNT_LOGOUT_ON_GET = True  # Se déconnecter immédiatement sur demande\n# REST_AUTH_SERIALIZERS = {\n#     'USER_DETAILS_SERIALIZER': 'users.serializers.CustomUserSerializer',  # Définissez un serializer personnalisé pour le profil utilisateur.\n# }\nAUTH_USER_MODEL = 'users.User'",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3397,7 +3734,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "TIME_ZONE = 'UTC'\nUSE_I18N = True\nUSE_TZ = True\n# Static files (CSS, JavaScript, Images)\n# https://docs.djangoproject.com/en/4.2/howto/static-files/\nSTATIC_URL = 'static/'\n# Default primary key field type\n# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field\nDEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'",
+        "peekOfCode": "TIME_ZONE = 'UTC'\nUSE_I18N = True\nUSE_TZ = True\n# Static files (CSS, JavaScript, Images)\n# https://docs.djangoproject.com/en/4.2/howto/static-files/\nSTATIC_URL = 'static/'\n# Default primary key field type\n# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field\nDEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'\nCORS_ALLOWED_ORIGINS = [",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3406,7 +3743,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "USE_I18N = True\nUSE_TZ = True\n# Static files (CSS, JavaScript, Images)\n# https://docs.djangoproject.com/en/4.2/howto/static-files/\nSTATIC_URL = 'static/'\n# Default primary key field type\n# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field\nDEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'",
+        "peekOfCode": "USE_I18N = True\nUSE_TZ = True\n# Static files (CSS, JavaScript, Images)\n# https://docs.djangoproject.com/en/4.2/howto/static-files/\nSTATIC_URL = 'static/'\n# Default primary key field type\n# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field\nDEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'\nCORS_ALLOWED_ORIGINS = [\n    \"http://localhost:4200\",  # Origine de votre application Angular",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3415,7 +3752,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "USE_TZ = True\n# Static files (CSS, JavaScript, Images)\n# https://docs.djangoproject.com/en/4.2/howto/static-files/\nSTATIC_URL = 'static/'\n# Default primary key field type\n# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field\nDEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'",
+        "peekOfCode": "USE_TZ = True\n# Static files (CSS, JavaScript, Images)\n# https://docs.djangoproject.com/en/4.2/howto/static-files/\nSTATIC_URL = 'static/'\n# Default primary key field type\n# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field\nDEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'\nCORS_ALLOWED_ORIGINS = [\n    \"http://localhost:4200\",  # Origine de votre application Angular\n]",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3424,7 +3761,7 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "STATIC_URL = 'static/'\n# Default primary key field type\n# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field\nDEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'",
+        "peekOfCode": "STATIC_URL = 'static/'\n# Default primary key field type\n# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field\nDEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'\nCORS_ALLOWED_ORIGINS = [\n    \"http://localhost:4200\",  # Origine de votre application Angular\n]",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3433,7 +3770,16 @@
         "kind": 5,
         "importPath": "prograppApi.settings",
         "description": "prograppApi.settings",
-        "peekOfCode": "DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'",
+        "peekOfCode": "DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'\nCORS_ALLOWED_ORIGINS = [\n    \"http://localhost:4200\",  # Origine de votre application Angular\n]",
+        "detail": "prograppApi.settings",
+        "documentation": {}
+    },
+    {
+        "label": "CORS_ALLOWED_ORIGINS",
+        "kind": 5,
+        "importPath": "prograppApi.settings",
+        "description": "prograppApi.settings",
+        "peekOfCode": "CORS_ALLOWED_ORIGINS = [\n    \"http://localhost:4200\",  # Origine de votre application Angular\n]",
         "detail": "prograppApi.settings",
         "documentation": {}
     },
@@ -3690,6 +4036,33 @@
         "documentation": {}
     },
     {
+        "label": "Migration",
+        "kind": 6,
+        "importPath": "users.migrations.0007_alter_user_is_active",
+        "description": "users.migrations.0007_alter_user_is_active",
+        "peekOfCode": "class Migration(migrations.Migration):\n    dependencies = [\n        ('users', '0006_alter_admin_institution_alter_apprenant_classe_and_more'),\n    ]\n    operations = [\n        migrations.AlterField(\n            model_name='user',\n            name='is_active',\n            field=models.BooleanField(default=False),\n        ),",
+        "detail": "users.migrations.0007_alter_user_is_active",
+        "documentation": {}
+    },
+    {
+        "label": "Migration",
+        "kind": 6,
+        "importPath": "users.migrations.0008_alter_formateur_groupes_alter_formateur_institutions_and_more",
+        "description": "users.migrations.0008_alter_formateur_groupes_alter_formateur_institutions_and_more",
+        "peekOfCode": "class Migration(migrations.Migration):\n    dependencies = [\n        ('academics', '0003_anneescolaire_description_classe_date_creation_and_more'),\n        ('users', '0007_alter_user_is_active'),\n    ]\n    operations = [\n        migrations.AlterField(\n            model_name='formateur',\n            name='groupes',\n            field=models.ManyToManyField(blank=True, null=True, related_name='formateurs', to='academics.groupe'),",
+        "detail": "users.migrations.0008_alter_formateur_groupes_alter_formateur_institutions_and_more",
+        "documentation": {}
+    },
+    {
+        "label": "Migration",
+        "kind": 6,
+        "importPath": "users.migrations.0009_user_activation_token",
+        "description": "users.migrations.0009_user_activation_token",
+        "peekOfCode": "class Migration(migrations.Migration):\n    dependencies = [\n        ('users', '0008_alter_formateur_groupes_alter_formateur_institutions_and_more'),\n    ]\n    operations = [\n        migrations.AddField(\n            model_name='user',\n            name='activation_token',\n            field=models.CharField(blank=True, editable=False, max_length=255),\n        ),",
+        "detail": "users.migrations.0009_user_activation_token",
+        "documentation": {}
+    },
+    {
         "label": "CustomUserAdmin",
         "kind": 6,
         "importPath": "users.admin",
@@ -3802,7 +4175,7 @@
         "kind": 6,
         "importPath": "users.models",
         "description": "users.models",
-        "peekOfCode": "class Apprenant(User):\n    matricule = models.CharField(max_length=20, unique=True, null=True)\n    date_naissance = models.DateField(null=True)\n    groupe = models.ForeignKey('academics.Groupe', on_delete=models.CASCADE, related_name='groupe_apprenant', null=True)\n    tuteur = models.ForeignKey(Parent, on_delete=models.CASCADE, related_name='children', null=True)\n    classe = models.ForeignKey('academics.Classe', on_delete=models.CASCADE, related_name='classe_apprenant', null=True)\n    class Meta:\n        pass\nclass Formateur(User):\n    institutions = models.ManyToManyField('academics.Institution', related_name=\"formateurs_users\", null=True)",
+        "peekOfCode": "class Apprenant(User):\n    matricule = models.CharField(max_length=20, unique=True, null=True)\n    date_naissance = models.DateField(null=True)\n    groupe = models.ForeignKey('academics.Groupe', on_delete=models.CASCADE, related_name='groupe_apprenant', null=True)\n    tuteur = models.ForeignKey(Parent, on_delete=models.CASCADE, related_name='children', null=True)\n    classe = models.ForeignKey('academics.Classe', on_delete=models.CASCADE, related_name='classe_apprenant', null=True)\n    class Meta:\n        pass\nclass Formateur(User):\n    institutions = models.ManyToManyField('academics.Institution', related_name=\"formateurs_users\", null=True, blank=True)",
         "detail": "users.models",
         "documentation": {}
     },
@@ -3811,7 +4184,7 @@
         "kind": 6,
         "importPath": "users.models",
         "description": "users.models",
-        "peekOfCode": "class Formateur(User):\n    institutions = models.ManyToManyField('academics.Institution', related_name=\"formateurs_users\", null=True)\n    specialites = models.ManyToManyField('academics.Specialite', related_name=\"formateurs\", null=True)\n    groupes = models.ManyToManyField('academics.Groupe', related_name=\"formateurs\", null=True)\n    def __str__(self):\n        return self.nom\n    class Meta:\n        pass\nclass ResponsableAcademique(User):\n    institution = models.ForeignKey('academics.Institution', on_delete=models.CASCADE, related_name='responsables_academiques', null=True)",
+        "peekOfCode": "class Formateur(User):\n    institutions = models.ManyToManyField('academics.Institution', related_name=\"formateurs_users\", null=True, blank=True)\n    specialites = models.ManyToManyField('academics.Specialite', related_name=\"formateurs\", null=True, blank=True)\n    groupes = models.ManyToManyField('academics.Groupe', related_name=\"formateurs\", null=True, blank=True)\n    def __str__(self):\n        return self.nom\n    class Meta:\n        pass\nclass ResponsableAcademique(User):\n    institution = models.ForeignKey('academics.Institution', on_delete=models.CASCADE, related_name='responsables_academiques', null=True)",
         "detail": "users.models",
         "documentation": {}
     },
@@ -3829,7 +4202,25 @@
         "kind": 6,
         "importPath": "users.serializers",
         "description": "users.serializers",
-        "peekOfCode": "class UserSerializer(serializers.ModelSerializer):\n    class Meta:\n        model = User\n        fields = ['email', 'nom', 'prenom', 'telephone', 'pays_residence', 'password']\n        extra_kwargs = {'password': {'write_only': True}}\n    def create(self, validated_data):\n        user = User.objects.create_user(**validated_data)\n        return user\nclass AdminSerializer(UserSerializer):\n    class Meta(UserSerializer.Meta):",
+        "peekOfCode": "class UserSerializer(serializers.ModelSerializer):\n    class Meta:\n        model = User\n        fields = ['email', 'nom', 'prenom', 'telephone', 'pays_residence', 'password']\n        extra_kwargs = {'password': {'write_only': True}}\n    def create(self, validated_data):\n        user = User.objects.create_user(**validated_data)\n        return {\n            \"message\": \"Un e-mail de vérification a été envoyé à l'adresse fournie.\"\n        }",
+        "detail": "users.serializers",
+        "documentation": {}
+    },
+    {
+        "label": "UserRegisterSerializer",
+        "kind": 6,
+        "importPath": "users.serializers",
+        "description": "users.serializers",
+        "peekOfCode": "class UserRegisterSerializer(serializers.ModelSerializer):\n    class Meta:\n        model = User\n        fields = ['email', 'nom', 'prenom', 'telephone', 'pays_residence', 'password']\n        extra_kwargs = {'password': {'write_only': True}}\n    def create(self, validated_data):\n        with transaction.atomic():\n            user = User.objects.create_user(**validated_data)\n            user.is_active = False  # L'utilisateur est inactif jusqu'à la vérification\n            user.save()",
+        "detail": "users.serializers",
+        "documentation": {}
+    },
+    {
+        "label": "UserLoginSerializer",
+        "kind": 6,
+        "importPath": "users.serializers",
+        "description": "users.serializers",
+        "peekOfCode": "class UserLoginSerializer(serializers.Serializer):\n    email = serializers.EmailField()\n    password = serializers.CharField(write_only=True)\n    def validate(self, data):\n        email = data.get('email')\n        password = data.get('password')\n        # Chercher l'utilisateur dans la base de données\n        user = get_user_model().objects.filter(email=email).first()\n        if user is None:\n            raise AuthenticationFailed(\"Identifiants invalides.\")",
         "detail": "users.serializers",
         "documentation": {}
     },
@@ -3838,7 +4229,7 @@
         "kind": 6,
         "importPath": "users.serializers",
         "description": "users.serializers",
-        "peekOfCode": "class AdminSerializer(UserSerializer):\n    class Meta(UserSerializer.Meta):\n        model = Admin\n        fields = UserSerializer.Meta.fields + ['date_entree', 'institution']\n    def create(self, validated_data):\n        return Admin.objects.create_user(**validated_data)\nclass SuperAdminSerializer(UserSerializer):\n    class Meta(UserSerializer.Meta):\n        model = SuperAdmin\n        fields = UserSerializer.Meta.fields",
+        "peekOfCode": "class AdminSerializer(UserSerializer):\n    class Meta(UserSerializer.Meta):\n        model = Admin\n        fields = UserRegisterSerializer.Meta.fields + ['date_entree', 'institution']\n    def create(self, validated_data):\n        password = validated_data.pop('password')\n        admin = Admin(**validated_data)\n        admin.set_password(password)  # Hachage du mot de passe\n        admin.save()\n        # Génération des identifiants sécurisés",
         "detail": "users.serializers",
         "documentation": {}
     },
@@ -3847,7 +4238,7 @@
         "kind": 6,
         "importPath": "users.serializers",
         "description": "users.serializers",
-        "peekOfCode": "class SuperAdminSerializer(UserSerializer):\n    class Meta(UserSerializer.Meta):\n        model = SuperAdmin\n        fields = UserSerializer.Meta.fields\n    def create(self, validated_data):\n        return SuperAdmin.objects.create_user(**validated_data)\nclass ParentSerializer(UserSerializer):\n    class Meta(UserSerializer.Meta):\n        model = Parent\n        fields = UserSerializer.Meta.fields + ['institution']",
+        "peekOfCode": "class SuperAdminSerializer(UserSerializer):\n    class Meta(UserSerializer.Meta):\n        model = SuperAdmin\n        fields = UserSerializer.Meta.fields\nclass ParentSerializer(serializers.ModelSerializer):\n    password = serializers.CharField(write_only=True)\n    class Meta:\n        model = Parent\n        fields = ['email', 'password', 'nom', 'prenom', 'telephone', 'pays_residence', 'institution']\n    def create(self, validated_data):",
         "detail": "users.serializers",
         "documentation": {}
     },
@@ -3856,7 +4247,7 @@
         "kind": 6,
         "importPath": "users.serializers",
         "description": "users.serializers",
-        "peekOfCode": "class ParentSerializer(UserSerializer):\n    class Meta(UserSerializer.Meta):\n        model = Parent\n        fields = UserSerializer.Meta.fields + ['institution']\n    def create(self, validated_data):\n        return Parent.objects.create_user(**validated_data)\nclass ApprenantSerializer(UserSerializer):\n    class Meta(UserSerializer.Meta):\n        model = Apprenant\n        fields = UserSerializer.Meta.fields + ['matricule', 'date_naissance', 'groupe', 'tuteur', 'classe']",
+        "peekOfCode": "class ParentSerializer(serializers.ModelSerializer):\n    password = serializers.CharField(write_only=True)\n    class Meta:\n        model = Parent\n        fields = ['email', 'password', 'nom', 'prenom', 'telephone', 'pays_residence', 'institution']\n    def create(self, validated_data):\n        email = validated_data.get('email')\n        password = validated_data.pop('password')\n        # Vérifiez si un utilisateur avec cet email existe déjà\n        if get_user_model().objects.filter(email=email).exists():",
         "detail": "users.serializers",
         "documentation": {}
     },
@@ -3865,7 +4256,7 @@
         "kind": 6,
         "importPath": "users.serializers",
         "description": "users.serializers",
-        "peekOfCode": "class ApprenantSerializer(UserSerializer):\n    class Meta(UserSerializer.Meta):\n        model = Apprenant\n        fields = UserSerializer.Meta.fields + ['matricule', 'date_naissance', 'groupe', 'tuteur', 'classe']\n    def create(self, validated_data):\n        return Apprenant.objects.create_user(**validated_data)\nclass FormateurSerializer(UserSerializer):\n    institutions = serializers.PrimaryKeyRelatedField(queryset=Institution.objects.all(), many=True)\n    specialites = serializers.PrimaryKeyRelatedField(queryset=Specialite.objects.all(), many=True)\n    groupes = serializers.PrimaryKeyRelatedField(queryset=Groupe.objects.all(), many=True)",
+        "peekOfCode": "class ApprenantSerializer(serializers.ModelSerializer):\n    password = serializers.CharField(write_only=True)\n    class Meta:\n        model = Apprenant\n        fields = ['email', 'password', 'nom', 'prenom', 'telephone', 'pays_residence', 'matricule', 'date_naissance', 'groupe', 'tuteur', 'classe']\n    def create(self, validated_data):\n        # Récupérer le mot de passe et le retirer de validated_data\n        password = validated_data.pop('password')\n        email = validated_data.get('email')\n        # Créer l'utilisateur de base sans les champs spécifiques à Apprenant",
         "detail": "users.serializers",
         "documentation": {}
     },
@@ -3883,7 +4274,25 @@
         "kind": 6,
         "importPath": "users.serializers",
         "description": "users.serializers",
-        "peekOfCode": "class ResponsableAcademiqueSerializer(UserSerializer):\n    specialite = serializers.CharField()\n    class Meta(UserSerializer.Meta):\n        model = ResponsableAcademique\n        fields = UserSerializer.Meta.fields + ['specialite']\n    def create(self, validated_data):\n        specialite = validated_data.pop('specialite')\n        responsable = ResponsableAcademique.objects.create_user(**validated_data, specialite=specialite)\n        return responsable",
+        "peekOfCode": "class ResponsableAcademiqueSerializer(UserSerializer):\n    # specialite = serializers.CharField()\n    class Meta(UserSerializer.Meta):\n        model = ResponsableAcademique\n        fields = UserSerializer.Meta.fields + ['institution', 'departement']\n    def create(self, validated_data):\n        responsable = ResponsableAcademique.objects.create_user(**validated_data)\n        activation_url = generate_activation_link(responsable, settings.FRONTEND_BASE_URL)\n        send_activation_email(responsable, subject=\"Activation du compte\", url=activation_url)\n        return responsable",
+        "detail": "users.serializers",
+        "documentation": {}
+    },
+    {
+        "label": "PasswordResetConfirmSerializer",
+        "kind": 6,
+        "importPath": "users.serializers",
+        "description": "users.serializers",
+        "peekOfCode": "class PasswordResetConfirmSerializer(serializers.Serializer):\n    new_password = serializers.CharField(write_only=True, min_length=8, max_length=128)\n    confirm_password = serializers.CharField(write_only=True, min_length=8, max_length=128)\n    def validate(self, data):\n        if data['new_password'] != data['confirm_password']:\n            raise serializers.ValidationError({\"error\": \"Les mots de passe ne correspondent pas.\"})\n        return data",
+        "detail": "users.serializers",
+        "documentation": {}
+    },
+    {
+        "label": "generate_activation_link",
+        "kind": 2,
+        "importPath": "users.serializers",
+        "description": "users.serializers",
+        "peekOfCode": "def generate_activation_link(user, frontend_url):\n    \"\"\"\n    Génère un lien d'activation sécurisé pour un utilisateur.\n    Args:\n        user (User): Instance de l'utilisateur pour lequel générer le lien d'activation.\n        frontend_url (str): URL de base de l'application frontend.\n    Returns:\n        str: Lien d'activation complet.\n    \"\"\"\n    # Génération des identifiants sécurisés",
         "detail": "users.serializers",
         "documentation": {}
     },
@@ -3910,7 +4319,7 @@
         "kind": 2,
         "importPath": "users.signals",
         "description": "users.signals",
-        "peekOfCode": "def send_verification_email(sender, instance, created, **kwargs):\n    \"\"\"\n    Envoie un e-mail de vérification après la création d'un utilisateur.\n    \"\"\"\n    if created and not instance.is_active:  # Si l'utilisateur vient juste d'être créé et n'est pas encore activé\n        uid = urlsafe_base64_encode(str(instance.pk).encode())\n        token = default_token_generator.make_token(instance)\n        activation_link = reverse('activate_user', kwargs={'uidb64': uid, 'token': token})\n        activation_url = f\"{settings.FRONTEND_URL}{activation_link}\"\n        send_mail(",
+        "peekOfCode": "def send_verification_email(sender, instance, created, **kwargs):\n    \"\"\"\n    Envoie un e-mail de vérification après la création d'un utilisateur.\n    \"\"\"\n    # if created and not instance.is_active:  # Si l'utilisateur vient juste d'être créé et n'est pas encore activé\n    #     uid = urlsafe_base64_encode(str(instance.pk).encode())\n    #     token = default_token_generator.make_token(instance)\n    #     activation_link = reverse('activate_user', kwargs={'uidb64': uid, 'token': token})\n    #     activation_url = f\"{settings.FRONTEND_URL}{activation_link}\"\n    #     send_mail(",
         "detail": "users.signals",
         "documentation": {}
     },
@@ -3919,8 +4328,44 @@
         "kind": 5,
         "importPath": "users.urls",
         "description": "users.urls",
-        "peekOfCode": "urlpatterns = [\n    path('admins/', AdminListCreateAPIView.as_view(), name='admin-list-create'),\n    path('apprenants/', ApprenantListCreateAPIView.as_view(), name='apprenant-list-create'),\n    path('superadmins/', SuperAdminListCreateAPIView.as_view(), name='superadmin-list-create'),\n    path('parents/', ParentListCreateAPIView.as_view(), name='parent-list-create'),\n    path('formateurs/', FormateurListCreateAPIView.as_view(), name='formateur-list-create'),\n    path('responsables-academiques/', ResponsableAcademiqueListCreateAPIView.as_view(), name='responsable-list-create'),\n    path('send-verification-email/', SendVerificationEmail.as_view(), name='send_verification_email'),\n    path('activate/<uidb64>/<token>/', ActivateUser.as_view(), name='activate_user'),\n]",
+        "peekOfCode": "urlpatterns = [\n    path('login/', UserLoginAPIView.as_view(), name='user-login'),\n    path('logout/', LogoutAPIView.as_view(), name='logout'),\n    path('admins/', AdminListCreateAPIView.as_view(), name='admin-list-create'),\n    path('apprenants/', ApprenantListCreateAPIView.as_view(), name='apprenant-list-create'),\n    path('superadmins/', SuperAdminListCreateAPIView.as_view(), name='superadmin-list-create'),\n    path('parents/', ParentListCreateAPIView.as_view(), name='parent-list-create'),\n    path('formateurs/', FormateurListCreateAPIView.as_view(), name='formateur-list-create'),\n    path('responsables-academiques/', ResponsableAcademiqueListCreateAPIView.as_view(), name='responsable-list-create'),\n    path('activate/<uidb64>/<token>/', ActivateUserAPIView.as_view(), name='activate_user'),",
         "detail": "users.urls",
+        "documentation": {}
+    },
+    {
+        "label": "send_verification_email",
+        "kind": 2,
+        "importPath": "users.utils",
+        "description": "users.utils",
+        "peekOfCode": "def send_verification_email(user):\n    \"\"\"\n    Envoie un e-mail de vérification au nouvel utilisateur.\n    \"\"\"\n    token = user.generate_email_verification_token()  # Implémentez une méthode pour générer un token sécurisé\n    verification_url = f\"{settings.FRONTEND_BASE_URL}{reverse('verify-email')}?{urlencode({'token': token})}\"\n    subject = \"Vérification de votre compte\"\n    message = f\"Bonjour {user.nom},\\n\\nCliquez sur le lien suivant pour vérifier votre e-mail : {verification_url}\\n\\nMerci !\"\n    send_mail(\n        subject,",
+        "detail": "users.utils",
+        "documentation": {}
+    },
+    {
+        "label": "custom_exception_handler",
+        "kind": 2,
+        "importPath": "users.utils",
+        "description": "users.utils",
+        "peekOfCode": "def custom_exception_handler(exc, context):\n    \"\"\"\n    Gestionnaire personnalisé pour les exceptions.\n    \"\"\"\n    # Appelez le gestionnaire d'exceptions par défaut fourni par DRF\n    response = exception_handler(exc, context)\n    # Personnalisez le message pour certaines exceptions spécifiques\n    if isinstance(exc, NotAuthenticated):\n        return Response(\n            {",
+        "detail": "users.utils",
+        "documentation": {}
+    },
+    {
+        "label": "send_activation_email",
+        "kind": 2,
+        "importPath": "users.utils",
+        "description": "users.utils",
+        "peekOfCode": "def send_activation_email(user, subject, url):\n    \"\"\"\n    Envoie un email d'activation à l'utilisateur.\n    Args:\n        user (User): Instance de l'utilisateur pour lequel envoyer l'email.\n        frontend_url (str): URL de base de l'application frontend.\n        subject (str): Sujet de l'email. Par défaut : \"Activer votre compte\".\n    \"\"\"\n    # Envoi de l'email\n    send_mail(",
+        "detail": "users.utils",
+        "documentation": {}
+    },
+    {
+        "label": "UserLoginAPIView",
+        "kind": 6,
+        "importPath": "users.views",
+        "description": "users.views",
+        "peekOfCode": "class UserLoginAPIView(APIView):\n    def post(self, request, *args, **kwargs):\n        serializer = UserLoginSerializer(data=request.data)\n        if serializer.is_valid():\n            user = serializer.validated_data['user']\n            # Vérifiez si l'utilisateur est activé\n            if not user.is_active:\n                return Response({\"message\": \"Le compte est désactivé.\"}, status=status.HTTP_400_BAD_REQUEST)\n            # Connectez l'utilisateur\n            login(request, user)",
+        "detail": "users.views",
         "documentation": {}
     },
     {
@@ -3928,7 +4373,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class AdminListCreateAPIView(APIView):\n    def get(self, request, *args, **kwargs):\n        admins = Admin.objects.all()\n        serializer = AdminSerializer(admins, many=True)\n        return Response(serializer.data, status=status.HTTP_200_OK)\n    def post(self, request, *args, **kwargs):\n        serializer = AdminSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(serializer.data, status=status.HTTP_201_CREATED)",
+        "peekOfCode": "class AdminListCreateAPIView(APIView):\n    def get(self, request, *args, **kwargs):\n        admins = Admin.objects.all()\n        serializer = AdminSerializer(admins, many=True)\n        return Response(serializer.data, status=status.HTTP_200_OK)\n    def post(self, request, *args, **kwargs):\n        serializer = AdminSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(",
         "detail": "users.views",
         "documentation": {}
     },
@@ -3937,7 +4382,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class ApprenantListCreateAPIView(APIView):\n    def get(self, request, *args, **kwargs):\n        apprenants = Apprenant.objects.all()\n        serializer = ApprenantSerializer(apprenants, many=True)\n        return Response(serializer.data, status=status.HTTP_200_OK)\n    def post(self, request, *args, **kwargs):\n        serializer = ApprenantSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(serializer.data, status=status.HTTP_201_CREATED)",
+        "peekOfCode": "class ApprenantListCreateAPIView(APIView):\n    def get(self, request, *args, **kwargs):\n        apprenants = Apprenant.objects.all()\n        serializer = ApprenantSerializer(apprenants, many=True)\n        return Response(serializer.data, status=status.HTTP_200_OK)\n    def post(self, request, *args, **kwargs):\n        serializer = ApprenantSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(",
         "detail": "users.views",
         "documentation": {}
     },
@@ -3955,7 +4400,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class ParentListCreateAPIView(APIView):\n    def get(self, request, *args, **kwargs):\n        parents = Parent.objects.all()\n        serializer = ParentSerializer(parents, many=True)\n        return Response(serializer.data, status=status.HTTP_200_OK)\n    def post(self, request, *args, **kwargs):\n        serializer = ParentSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(serializer.data, status=status.HTTP_201_CREATED)",
+        "peekOfCode": "class ParentListCreateAPIView(APIView):\n    def get(self, request, *args, **kwargs):\n        parents = Parent.objects.all()\n        serializer = ParentSerializer(parents, many=True)\n        return Response(serializer.data, status=status.HTTP_200_OK)\n    def post(self, request, *args, **kwargs):\n        serializer = ParentSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(",
         "detail": "users.views",
         "documentation": {}
     },
@@ -3964,7 +4409,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class FormateurListCreateAPIView(APIView):\n    def get(self, request, *args, **kwargs):\n        formateurs = Formateur.objects.all()\n        serializer = FormateurSerializer(formateurs, many=True)\n        return Response(serializer.data, status=status.HTTP_200_OK)\n    def post(self, request, *args, **kwargs):\n        serializer = FormateurSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(serializer.data, status=status.HTTP_201_CREATED)",
+        "peekOfCode": "class FormateurListCreateAPIView(APIView):\n    def get(self, request, *args, **kwargs):\n        formateurs = Formateur.objects.all()\n        serializer = FormateurSerializer(formateurs, many=True)\n        return Response(serializer.data, status=status.HTTP_200_OK)\n    def post(self, request, *args, **kwargs):\n        serializer = FormateurSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(",
         "detail": "users.views",
         "documentation": {}
     },
@@ -3973,25 +4418,52 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class ResponsableAcademiqueListCreateAPIView(APIView):\n    def get(self, request, *args, **kwargs):\n        responsables = ResponsableAcademique.objects.all()\n        serializer = ResponsableAcademiqueSerializer(responsables, many=True)\n        return Response(serializer.data, status=status.HTTP_200_OK)\n    def post(self, request, *args, **kwargs):\n        serializer = ResponsableAcademiqueSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(serializer.data, status=status.HTTP_201_CREATED)",
+        "peekOfCode": "class ResponsableAcademiqueListCreateAPIView(APIView):\n    def get(self, request, *args, **kwargs):\n        responsables = ResponsableAcademique.objects.all()\n        serializer = ResponsableAcademiqueSerializer(responsables, many=True)\n        return Response(serializer.data, status=status.HTTP_200_OK)\n    def post(self, request, *args, **kwargs):\n        serializer = ResponsableAcademiqueSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(",
         "detail": "users.views",
         "documentation": {}
     },
     {
-        "label": "SendVerificationEmail",
+        "label": "ActivateUserAPIView",
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class SendVerificationEmail(APIView):\n    def post(self, request):\n        email = request.data.get(\"email\")\n        try:\n            user = get_user_model().objects.get(email=email)\n            if user.is_active:\n                return Response({\"detail\": \"User already activated.\"}, status=status.HTTP_400_BAD_REQUEST)\n            # Génération de l'UID et du Token\n            uid = urlsafe_base64_encode(str(user.pk).encode())\n            token = default_token_generator.make_token(user)",
+        "peekOfCode": "class ActivateUserAPIView(APIView):\n    \"\"\"\n    APIView pour activer un utilisateur via un lien d'activation.\n    \"\"\"\n    def get(self, request, uidb64, token, *args, **kwargs):\n        try:\n            # Décoder l'UID\n            uid = urlsafe_base64_decode(uidb64).decode()\n            user = get_object_or_404(User, pk=uid)\n            # Vérifier le jeton",
         "detail": "users.views",
         "documentation": {}
     },
     {
-        "label": "ActivateUser",
+        "label": "LogoutAPIView",
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class ActivateUser(APIView):\n    def get(self, request, uidb64, token):\n        try:\n            # Décoder l'UID pour obtenir l'ID de l'utilisateur\n            uid = urlsafe_base64_decode(uidb64).decode()\n            user = get_user_model().objects.get(pk=uid)\n            # Vérifier le token\n            if default_token_generator.check_token(user, token):\n                user.is_active = True\n                user.save()",
+        "peekOfCode": "class LogoutAPIView(APIView):\n    \"\"\"\n    API pour déconnecter l'utilisateur en supprimant son token d'authentification.\n    \"\"\"\n    permission_classes = [IsAuthenticated]  # L'utilisateur doit être authentifié\n    def post(self, request, *args, **kwargs):\n        try:\n            # Supprimer le token de l'utilisateur connecté\n            token = Token.objects.get(user=request.user)\n            token.delete()",
+        "detail": "users.views",
+        "documentation": {}
+    },
+    {
+        "label": "PasswordResetAPIView",
+        "kind": 6,
+        "importPath": "users.views",
+        "description": "users.views",
+        "peekOfCode": "class PasswordResetAPIView(generics.GenericAPIView):\n    permission_classes = [AllowAny]\n    def post(self, request, *args, **kwargs):\n        email = request.data.get('email')\n        try:\n            user = get_user_model().objects.get(email=email)\n            uid = urlsafe_base64_encode(str(user.pk).encode())\n            token = default_token_generator.make_token(user)\n            # Construction du lien de réinitialisation\n            reset_link = reverse('password_reset_confirm', kwargs={'uidb64': uid, 'token': token})",
+        "detail": "users.views",
+        "documentation": {}
+    },
+    {
+        "label": "PasswordResetConfirmAPIView",
+        "kind": 6,
+        "importPath": "users.views",
+        "description": "users.views",
+        "peekOfCode": "class PasswordResetConfirmAPIView(generics.GenericAPIView):\n    serializer_class = PasswordResetConfirmSerializer\n    def post(self, request, uidb64, token, *args, **kwargs):\n        try:\n            uid = force_str(urlsafe_base64_decode(uidb64))\n            user = User.objects.get(pk=uid)\n        except (TypeError, ValueError, OverflowError, User.DoesNotExist):\n            return Response({\"error\": \"Lien invalide ou utilisateur non trouvé.\"}, status=status.HTTP_400_BAD_REQUEST)\n        if not default_token_generator.check_token(user, token):\n            return Response({\"error\": \"Jeton invalide ou expiré.\"}, status=status.HTTP_400_BAD_REQUEST)",
+        "detail": "users.views",
+        "documentation": {}
+    },
+    {
+        "label": "activate_user_view",
+        "kind": 2,
+        "importPath": "users.views",
+        "description": "users.views",
+        "peekOfCode": "def activate_user_view(request, uidb64, token):\n    try:\n        uid = force_str(urlsafe_base64_decode(uidb64))\n        user = User.objects.get(pk=uid)\n    except (TypeError, ValueError, OverflowError, User.DoesNotExist):\n        user = None\n    if user is not None and default_token_generator.check_token(user, token):\n        user.is_active = True  # Activer l'utilisateur\n        user.save()\n        return HttpResponse(\"Votre compte a été activé avec succès.\")",
         "detail": "users.views",
         "documentation": {}
     },

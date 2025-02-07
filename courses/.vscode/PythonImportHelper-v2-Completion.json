@@ -1,0 +1,387 @@
+[
+    {
+        "label": "migrations",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "migrations",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "django.db.models.deletion",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "django.db.models.deletion",
+        "description": "django.db.models.deletion",
+        "detail": "django.db.models.deletion",
+        "documentation": {}
+    },
+    {
+        "label": "admin",
+        "importPath": "django.contrib",
+        "description": "django.contrib",
+        "isExtraImport": true,
+        "detail": "django.contrib",
+        "documentation": {}
+    },
+    {
+        "label": "AppConfig",
+        "importPath": "django.apps",
+        "description": "django.apps",
+        "isExtraImport": true,
+        "detail": "django.apps",
+        "documentation": {}
+    },
+    {
+        "label": "Groupe",
+        "importPath": "academics.models",
+        "description": "academics.models",
+        "isExtraImport": true,
+        "detail": "academics.models",
+        "documentation": {}
+    },
+    {
+        "label": "Matiere",
+        "importPath": "academics.models",
+        "description": "academics.models",
+        "isExtraImport": true,
+        "detail": "academics.models",
+        "documentation": {}
+    },
+    {
+        "label": "Module",
+        "importPath": "ast",
+        "description": "ast",
+        "isExtraImport": true,
+        "detail": "ast",
+        "documentation": {}
+    },
+    {
+        "label": "Module",
+        "importPath": "ast",
+        "description": "ast",
+        "isExtraImport": true,
+        "detail": "ast",
+        "documentation": {}
+    },
+    {
+        "label": "serializers",
+        "importPath": "rest_framework",
+        "description": "rest_framework",
+        "isExtraImport": true,
+        "detail": "rest_framework",
+        "documentation": {}
+    },
+    {
+        "label": "status",
+        "importPath": "rest_framework",
+        "description": "rest_framework",
+        "isExtraImport": true,
+        "detail": "rest_framework",
+        "documentation": {}
+    },
+    {
+        "label": "ApprenantSerializer",
+        "importPath": "users.serializers",
+        "description": "users.serializers",
+        "isExtraImport": true,
+        "detail": "users.serializers",
+        "documentation": {}
+    },
+    {
+        "label": "FormateurSerializer",
+        "importPath": "users.serializers",
+        "description": "users.serializers",
+        "isExtraImport": true,
+        "detail": "users.serializers",
+        "documentation": {}
+    },
+    {
+        "label": "TestCase",
+        "importPath": "django.test",
+        "description": "django.test",
+        "isExtraImport": true,
+        "detail": "django.test",
+        "documentation": {}
+    },
+    {
+        "label": "path",
+        "importPath": "django.urls",
+        "description": "django.urls",
+        "isExtraImport": true,
+        "detail": "django.urls",
+        "documentation": {}
+    },
+    {
+        "label": "render",
+        "importPath": "django.shortcuts",
+        "description": "django.shortcuts",
+        "isExtraImport": true,
+        "detail": "django.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "APIView",
+        "importPath": "rest_framework.views",
+        "description": "rest_framework.views",
+        "isExtraImport": true,
+        "detail": "rest_framework.views",
+        "documentation": {}
+    },
+    {
+        "label": "Response",
+        "importPath": "rest_framework.response",
+        "description": "rest_framework.response",
+        "isExtraImport": true,
+        "detail": "rest_framework.response",
+        "documentation": {}
+    },
+    {
+        "label": "Migration",
+        "kind": 6,
+        "importPath": "migrations.0001_initial",
+        "description": "migrations.0001_initial",
+        "peekOfCode": "class Migration(migrations.Migration):\n    initial = True\n    dependencies = [\n    ]\n    operations = [\n        migrations.CreateModel(\n            name='Cours',\n            fields=[\n                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),\n                ('date', models.DateField(blank=True, null=True)),",
+        "detail": "migrations.0001_initial",
+        "documentation": {}
+    },
+    {
+        "label": "Migration",
+        "kind": 6,
+        "importPath": "migrations.0002_initial",
+        "description": "migrations.0002_initial",
+        "peekOfCode": "class Migration(migrations.Migration):\n    initial = True\n    dependencies = [\n        ('academics', '0002_initial'),\n        ('courses', '0001_initial'),\n        ('users', '0001_initial'),\n    ]\n    operations = [\n        migrations.AddField(\n            model_name='cours',",
+        "detail": "migrations.0002_initial",
+        "documentation": {}
+    },
+    {
+        "label": "CoursesConfig",
+        "kind": 6,
+        "importPath": "apps",
+        "description": "apps",
+        "peekOfCode": "class CoursesConfig(AppConfig):\n    default_auto_field = 'django.db.models.BigAutoField'\n    name = 'courses'",
+        "detail": "apps",
+        "documentation": {}
+    },
+    {
+        "label": "Cours",
+        "kind": 6,
+        "importPath": "models",
+        "description": "models",
+        "peekOfCode": "class Cours(models.Model):\n    groupe = models.ForeignKey(Groupe, on_delete=models.CASCADE)\n    enseignant = models.ForeignKey('users.Formateur', on_delete=models.CASCADE)\n    matiere = models.ForeignKey(Matiere, on_delete=models.CASCADE)\n    date = models.DateField(null=True, blank=True)\n    heure = models.TimeField(null=True, blank=True)\n    def __str__(self):\n        return f\"Cours de {self.matiere} par {self.enseignant} dans {self.groupe}\"\nclass Sequence(models.Model):\n    titre = models.CharField(max_length=255)",
+        "detail": "models",
+        "documentation": {}
+    },
+    {
+        "label": "Sequence",
+        "kind": 6,
+        "importPath": "models",
+        "description": "models",
+        "peekOfCode": "class Sequence(models.Model):\n    titre = models.CharField(max_length=255)\n    module = models.ForeignKey('Module', on_delete=models.CASCADE, related_name='sequences')\n    def __str__(self):\n        return self.titre\nclass Module(models.Model):\n    titre = models.CharField(max_length=255)\n    description = models.TextField()\n    cours = models.ForeignKey(Cours, on_delete=models.CASCADE, related_name='modules')\n    def __str__(self):",
+        "detail": "models",
+        "documentation": {}
+    },
+    {
+        "label": "Module",
+        "kind": 6,
+        "importPath": "models",
+        "description": "models",
+        "peekOfCode": "class Module(models.Model):\n    titre = models.CharField(max_length=255)\n    description = models.TextField()\n    cours = models.ForeignKey(Cours, on_delete=models.CASCADE, related_name='modules')\n    def __str__(self):\n        return self.titre\nclass InscriptionCours(models.Model):\n    apprenant = models.ForeignKey('users.Apprenant', on_delete=models.CASCADE, related_name='inscriptions')\n    cours = models.ForeignKey(Cours, on_delete=models.CASCADE, related_name='inscriptions')\n    date_inscription = models.DateField(auto_now_add=True)",
+        "detail": "models",
+        "documentation": {}
+    },
+    {
+        "label": "InscriptionCours",
+        "kind": 6,
+        "importPath": "models",
+        "description": "models",
+        "peekOfCode": "class InscriptionCours(models.Model):\n    apprenant = models.ForeignKey('users.Apprenant', on_delete=models.CASCADE, related_name='inscriptions')\n    cours = models.ForeignKey(Cours, on_delete=models.CASCADE, related_name='inscriptions')\n    date_inscription = models.DateField(auto_now_add=True)\n    statut = models.CharField(max_length=50)  # Par exemple : 'en cours', 'complété', etc.\n    def __str__(self):\n        return f\"{self.apprenant.nom} inscrit à {self.cours.nom}\"\nclass Suivi(models.Model):\n    apprenant = models.ForeignKey('users.Apprenant', on_delete=models.CASCADE, related_name='suivis')\n    cours = models.ForeignKey(Cours, on_delete=models.CASCADE, related_name='suivis')",
+        "detail": "models",
+        "documentation": {}
+    },
+    {
+        "label": "Suivi",
+        "kind": 6,
+        "importPath": "models",
+        "description": "models",
+        "peekOfCode": "class Suivi(models.Model):\n    apprenant = models.ForeignKey('users.Apprenant', on_delete=models.CASCADE, related_name='suivis')\n    cours = models.ForeignKey(Cours, on_delete=models.CASCADE, related_name='suivis')\n    date_debut = models.DateField(auto_now_add=True)\n    progression = models.FloatField(default=0.0)  # Progrès en pourcentage (0.0 à 100.0)\n    note = models.FloatField(null=True, blank=True)  # Note de l'apprenant, si applicable\n    commentaires = models.TextField(null=True, blank=True)  # Commentaires ou retours sur le suivi\n    def __str__(self):\n        return f\"Suivi de {self.apprenant.nom} pour {self.cours.nom}\"\n    def save(self, *args, **kwargs):",
+        "detail": "models",
+        "documentation": {}
+    },
+    {
+        "label": "Session",
+        "kind": 6,
+        "importPath": "models",
+        "description": "models",
+        "peekOfCode": "class Session(models.Model):\n    titre = models.CharField(max_length=255)\n    date_debut = models.DateTimeField()\n    date_fin = models.DateTimeField()\n    cours = models.ForeignKey('Cours', on_delete=models.CASCADE,\n                              related_name='sessions')  # Supposons que vous ayez déjà un modèle Cours\n    formateur = models.ForeignKey('users.Formateur', on_delete=models.CASCADE,\n                                  related_name='sessions')  # Formateur pour la session\n    def __str__(self):\n        return f\"{self.titre} ({self.date_debut} - {self.date_fin})\"",
+        "detail": "models",
+        "documentation": {}
+    },
+    {
+        "label": "Participation",
+        "kind": 6,
+        "importPath": "models",
+        "description": "models",
+        "peekOfCode": "class Participation(models.Model):\n    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='participations')\n    apprenant = models.ForeignKey('users.Apprenant', on_delete=models.CASCADE,\n                                  related_name='participations')  # On suppose que User représente les apprenants\n    date_participation = models.DateTimeField(auto_now_add=True)\n    class Meta:\n        unique_together = (\n            'session', 'apprenant')  # Assurer qu'un apprenant ne peut pas participer à la même session plusieurs fois\n    def __str__(self):\n        return f\"{self.apprenant.username} participe à {self.session.titre}\"",
+        "detail": "models",
+        "documentation": {}
+    },
+    {
+        "label": "CoursSerializer",
+        "kind": 6,
+        "importPath": "serializers",
+        "description": "serializers",
+        "peekOfCode": "class CoursSerializer(serializers.ModelSerializer):\n    class Meta:\n        model = Cours\n        fields = ['id', 'nom', 'description']  # Ajouter les champs de votre modèle Cours\nclass ModuleSerializer(serializers.ModelSerializer):\n    cours = CoursSerializer()\n    class Meta:\n        model = Module\n        fields = ['id', 'titre', 'description', 'cours']\nclass SequenceSerializer(serializers.ModelSerializer):",
+        "detail": "serializers",
+        "documentation": {}
+    },
+    {
+        "label": "ModuleSerializer",
+        "kind": 6,
+        "importPath": "serializers",
+        "description": "serializers",
+        "peekOfCode": "class ModuleSerializer(serializers.ModelSerializer):\n    cours = CoursSerializer()\n    class Meta:\n        model = Module\n        fields = ['id', 'titre', 'description', 'cours']\nclass SequenceSerializer(serializers.ModelSerializer):\n    # Sérialiser l'attribut module lié (clé étrangère)\n    module = ModuleSerializer()  # Utilisation d'un serializer imbriqué pour 'module'\n    class Meta:\n        model = Sequence",
+        "detail": "serializers",
+        "documentation": {}
+    },
+    {
+        "label": "SequenceSerializer",
+        "kind": 6,
+        "importPath": "serializers",
+        "description": "serializers",
+        "peekOfCode": "class SequenceSerializer(serializers.ModelSerializer):\n    # Sérialiser l'attribut module lié (clé étrangère)\n    module = ModuleSerializer()  # Utilisation d'un serializer imbriqué pour 'module'\n    class Meta:\n        model = Sequence\n        fields = ['id', 'titre', 'module']\nclass InscriptionCoursSerializer(serializers.ModelSerializer):\n    # Sérialiser les relations apprenant et cours avec des serializers imbriqués\n    apprenant = ApprenantSerializer()\n    cours = CoursSerializer()",
+        "detail": "serializers",
+        "documentation": {}
+    },
+    {
+        "label": "InscriptionCoursSerializer",
+        "kind": 6,
+        "importPath": "serializers",
+        "description": "serializers",
+        "peekOfCode": "class InscriptionCoursSerializer(serializers.ModelSerializer):\n    # Sérialiser les relations apprenant et cours avec des serializers imbriqués\n    apprenant = ApprenantSerializer()\n    cours = CoursSerializer()\n    class Meta:\n        model = InscriptionCours\n        fields = ['id', 'apprenant', 'cours', 'date_inscription', 'statut']\nclass SuiviSerializer(serializers.ModelSerializer):\n    apprenant = ApprenantSerializer()\n    cours = CoursSerializer()",
+        "detail": "serializers",
+        "documentation": {}
+    },
+    {
+        "label": "SuiviSerializer",
+        "kind": 6,
+        "importPath": "serializers",
+        "description": "serializers",
+        "peekOfCode": "class SuiviSerializer(serializers.ModelSerializer):\n    apprenant = ApprenantSerializer()\n    cours = CoursSerializer()\n    class Meta:\n        model = Suivi\n        fields = ['id', 'apprenant', 'cours', 'date_debut', 'progression', 'note', 'commentaires']\nclass SessionSerializer(serializers.ModelSerializer):\n    formateur = FormateurSerializer()\n    cours = CoursSerializer()\n    class Meta:",
+        "detail": "serializers",
+        "documentation": {}
+    },
+    {
+        "label": "SessionSerializer",
+        "kind": 6,
+        "importPath": "serializers",
+        "description": "serializers",
+        "peekOfCode": "class SessionSerializer(serializers.ModelSerializer):\n    formateur = FormateurSerializer()\n    cours = CoursSerializer()\n    class Meta:\n        model = Session\n        fields = ['id', 'titre', 'date_debut', 'date_fin', 'formateur', 'cours']\nclass ParticipationSerializer(serializers.ModelSerializer):\n    session = SessionSerializer()  # Sérialiser la session liée\n    apprenant = ApprenantSerializer()  # Sérialiser l'apprenant lié\n    class Meta:",
+        "detail": "serializers",
+        "documentation": {}
+    },
+    {
+        "label": "ParticipationSerializer",
+        "kind": 6,
+        "importPath": "serializers",
+        "description": "serializers",
+        "peekOfCode": "class ParticipationSerializer(serializers.ModelSerializer):\n    session = SessionSerializer()  # Sérialiser la session liée\n    apprenant = ApprenantSerializer()  # Sérialiser l'apprenant lié\n    class Meta:\n        model = Participation\n        fields = ['id', 'session', 'apprenant', 'date_participation']",
+        "detail": "serializers",
+        "documentation": {}
+    },
+    {
+        "label": "urlpatterns",
+        "kind": 5,
+        "importPath": "urls",
+        "description": "urls",
+        "peekOfCode": "urlpatterns = [\n    path('sequences/', SequenceListCreateAPIView.as_view(), name='sequence-list-create'),\n    path('modules/', ModuleListCreateAPIView.as_view(), name='module-list-create'),\n    path('inscriptions-cours/', InscriptionCoursListCreateAPIView.as_view(), name='inscription-cours-list-create'),\n    path('suivis/', SuiviListCreateAPIView.as_view(), name='suivi-list-create'),\n    path('sessions/', SessionListCreateAPIView.as_view(), name='session-list-create'),\n    path('participations/', ParticipationListCreateAPIView.as_view(), name='participation-list-create'),\n]",
+        "detail": "urls",
+        "documentation": {}
+    },
+    {
+        "label": "SequenceListCreateAPIView",
+        "kind": 6,
+        "importPath": "views",
+        "description": "views",
+        "peekOfCode": "class SequenceListCreateAPIView(APIView):\n    def get(self, request):\n        sequences = Sequence.objects.all()\n        serializer = SequenceSerializer(sequences, many=True)\n        return Response(serializer.data)\n    def post(self, request):\n        serializer = SequenceSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(serializer.data, status=status.HTTP_201_CREATED)",
+        "detail": "views",
+        "documentation": {}
+    },
+    {
+        "label": "ModuleListCreateAPIView",
+        "kind": 6,
+        "importPath": "views",
+        "description": "views",
+        "peekOfCode": "class ModuleListCreateAPIView(APIView):\n    def get(self, request):\n        modules = Module.objects.all()\n        serializer = ModuleSerializer(modules, many=True)\n        return Response(serializer.data)\n    def post(self, request):\n        serializer = ModuleSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(serializer.data, status=status.HTTP_201_CREATED)",
+        "detail": "views",
+        "documentation": {}
+    },
+    {
+        "label": "InscriptionCoursListCreateAPIView",
+        "kind": 6,
+        "importPath": "views",
+        "description": "views",
+        "peekOfCode": "class InscriptionCoursListCreateAPIView(APIView):\n    def get(self, request):\n        inscriptions = InscriptionCours.objects.all()\n        serializer = InscriptionCoursSerializer(inscriptions, many=True)\n        return Response(serializer.data)\n    def post(self, request):\n        serializer = InscriptionCoursSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(serializer.data, status=status.HTTP_201_CREATED)",
+        "detail": "views",
+        "documentation": {}
+    },
+    {
+        "label": "SuiviListCreateAPIView",
+        "kind": 6,
+        "importPath": "views",
+        "description": "views",
+        "peekOfCode": "class SuiviListCreateAPIView(APIView):\n    def get(self, request):\n        suivis = Suivi.objects.all()\n        serializer = SuiviSerializer(suivis, many=True)\n        return Response(serializer.data)\n    def post(self, request):\n        serializer = SuiviSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(serializer.data, status=status.HTTP_201_CREATED)",
+        "detail": "views",
+        "documentation": {}
+    },
+    {
+        "label": "SessionListCreateAPIView",
+        "kind": 6,
+        "importPath": "views",
+        "description": "views",
+        "peekOfCode": "class SessionListCreateAPIView(APIView):\n    def get(self, request):\n        sessions = Session.objects.all()\n        serializer = SessionSerializer(sessions, many=True)\n        return Response(serializer.data)\n    def post(self, request):\n        serializer = SessionSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(serializer.data, status=status.HTTP_201_CREATED)",
+        "detail": "views",
+        "documentation": {}
+    },
+    {
+        "label": "ParticipationListCreateAPIView",
+        "kind": 6,
+        "importPath": "views",
+        "description": "views",
+        "peekOfCode": "class ParticipationListCreateAPIView(APIView):\n    def get(self, request):\n        participations = Participation.objects.all()\n        serializer = ParticipationSerializer(participations, many=True)\n        return Response(serializer.data)\n    def post(self, request):\n        serializer = ParticipationSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(serializer.data, status=status.HTTP_201_CREATED)",
+        "detail": "views",
+        "documentation": {}
+    }
+]
