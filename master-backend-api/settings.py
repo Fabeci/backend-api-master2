@@ -72,7 +72,7 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware', 
 ]
 
-ROOT_URLCONF = 'prograppApi.urls'
+ROOT_URLCONF = 'master-backend-api.urls'
 
 TEMPLATES = [
     {
@@ -90,7 +90,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'prograppApi.wsgi.application'
+WSGI_APPLICATION = 'master-backend-api.wsgi.application'
 
 
 # Database
@@ -145,7 +145,7 @@ EMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'
 FRONTEND_BASE_URL = 'http://localhost:4200'
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_USERNAME_REQUIRED = False
-ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # Vérification obligatoire
 ACCOUNT_LOGOUT_ON_GET = True  # Se déconnecter immédiatement sur demande
 
@@ -154,6 +154,7 @@ ACCOUNT_LOGOUT_ON_GET = True  # Se déconnecter immédiatement sur demande
 # }
 
 AUTH_USER_MODEL = 'users.User'
+FRONTEND_URL = "http://localhost:3000"
 
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/

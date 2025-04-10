@@ -1,10 +1,12 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from .views import (
+    ActivateAccountAPIView,
     ActivateUserAPIView,
     LogoutAPIView,
     PasswordResetAPIView,
     PasswordResetConfirmAPIView,
+    RegisterAPIView,
     SuperAdminListCreateAPIView,
     ParentListCreateAPIView,
     FormateurListCreateAPIView,
@@ -16,6 +18,8 @@ from .views import (
 
 urlpatterns = [
     path('login/', UserLoginAPIView.as_view(), name='user-login'),
+    path("register/", RegisterAPIView.as_view(), name="register"),
+    path("activate/<uuid:token>/", ActivateAccountAPIView.as_view(), name="activate"),
     path('logout/', LogoutAPIView.as_view(), name='logout'),
     path('admins/', AdminListCreateAPIView.as_view(), name='admin-list-create'),
     path('apprenants/', ApprenantListCreateAPIView.as_view(), name='apprenant-list-create'),

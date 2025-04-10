@@ -1,3 +1,4 @@
+import uuid
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework import generics
@@ -17,21 +18,160 @@ from .serializers import (
 )
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_decode
-from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import login
-from rest_framework.authtoken.models import Token
-from django.utils.http import urlsafe_base64_decode
 from django.utils.encoding import force_str
-from django.contrib.auth.tokens import default_token_generator
 from django.http import HttpResponse
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
+from users.models import User, UserRole, Admin, Apprenant, Parent, Formateur, ResponsableAcademique
+from .models import User, UserRole, Admin, Apprenant, Parent, Formateur, ResponsableAcademique
+import uuid
 
 
+class RegisterAPIView(APIView):
+    def post(self, request):
+        data = request.data
+        email = data.get("email")
+        password = data.get("password")
+        role_name = data.get("role")
+
+        if not email or not password or not role_name:
+            return Response(
+                {"status": status.HTTP_400_BAD_REQUEST, "message": "Email, mot de passe et rôle sont requis", "success": False, "data": None},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            role = UserRole.objects.get(name=role_name)
+        except UserRole.DoesNotExist:
+            return Response(
+                {"status": status.HTTP_400_BAD_REQUEST, "message": "Rôle invalide", "success": False, "data": None},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Vérifier si l'utilisateur existe déjà
+        if User.objects.filter(email=email).exists():
+            return Response(
+                {"status": status.HTTP_400_BAD_REQUEST, "message": "Cet email est déjà utilisé", "success": False, "data": None},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Création du profil associé en fonction du rôle
+        if role.name == "Admin":
+            user = Admin.objects.create_user(
+                email=email,
+                password=password,
+                nom=data.get("nom"),
+                prenom=data.get("prenom"),
+                telephone=data.get("telephone"),
+                pays_residence_id=data.get("pays_residence"),
+                role=role,
+                activation_token=str(uuid.uuid4()),
+                date_entree=data.get("date_entree"), 
+                institution_id=data.get("institution")
+            )
+        elif role.name == "Apprenant":
+            user = Apprenant.objects.create_user(
+                email=email,
+                password=password,
+                nom=data.get("nom"),
+                prenom=data.get("prenom"),
+                telephone=data.get("telephone"),
+                pays_residence_id=data.get("pays_residence"),
+                role=role,
+                activation_token=str(uuid.uuid4()),
+                matricule=data.get("matricule"),
+                date_naissance=data.get("date_naissance"),
+                groupe_id=data.get("groupe"),
+                tuteur_id=data.get("tuteur"),
+                classe_id=data.get("classe"),
+            )
+        elif role.name == "Parent":
+            user = Parent.objects.create_user(
+                email=email,
+                password=password,
+                nom=data.get("nom"),
+                prenom=data.get("prenom"),
+                telephone=data.get("telephone"),
+                pays_residence_id=data.get("pays_residence"),
+                role=role,
+                activation_token=str(uuid.uuid4()),
+                institution_id=data.get("institution")
+            )
+        elif role.name == "Formateur":
+            user = Formateur.objects.create_user(
+                email=email,
+                password=password,
+                nom=data.get("nom"),
+                prenom=data.get("prenom"),
+                telephone=data.get("telephone"),
+                pays_residence_id=data.get("pays_residence"),
+                role=role,
+                activation_token=str(uuid.uuid4()),
+            )
+            
+            institutions = data.get("institutions", [])
+            specialites = data.get("specialites", [])
+            groupes = data.get("groupes", [])
+
+            # Si les données sont None, les remplacer par des listes vides
+            user.institutions.set(institutions if institutions is not None else [])
+            user.specialites.set(specialites if specialites is not None else [])
+            user.groupes.set(groupes if groupes is not None else [])
+        elif role.name == "Responsable Académique":
+            user = ResponsableAcademique.objects.create(
+                email=email,
+                password=password,
+                nom=data.get("nom"),
+                prenom=data.get("prenom"),
+                telephone=data.get("telephone"),
+                pays_residence_id=data.get("pays_residence"),
+                role=role,
+                activation_token=str(uuid.uuid4()),
+                institution_id=data.get("institution"),
+                departement_id=data.get("departement"),
+            )
+
+        # Envoi de l'email d'activation
+        self.send_activation_email(user)
+
+        return Response(
+            {
+                "status": status.HTTP_201_CREATED,
+                "message": "Utilisateur créé avec succès. Vérifiez votre email pour activer votre compte.",
+                "success": True,
+                "data": {"user_id": user.id, "email": user.email}
+            },
+            status=status.HTTP_201_CREATED
+        )
+
+    def send_activation_email(self, user):
+        # Logique pour envoyer un email d'activation
+        activation_link = f"{settings.FRONTEND_URL}/activate/{user.activation_token}"
+        subject = "Activation de votre compte"
+        message = f"Bonjour {user.nom},\n\nVeuillez activer votre compte en cliquant sur le lien suivant : {activation_link}"
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email])
+
+
+class ActivateAccountAPIView(APIView):
+    def get(self, request, token):
+        user = get_object_or_404(User, activation_token=token)
+
+        if user.is_active:
+            return Response({"message": "Ce compte est déjà activé", "success": False, "status": status.HTTP_400_BAD_REQUEST}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.is_active = True
+        user.activation_token = None  # Supprime le token après activation
+        user.save()
+
+        return Response({"message": "Compte activé avec succès"}, status=status.HTTP_200_OK)
+    
+    
 def activate_user_view(request, uidb64, token):
     try:
         uid = force_str(urlsafe_base64_decode(uidb64))
