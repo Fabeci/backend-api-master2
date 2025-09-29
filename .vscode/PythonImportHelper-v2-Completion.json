@@ -48,7 +48,39 @@
         "documentation": {}
     },
     {
+        "label": "migrations",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
         "label": "models",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "transaction",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "transaction",
         "importPath": "django.db",
         "description": "django.db",
         "isExtraImport": true,
@@ -817,7 +849,41 @@
         "documentation": {}
     },
     {
+        "label": "secrets",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "secrets",
+        "description": "secrets",
+        "detail": "secrets",
+        "documentation": {}
+    },
+    {
+        "label": "string",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "string",
+        "description": "string",
+        "detail": "string",
+        "documentation": {}
+    },
+    {
         "label": "serializers",
+        "importPath": "rest_framework",
+        "description": "rest_framework",
+        "isExtraImport": true,
+        "detail": "rest_framework",
+        "documentation": {}
+    },
+    {
+        "label": "viewsets",
+        "importPath": "rest_framework",
+        "description": "rest_framework",
+        "isExtraImport": true,
+        "detail": "rest_framework",
+        "documentation": {}
+    },
+    {
+        "label": "status",
         "importPath": "rest_framework",
         "description": "rest_framework",
         "isExtraImport": true,
@@ -914,6 +980,14 @@
     },
     {
         "label": "viewsets",
+        "importPath": "rest_framework",
+        "description": "rest_framework",
+        "isExtraImport": true,
+        "detail": "rest_framework",
+        "documentation": {}
+    },
+    {
+        "label": "permissions",
         "importPath": "rest_framework",
         "description": "rest_framework",
         "isExtraImport": true,
@@ -1049,23 +1123,7 @@
         "documentation": {}
     },
     {
-        "label": "AnneeScolaire",
-        "importPath": "academics.models",
-        "description": "academics.models",
-        "isExtraImport": true,
-        "detail": "academics.models",
-        "documentation": {}
-    },
-    {
         "label": "Classe",
-        "importPath": "academics.models",
-        "description": "academics.models",
-        "isExtraImport": true,
-        "detail": "academics.models",
-        "documentation": {}
-    },
-    {
-        "label": "DomaineEtude",
         "importPath": "academics.models",
         "description": "academics.models",
         "isExtraImport": true,
@@ -1090,6 +1148,46 @@
     },
     {
         "label": "Inscription",
+        "importPath": "academics.models",
+        "description": "academics.models",
+        "isExtraImport": true,
+        "detail": "academics.models",
+        "documentation": {}
+    },
+    {
+        "label": "Institution",
+        "importPath": "academics.models",
+        "description": "academics.models",
+        "isExtraImport": true,
+        "detail": "academics.models",
+        "documentation": {}
+    },
+    {
+        "label": "DomaineEtude",
+        "importPath": "academics.models",
+        "description": "academics.models",
+        "isExtraImport": true,
+        "detail": "academics.models",
+        "documentation": {}
+    },
+    {
+        "label": "Matiere",
+        "importPath": "academics.models",
+        "description": "academics.models",
+        "isExtraImport": true,
+        "detail": "academics.models",
+        "documentation": {}
+    },
+    {
+        "label": "AnneeScolaire",
+        "importPath": "academics.models",
+        "description": "academics.models",
+        "isExtraImport": true,
+        "detail": "academics.models",
+        "documentation": {}
+    },
+    {
+        "label": "DomaineEtude",
         "importPath": "academics.models",
         "description": "academics.models",
         "isExtraImport": true,
@@ -1154,6 +1252,30 @@
     },
     {
         "label": "Admin",
+        "importPath": "users.models",
+        "description": "users.models",
+        "isExtraImport": true,
+        "detail": "users.models",
+        "documentation": {}
+    },
+    {
+        "label": "UserRole",
+        "importPath": "users.models",
+        "description": "users.models",
+        "isExtraImport": true,
+        "detail": "users.models",
+        "documentation": {}
+    },
+    {
+        "label": "Admin",
+        "importPath": "users.models",
+        "description": "users.models",
+        "isExtraImport": true,
+        "detail": "users.models",
+        "documentation": {}
+    },
+    {
+        "label": "UserRole",
         "importPath": "users.models",
         "description": "users.models",
         "isExtraImport": true,
@@ -1305,6 +1427,14 @@
         "documentation": {}
     },
     {
+        "label": "ValidationError",
+        "importPath": "django.core.exceptions",
+        "description": "django.core.exceptions",
+        "isExtraImport": true,
+        "detail": "django.core.exceptions",
+        "documentation": {}
+    },
+    {
         "label": "TestCase",
         "importPath": "django.test",
         "description": "django.test",
@@ -1465,23 +1595,7 @@
         "documentation": {}
     },
     {
-        "label": "path",
-        "importPath": "django.urls",
-        "description": "django.urls",
-        "isExtraImport": true,
-        "detail": "django.urls",
-        "documentation": {}
-    },
-    {
-        "label": "reverse",
-        "importPath": "django.urls",
-        "description": "django.urls",
-        "isExtraImport": true,
-        "detail": "django.urls",
-        "documentation": {}
-    },
-    {
-        "label": "reverse",
+        "label": "re_path",
         "importPath": "django.urls",
         "description": "django.urls",
         "isExtraImport": true,
@@ -1510,6 +1624,46 @@
         "description": "django.urls",
         "isExtraImport": true,
         "detail": "django.urls",
+        "documentation": {}
+    },
+    {
+        "label": "path",
+        "importPath": "django.urls",
+        "description": "django.urls",
+        "isExtraImport": true,
+        "detail": "django.urls",
+        "documentation": {}
+    },
+    {
+        "label": "reverse",
+        "importPath": "django.urls",
+        "description": "django.urls",
+        "isExtraImport": true,
+        "detail": "django.urls",
+        "documentation": {}
+    },
+    {
+        "label": "reverse",
+        "importPath": "django.urls",
+        "description": "django.urls",
+        "isExtraImport": true,
+        "detail": "django.urls",
+        "documentation": {}
+    },
+    {
+        "label": "views",
+        "importPath": "academics",
+        "description": "academics",
+        "isExtraImport": true,
+        "detail": "academics",
+        "documentation": {}
+    },
+    {
+        "label": "viewsets",
+        "importPath": "academics",
+        "description": "academics",
+        "isExtraImport": true,
+        "detail": "academics",
         "documentation": {}
     },
     {
@@ -1529,51 +1683,12 @@
         "documentation": {}
     },
     {
-        "label": "render",
-        "importPath": "django.shortcuts",
-        "description": "django.shortcuts",
+        "label": "uuid",
+        "kind": 6,
         "isExtraImport": true,
-        "detail": "django.shortcuts",
-        "documentation": {}
-    },
-    {
-        "label": "render",
-        "importPath": "django.shortcuts",
-        "description": "django.shortcuts",
-        "isExtraImport": true,
-        "detail": "django.shortcuts",
-        "documentation": {}
-    },
-    {
-        "label": "render",
-        "importPath": "django.shortcuts",
-        "description": "django.shortcuts",
-        "isExtraImport": true,
-        "detail": "django.shortcuts",
-        "documentation": {}
-    },
-    {
-        "label": "render",
-        "importPath": "django.shortcuts",
-        "description": "django.shortcuts",
-        "isExtraImport": true,
-        "detail": "django.shortcuts",
-        "documentation": {}
-    },
-    {
-        "label": "render",
-        "importPath": "django.shortcuts",
-        "description": "django.shortcuts",
-        "isExtraImport": true,
-        "detail": "django.shortcuts",
-        "documentation": {}
-    },
-    {
-        "label": "get_object_or_404",
-        "importPath": "django.shortcuts",
-        "description": "django.shortcuts",
-        "isExtraImport": true,
-        "detail": "django.shortcuts",
+        "importPath": "uuid",
+        "description": "uuid",
+        "detail": "uuid",
         "documentation": {}
     },
     {
@@ -1721,11 +1836,107 @@
         "documentation": {}
     },
     {
-        "label": "AnneeScolaireSerializer",
-        "importPath": "academics.serializers",
-        "description": "academics.serializers",
+        "label": "get_object_or_404",
+        "importPath": "django.shortcuts",
+        "description": "django.shortcuts",
         "isExtraImport": true,
-        "detail": "academics.serializers",
+        "detail": "django.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "render",
+        "importPath": "django.shortcuts",
+        "description": "django.shortcuts",
+        "isExtraImport": true,
+        "detail": "django.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "render",
+        "importPath": "django.shortcuts",
+        "description": "django.shortcuts",
+        "isExtraImport": true,
+        "detail": "django.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "render",
+        "importPath": "django.shortcuts",
+        "description": "django.shortcuts",
+        "isExtraImport": true,
+        "detail": "django.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "render",
+        "importPath": "django.shortcuts",
+        "description": "django.shortcuts",
+        "isExtraImport": true,
+        "detail": "django.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "get_object_or_404",
+        "importPath": "django.shortcuts",
+        "description": "django.shortcuts",
+        "isExtraImport": true,
+        "detail": "django.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "BaseUserManager",
+        "importPath": "django.contrib.auth.models",
+        "description": "django.contrib.auth.models",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth.models",
+        "documentation": {}
+    },
+    {
+        "label": "AbstractBaseUser",
+        "importPath": "django.contrib.auth.models",
+        "description": "django.contrib.auth.models",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth.models",
+        "documentation": {}
+    },
+    {
+        "label": "PermissionsMixin",
+        "importPath": "django.contrib.auth.models",
+        "description": "django.contrib.auth.models",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth.models",
+        "documentation": {}
+    },
+    {
+        "label": "BaseUserManager",
+        "importPath": "django.contrib.auth.models",
+        "description": "django.contrib.auth.models",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth.models",
+        "documentation": {}
+    },
+    {
+        "label": "AbstractUser",
+        "importPath": "django.contrib.auth.models",
+        "description": "django.contrib.auth.models",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth.models",
+        "documentation": {}
+    },
+    {
+        "label": "Group",
+        "importPath": "django.contrib.auth.models",
+        "description": "django.contrib.auth.models",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth.models",
+        "documentation": {}
+    },
+    {
+        "label": "Permission",
+        "importPath": "django.contrib.auth.models",
+        "description": "django.contrib.auth.models",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth.models",
         "documentation": {}
     },
     {
@@ -1762,6 +1973,14 @@
     },
     {
         "label": "InstitutionSerializer",
+        "importPath": "academics.serializers",
+        "description": "academics.serializers",
+        "isExtraImport": true,
+        "detail": "academics.serializers",
+        "documentation": {}
+    },
+    {
+        "label": "AnneeScolaireSerializer",
         "importPath": "academics.serializers",
         "description": "academics.serializers",
         "isExtraImport": true,
@@ -1954,6 +2173,22 @@
         "documentation": {}
     },
     {
+        "label": "get_schema_view",
+        "importPath": "drf_yasg.views",
+        "description": "drf_yasg.views",
+        "isExtraImport": true,
+        "detail": "drf_yasg.views",
+        "documentation": {}
+    },
+    {
+        "label": "openapi",
+        "importPath": "drf_yasg",
+        "description": "drf_yasg",
+        "isExtraImport": true,
+        "detail": "drf_yasg",
+        "documentation": {}
+    },
+    {
         "label": "get_wsgi_application",
         "importPath": "django.core.wsgi",
         "description": "django.core.wsgi",
@@ -1987,15 +2222,6 @@
         "documentation": {}
     },
     {
-        "label": "uuid",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "uuid",
-        "description": "uuid",
-        "detail": "uuid",
-        "documentation": {}
-    },
-    {
         "label": "settings",
         "importPath": "django.conf",
         "description": "django.conf",
@@ -2041,54 +2267,6 @@
         "description": "django.conf",
         "isExtraImport": true,
         "detail": "django.conf",
-        "documentation": {}
-    },
-    {
-        "label": "AbstractBaseUser",
-        "importPath": "django.contrib.auth.models",
-        "description": "django.contrib.auth.models",
-        "isExtraImport": true,
-        "detail": "django.contrib.auth.models",
-        "documentation": {}
-    },
-    {
-        "label": "PermissionsMixin",
-        "importPath": "django.contrib.auth.models",
-        "description": "django.contrib.auth.models",
-        "isExtraImport": true,
-        "detail": "django.contrib.auth.models",
-        "documentation": {}
-    },
-    {
-        "label": "BaseUserManager",
-        "importPath": "django.contrib.auth.models",
-        "description": "django.contrib.auth.models",
-        "isExtraImport": true,
-        "detail": "django.contrib.auth.models",
-        "documentation": {}
-    },
-    {
-        "label": "AbstractUser",
-        "importPath": "django.contrib.auth.models",
-        "description": "django.contrib.auth.models",
-        "isExtraImport": true,
-        "detail": "django.contrib.auth.models",
-        "documentation": {}
-    },
-    {
-        "label": "Group",
-        "importPath": "django.contrib.auth.models",
-        "description": "django.contrib.auth.models",
-        "isExtraImport": true,
-        "detail": "django.contrib.auth.models",
-        "documentation": {}
-    },
-    {
-        "label": "Permission",
-        "importPath": "django.contrib.auth.models",
-        "description": "django.contrib.auth.models",
-        "isExtraImport": true,
-        "detail": "django.contrib.auth.models",
         "documentation": {}
     },
     {
@@ -2416,6 +2594,15 @@
         "documentation": {}
     },
     {
+        "label": "Migration",
+        "kind": 6,
+        "importPath": "academics.migrations.0004_rename_telephone_institution_telephone_1_and_more",
+        "description": "academics.migrations.0004_rename_telephone_institution_telephone_1_and_more",
+        "peekOfCode": "class Migration(migrations.Migration):\n    dependencies = [\n        ('academics', '0003_anneescolaire_description_classe_date_creation_and_more'),\n    ]\n    operations = [\n        migrations.RenameField(\n            model_name='institution',\n            old_name='telephone',\n            new_name='telephone_1',\n        ),",
+        "detail": "academics.migrations.0004_rename_telephone_institution_telephone_1_and_more",
+        "documentation": {}
+    },
+    {
         "label": "AcademicsConfig",
         "kind": 6,
         "importPath": "academics.apps",
@@ -2519,7 +2706,7 @@
         "kind": 6,
         "importPath": "academics.serializers",
         "description": "academics.serializers",
-        "peekOfCode": "class InstitutionSerializer(serializers.ModelSerializer):\n    administrateur = AdminSerializer(write_only=True)  # Champ pour les détails de l'Admin\n    class Meta:\n        model = Institution\n        fields = ['nom', 'pays', 'adresse', 'telephone', 'email', 'logo', 'description', 'statut', 'type_institution', \n                  'nombre_etudiants', 'site_web', 'accreditations', 'administrateur']\n    def create(self, validated_data):\n        admin_data = validated_data.pop('administrateur')\n        # Création de l'Institution\n        institution = Institution.objects.create(**validated_data)",
+        "peekOfCode": "class InstitutionSerializer(serializers.ModelSerializer):\n    admin_account = AdminSerializer(write_only=True)  # Champ pour les détails de l'Admin\n    admin_account_data = AdminSerializer(read_only=True, source='admin')\n    class Meta:\n        model = Institution\n        fields = ['nom', 'pays', 'adresse', 'telephone_1', 'telephone_2', 'email', 'logo', \n                  'description', 'statut', 'type_institution', 'nombre_etudiants', 'site_web', \n                  'accreditations', 'date_creation', 'admin_account', 'admin_account_data']\n    def create(self, validated_data):\n        admin_data = validated_data.pop('admin_account')",
         "detail": "academics.serializers",
         "documentation": {}
     },
@@ -2596,11 +2783,29 @@
         "documentation": {}
     },
     {
+        "label": "generate_random_password",
+        "kind": 2,
+        "importPath": "academics.serializers",
+        "description": "academics.serializers",
+        "peekOfCode": "def generate_random_password(length=8):\n    # Utilisation de secrets pour générer un mot de passe aléatoire\n    alphabet = string.ascii_letters + string.digits + string.punctuation\n    return ''.join(secrets.choice(alphabet) for i in range(length))\nclass InstitutionSerializer(serializers.ModelSerializer):\n    admin_account = AdminSerializer(write_only=True)  # Champ pour les détails de l'Admin\n    admin_account_data = AdminSerializer(read_only=True, source='admin')\n    class Meta:\n        model = Institution\n        fields = ['nom', 'pays', 'adresse', 'telephone_1', 'telephone_2', 'email', 'logo', ",
+        "detail": "academics.serializers",
+        "documentation": {}
+    },
+    {
         "label": "router",
         "kind": 5,
         "importPath": "academics.urls",
         "description": "academics.urls",
-        "peekOfCode": "router = DefaultRouter()\nrouter.register(r'domaines-etudes', DomaineEtudeViewSet, basename='domaine')\nrouter.register(r'matieres', MatiereViewSet, basename='matiere')\nrouter.register(r'specialites', SpecialiteViewSet, basename='specialite')\nrouter.register(r'annees-scolaires', AnneeScolaireViewSet, basename='annees-scolaires')\nurlpatterns = [\n    path('', include(router.urls)),\n    path('institutions/create/', InstitutionCreateAPIView.as_view(), name='institution-create'),\n    path('filieres/', FiliereListCreateAPIView.as_view(), name='filiere-list-create'),\n    path('filieres/<int:pk>/', FiliereDetailAPIView.as_view(), name='filiere-detail'),",
+        "peekOfCode": "router = DefaultRouter()\nrouter.register(r'domaines-etudes', vset.DomaineEtudeViewSet, basename='domaine')\nrouter.register(r'matieres', vset.MatiereViewSet, basename='matiere')\nrouter.register(r'specialites', vset.SpecialiteViewSet, basename='specialite')\nrouter.register(r'annees-scolaires', vset.AnneeScolaireViewSet, basename='annees-scolaires')\nhandler404 = 'academics.views.custom_404_handler'\nurlpatterns = [\n    path('', include(router.urls)),\n    # path('institutions/create/', InstitutionCreateAPIView.as_view(), name='institution-create'),\n    path('institutions/', views.InstitutionAPIView.as_view(), name='institution-list-create'),",
+        "detail": "academics.urls",
+        "documentation": {}
+    },
+    {
+        "label": "handler404",
+        "kind": 5,
+        "importPath": "academics.urls",
+        "description": "academics.urls",
+        "peekOfCode": "handler404 = 'academics.views.custom_404_handler'\nurlpatterns = [\n    path('', include(router.urls)),\n    # path('institutions/create/', InstitutionCreateAPIView.as_view(), name='institution-create'),\n    path('institutions/', views.InstitutionAPIView.as_view(), name='institution-list-create'),\n    path('institutions/<int:pk>/', views.InstitutionAPIView.as_view(), name='institution-detail'),\n    path('filieres/', views.FiliereListCreateAPIView.as_view(), name='filiere-list-create'),\n    path('filieres/<int:pk>/', views.FiliereDetailAPIView.as_view(), name='filiere-detail'),\n    path('groupes/', views.GroupeListCreateAPIView.as_view(), name='groupe-list-create'),\n    path('groupes/<int:pk>/', views.GroupeDetailAPIView.as_view(), name='groupe-detail'),",
         "detail": "academics.urls",
         "documentation": {}
     },
@@ -2609,52 +2814,16 @@
         "kind": 5,
         "importPath": "academics.urls",
         "description": "academics.urls",
-        "peekOfCode": "urlpatterns = [\n    path('', include(router.urls)),\n    path('institutions/create/', InstitutionCreateAPIView.as_view(), name='institution-create'),\n    path('filieres/', FiliereListCreateAPIView.as_view(), name='filiere-list-create'),\n    path('filieres/<int:pk>/', FiliereDetailAPIView.as_view(), name='filiere-detail'),\n    path('groupes/', GroupeListCreateAPIView.as_view(), name='groupe-list-create'),\n    path('groupes/<int:pk>/', GroupeDetailAPIView.as_view(), name='groupe-detail'),\n    path('classes/', ClasseListCreateAPIView.as_view(), name='classe-list-create'),\n    path('classes/<int:pk>/', ClasseDetailAPIView.as_view(), name='classe-detail'),\n    path('api/inscriptions/', InscriptionListCreateAPIView.as_view(), name='inscription-list-create'),",
+        "peekOfCode": "urlpatterns = [\n    path('', include(router.urls)),\n    # path('institutions/create/', InstitutionCreateAPIView.as_view(), name='institution-create'),\n    path('institutions/', views.InstitutionAPIView.as_view(), name='institution-list-create'),\n    path('institutions/<int:pk>/', views.InstitutionAPIView.as_view(), name='institution-detail'),\n    path('filieres/', views.FiliereListCreateAPIView.as_view(), name='filiere-list-create'),\n    path('filieres/<int:pk>/', views.FiliereDetailAPIView.as_view(), name='filiere-detail'),\n    path('groupes/', views.GroupeListCreateAPIView.as_view(), name='groupe-list-create'),\n    path('groupes/<int:pk>/', views.GroupeDetailAPIView.as_view(), name='groupe-detail'),\n    path('classes/', views.ClasseListCreateAPIView.as_view(), name='classe-list-create'),",
         "detail": "academics.urls",
         "documentation": {}
     },
     {
-        "label": "InstitutionCreateAPIView",
+        "label": "InstitutionAPIView",
         "kind": 6,
         "importPath": "academics.views",
         "description": "academics.views",
-        "peekOfCode": "class InstitutionCreateAPIView(APIView):\n    def post(self, request, *args, **kwargs):\n        serializer = InstitutionSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(serializer.data, status=status.HTTP_201_CREATED)\n        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)\nclass DomaineEtudeViewSet(viewsets.ModelViewSet):\n    queryset = DomaineEtude.objects.all()\n    serializer_class = DomaineEtudeSerializer",
-        "detail": "academics.views",
-        "documentation": {}
-    },
-    {
-        "label": "DomaineEtudeViewSet",
-        "kind": 6,
-        "importPath": "academics.views",
-        "description": "academics.views",
-        "peekOfCode": "class DomaineEtudeViewSet(viewsets.ModelViewSet):\n    queryset = DomaineEtude.objects.all()\n    serializer_class = DomaineEtudeSerializer\nclass MatiereViewSet(viewsets.ModelViewSet):\n    queryset = Matiere.objects.all()\n    serializer_class = MatiereSerializer\nclass SpecialiteViewSet(viewsets.ModelViewSet):\n    queryset = Specialite.objects.all()\n    serializer_class = SpecialiteSerializer\nclass AnneeScolaireViewSet(viewsets.ModelViewSet):",
-        "detail": "academics.views",
-        "documentation": {}
-    },
-    {
-        "label": "MatiereViewSet",
-        "kind": 6,
-        "importPath": "academics.views",
-        "description": "academics.views",
-        "peekOfCode": "class MatiereViewSet(viewsets.ModelViewSet):\n    queryset = Matiere.objects.all()\n    serializer_class = MatiereSerializer\nclass SpecialiteViewSet(viewsets.ModelViewSet):\n    queryset = Specialite.objects.all()\n    serializer_class = SpecialiteSerializer\nclass AnneeScolaireViewSet(viewsets.ModelViewSet):\n    queryset = AnneeScolaire.objects.all()\n    serializer_class = AnneeScolaireSerializer\nclass FiliereListCreateAPIView(APIView):",
-        "detail": "academics.views",
-        "documentation": {}
-    },
-    {
-        "label": "SpecialiteViewSet",
-        "kind": 6,
-        "importPath": "academics.views",
-        "description": "academics.views",
-        "peekOfCode": "class SpecialiteViewSet(viewsets.ModelViewSet):\n    queryset = Specialite.objects.all()\n    serializer_class = SpecialiteSerializer\nclass AnneeScolaireViewSet(viewsets.ModelViewSet):\n    queryset = AnneeScolaire.objects.all()\n    serializer_class = AnneeScolaireSerializer\nclass FiliereListCreateAPIView(APIView):\n    def get(self, request):\n        filieres = Filiere.objects.all()\n        serializer = FiliereSerializer(filieres, many=True)",
-        "detail": "academics.views",
-        "documentation": {}
-    },
-    {
-        "label": "AnneeScolaireViewSet",
-        "kind": 6,
-        "importPath": "academics.views",
-        "description": "academics.views",
-        "peekOfCode": "class AnneeScolaireViewSet(viewsets.ModelViewSet):\n    queryset = AnneeScolaire.objects.all()\n    serializer_class = AnneeScolaireSerializer\nclass FiliereListCreateAPIView(APIView):\n    def get(self, request):\n        filieres = Filiere.objects.all()\n        serializer = FiliereSerializer(filieres, many=True)\n        return Response(serializer.data)\n    def post(self, request):\n        serializer = FiliereSerializer(data=request.data)",
+        "peekOfCode": "class InstitutionAPIView(APIView):\n    def get(self, request, pk=None):\n        if pk:\n            institution = get_object_or_404(Institution, pk=pk)\n            serializer = InstitutionSerializer(institution)\n            return Response({\"status\": 200, \"success\": True, \"message\": \"Institution trouvée\", \"data\": serializer.data})\n        else:\n            institutions = Institution.objects.all()\n            serializer = InstitutionSerializer(institutions, many=True)\n            return Response({\"status\": 200, \"success\": True, \"message\": \"Liste des institutions\", \"data\": serializer.data})",
         "detail": "academics.views",
         "documentation": {}
     },
@@ -2728,6 +2897,51 @@
         "description": "academics.views",
         "peekOfCode": "class InscriptionDetailAPIView(APIView):\n    def get_object(self, pk):\n        try:\n            return Inscription.objects.get(pk=pk)\n        except Inscription.DoesNotExist:\n            return None\n    def get(self, request, pk):\n        inscription = self.get_object(pk)\n        if inscription:\n            serializer = InscriptionSerializer(inscription)",
         "detail": "academics.views",
+        "documentation": {}
+    },
+    {
+        "label": "custom_404_handler",
+        "kind": 2,
+        "importPath": "academics.views",
+        "description": "academics.views",
+        "peekOfCode": "def custom_404_handler(request, exception=None):\n    return Response({\n        \"status\": 404,\n        \"success\": False,\n        \"message\": \"Ressource non trouvée. Vérifiez l'URL.\",\n        \"data\": None\n    }, status=404)\n# Create your views here.\nclass InstitutionAPIView(APIView):\n    def get(self, request, pk=None):",
+        "detail": "academics.views",
+        "documentation": {}
+    },
+    {
+        "label": "DomaineEtudeViewSet",
+        "kind": 6,
+        "importPath": "academics.viewsets",
+        "description": "academics.viewsets",
+        "peekOfCode": "class DomaineEtudeViewSet(viewsets.ModelViewSet):\n    queryset = DomaineEtude.objects.all()\n    serializer_class = DomaineEtudeSerializer\nclass MatiereViewSet(viewsets.ModelViewSet):\n    queryset = Matiere.objects.all()\n    serializer_class = MatiereSerializer\nclass SpecialiteViewSet(viewsets.ModelViewSet):\n    queryset = Specialite.objects.all()\n    serializer_class = SpecialiteSerializer\nclass AnneeScolaireViewSet(viewsets.ModelViewSet):",
+        "detail": "academics.viewsets",
+        "documentation": {}
+    },
+    {
+        "label": "MatiereViewSet",
+        "kind": 6,
+        "importPath": "academics.viewsets",
+        "description": "academics.viewsets",
+        "peekOfCode": "class MatiereViewSet(viewsets.ModelViewSet):\n    queryset = Matiere.objects.all()\n    serializer_class = MatiereSerializer\nclass SpecialiteViewSet(viewsets.ModelViewSet):\n    queryset = Specialite.objects.all()\n    serializer_class = SpecialiteSerializer\nclass AnneeScolaireViewSet(viewsets.ModelViewSet):\n    queryset = AnneeScolaire.objects.all()\n    serializer_class = AnneeScolaireSerializer",
+        "detail": "academics.viewsets",
+        "documentation": {}
+    },
+    {
+        "label": "SpecialiteViewSet",
+        "kind": 6,
+        "importPath": "academics.viewsets",
+        "description": "academics.viewsets",
+        "peekOfCode": "class SpecialiteViewSet(viewsets.ModelViewSet):\n    queryset = Specialite.objects.all()\n    serializer_class = SpecialiteSerializer\nclass AnneeScolaireViewSet(viewsets.ModelViewSet):\n    queryset = AnneeScolaire.objects.all()\n    serializer_class = AnneeScolaireSerializer",
+        "detail": "academics.viewsets",
+        "documentation": {}
+    },
+    {
+        "label": "AnneeScolaireViewSet",
+        "kind": 6,
+        "importPath": "academics.viewsets",
+        "description": "academics.viewsets",
+        "peekOfCode": "class AnneeScolaireViewSet(viewsets.ModelViewSet):\n    queryset = AnneeScolaire.objects.all()\n    serializer_class = AnneeScolaireSerializer",
+        "detail": "academics.viewsets",
         "documentation": {}
     },
     {
@@ -3973,11 +4187,20 @@
         "documentation": {}
     },
     {
+        "label": "schema_view",
+        "kind": 5,
+        "importPath": "master-backend-api.urls",
+        "description": "master-backend-api.urls",
+        "peekOfCode": "schema_view = get_schema_view(\n   openapi.Info(\n      title=\"SOMAPRO API\",\n      default_version='v1',\n      description=\"Documentation interactive de l'API\",\n      terms_of_service=\"https://www.google.com/policies/terms/\",\n      contact=openapi.Contact(email=\"contact@tonapi.local\"),\n      license=openapi.License(name=\"BSD License\"),\n   ),\n   public=True,",
+        "detail": "master-backend-api.urls",
+        "documentation": {}
+    },
+    {
         "label": "urlpatterns",
         "kind": 5,
         "importPath": "master-backend-api.urls",
         "description": "master-backend-api.urls",
-        "peekOfCode": "urlpatterns = [\n    path('admin/', admin.site.urls),\n    path('api/', include('users.urls')),\n    path('api/', include('academics.urls')),\n    path('api/', include('locations.urls')),\n    path('api/', include('courses.urls')),\n    path('api/', include('collaborations.urls')),\n    path('api/', include('evaluations.urls')),\n    # path('api/', include('notifications.urls')),\n    path('api/', include('resources.urls')),",
+        "peekOfCode": "urlpatterns = [\n    re_path(r'^swagger(?P<format>\\.json|\\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),\n    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),\n    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),\n    path('admin/', admin.site.urls),\n    path('api/', include('users.urls')),\n    path('api/', include('academics.urls')),\n    path('api/', include('locations.urls')),\n    path('api/', include('courses.urls')),\n    path('api/', include('collaborations.urls')),",
         "detail": "master-backend-api.urls",
         "documentation": {}
     },
@@ -4481,7 +4704,7 @@
         "kind": 6,
         "importPath": "users.models",
         "description": "users.models",
-        "peekOfCode": "class Admin(User):\n    date_entree = models.DateField(null=True)\n    institution = models.ForeignKey('academics.Institution', on_delete=models.CASCADE, related_name='administrateurs', null=True)\n    def __str__(self):\n        return f\"Admin: {self.user.nom} {self.user.prenom}\"\nclass Parent(User):\n    institution = models.ForeignKey('academics.Institution', on_delete=models.CASCADE, related_name='parents', null=True, blank=True)\n    def __str__(self):\n        return f\"Parent: {self.user.nom} {self.user.prenom}\"\nclass Apprenant(User):",
+        "peekOfCode": "class Admin(User):\n    date_entree = models.DateField(null=True, auto_now=True)\n    institution = models.ForeignKey('academics.Institution', on_delete=models.CASCADE, related_name='administrateurs', null=True)\n    def __str__(self):\n        return f\"Admin: {self.user.nom} {self.user.prenom}\"\nclass Parent(User):\n    institution = models.ForeignKey('academics.Institution', on_delete=models.CASCADE, related_name='parents', null=True, blank=True)\n    def __str__(self):\n        return f\"Parent: {self.user.nom} {self.user.prenom}\"\nclass Apprenant(User):",
         "detail": "users.models",
         "documentation": {}
     },
@@ -4562,7 +4785,7 @@
         "kind": 6,
         "importPath": "users.serializers",
         "description": "users.serializers",
-        "peekOfCode": "class AdminSerializer(UserSerializer):\n    class Meta(UserSerializer.Meta):\n        model = Admin\n        fields = UserRegisterSerializer.Meta.fields + ['date_entree', 'institution']\n    def create(self, validated_data):\n        password = validated_data.pop('password')\n        admin = Admin(**validated_data)\n        admin.set_password(password)  # Hachage du mot de passe\n        admin.save()\n        # Génération des identifiants sécurisés",
+        "peekOfCode": "class AdminSerializer(UserSerializer):\n    password = serializers.CharField(write_only=True, required=False)\n    class Meta(UserSerializer.Meta):\n        model = Admin\n        fields = UserRegisterSerializer.Meta.fields + ['date_entree', 'institution']\n    def create(self, validated_data):\n        password = validated_data.pop('password')\n        admin = Admin(**validated_data)\n        admin.set_password(password)  # Hachage du mot de passe\n        admin.save()",
         "detail": "users.serializers",
         "documentation": {}
     },
@@ -4661,7 +4884,7 @@
         "kind": 5,
         "importPath": "users.urls",
         "description": "users.urls",
-        "peekOfCode": "urlpatterns = [\n    path('login/', UserLoginAPIView.as_view(), name='user-login'),\n    path(\"register/\", RegisterAPIView.as_view(), name=\"register\"),\n    path(\"activate/<uuid:token>/\", ActivateAccountAPIView.as_view(), name=\"activate\"),\n    path('logout/', LogoutAPIView.as_view(), name='logout'),\n    path('admins/', AdminListCreateAPIView.as_view(), name='admin-list-create'),\n    path('apprenants/', ApprenantListCreateAPIView.as_view(), name='apprenant-list-create'),\n    path('superadmins/', SuperAdminListCreateAPIView.as_view(), name='superadmin-list-create'),\n    path('parents/', ParentListCreateAPIView.as_view(), name='parent-list-create'),\n    path('formateurs/', FormateurListCreateAPIView.as_view(), name='formateur-list-create'),",
+        "peekOfCode": "urlpatterns = [\n    path('login/', UserLoginAPIView.as_view(), name='user-login'),\n    path(\"register/\", RegisterAPIView.as_view(), name=\"register\"),\n    path(\"activate/<uuid:token>/\", ActivateAccountAPIView.as_view(), name=\"activate\"),\n    path('logout/', LogoutAPIView.as_view(), name='logout'),\n    # path('admins/', AdminListCreateAPIView.as_view(), name='admin-list-create'),\n    # path('apprenants/', ApprenantListCreateAPIView.as_view(), name='apprenant-list-create'),\n    # path('superadmins/', SuperAdminListCreateAPIView.as_view(), name='superadmin-list-create'),\n    # path('parents/', ParentListCreateAPIView.as_view(), name='parent-list-create'),\n    # path('formateurs/', FormateurListCreateAPIView.as_view(), name='formateur-list-create'),",
         "detail": "users.urls",
         "documentation": {}
     },

@@ -1,38 +1,83 @@
-from django.shortcuts import render
+import secrets
+import string
+import uuid
+from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import viewsets, status
-from academics.models import AnneeScolaire, Classe, DomaineEtude, Filiere, Groupe, Inscription, Matiere, Specialite
-from academics.serializers import AnneeScolaireSerializer, ClasseSerializer, FiliereSerializer, GroupeSerializer, InscriptionSerializer, InstitutionSerializer, DomaineEtudeSerializer, MatiereSerializer, SpecialiteSerializer
+from django.shortcuts import get_object_or_404
+from django.contrib.auth.models import BaseUserManager
+from academics.models import Classe, Filiere, Groupe, Inscription, Institution
+from academics.serializers import ClasseSerializer, FiliereSerializer, GroupeSerializer, InscriptionSerializer, InstitutionSerializer
+from users.models import Admin, UserRole
+
+
+def custom_404_handler(request, exception=None):
+    return Response({
+        "status": 404,
+        "success": False,
+        "message": "Ressource non trouvée. Vérifiez l'URL.",
+        "data": None
+    }, status=404)
+
 
 # Create your views here.
-class InstitutionCreateAPIView(APIView):
-    def post(self, request, *args, **kwargs):
+class InstitutionAPIView(APIView):
+
+    def get(self, request, pk=None):
+        if pk:
+            institution = get_object_or_404(Institution, pk=pk)
+            serializer = InstitutionSerializer(institution)
+            return Response({"status": 200, "success": True, "message": "Institution trouvée", "data": serializer.data})
+        else:
+            institutions = Institution.objects.all()
+            serializer = InstitutionSerializer(institutions, many=True)
+            return Response({"status": 200, "success": True, "message": "Liste des institutions", "data": serializer.data})
+
+    def post(self, request):
+        # Sérialisation des données de la requête
         serializer = InstitutionSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            # Si les données sont valides, crée l'institution et l'administrateur
+            institution = serializer.save()
+
+            # Retourne une réponse avec succès
+            return Response({
+                "status": 201,
+                "success": True,
+                "message": "Institution et administrateur créés avec succès",
+                "data": serializer.data
+            }, status=status.HTTP_201_CREATED)
+        
+        # Si la validation échoue, retourne les erreurs
+        return Response({
+            "status": 400,
+            "success": False,
+            "message": "Erreur de validation des données de l'établissement",
+            "data": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request, pk):
+        institution = get_object_or_404(Institution, pk=pk)
+        serializer = InstitutionSerializer(institution, data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+            return Response({"status": 200, "success": True, "message": "Institution mise à jour avec succès", "data": serializer.data})
+        return Response({"status": 400, "success": False, "message": "Erreur de validation", "data": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-class DomaineEtudeViewSet(viewsets.ModelViewSet):
-    queryset = DomaineEtude.objects.all()
-    serializer_class = DomaineEtudeSerializer
-    
+    def patch(self, request, pk):
+        institution = get_object_or_404(Institution, pk=pk)
+        serializer = InstitutionSerializer(institution, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"status": 200, "success": True, "message": "Institution mise à jour partiellement", "data": serializer.data})
+        return Response({"status": 400, "success": False, "message": "Erreur de validation", "data": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-class MatiereViewSet(viewsets.ModelViewSet):
-    queryset = Matiere.objects.all()
-    serializer_class = MatiereSerializer
-    
-    
-class SpecialiteViewSet(viewsets.ModelViewSet):
-    queryset = Specialite.objects.all()
-    serializer_class = SpecialiteSerializer
-    
-    
-class AnneeScolaireViewSet(viewsets.ModelViewSet):
-    queryset = AnneeScolaire.objects.all()
-    serializer_class = AnneeScolaireSerializer
+    def delete(self, request, pk):
+        institution = get_object_or_404(Institution, pk=pk)
+        institution.delete()
+        return Response({"status": 204, "success": True, "message": "Institution supprimée"}, status=status.HTTP_204_NO_CONTENT)
     
     
 class FiliereListCreateAPIView(APIView):

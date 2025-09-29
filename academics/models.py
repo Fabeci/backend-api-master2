@@ -1,5 +1,4 @@
 from django.db import models
-
 from locations.models import Pays
 # from users.models import ResponsableAcademique, Apprenant, Formateur
 
@@ -57,7 +56,6 @@ class Filiere(models.Model):
     
     def __str__(self):
         return self.nom
-
 
 class Matiere(models.Model):
     nom = models.CharField(max_length=255)

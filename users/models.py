@@ -83,7 +83,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class Admin(User):
-    date_entree = models.DateField(null=True)
+    date_entree = models.DateField(null=True, auto_now=True)
     institution = models.ForeignKey('academics.Institution', on_delete=models.CASCADE, related_name='administrateurs', null=True)
 
     def __str__(self):

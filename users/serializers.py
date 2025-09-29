@@ -107,6 +107,7 @@ class UserLoginSerializer(serializers.Serializer):
        
 
 class AdminSerializer(UserSerializer):
+    password = serializers.CharField(write_only=True, required=False)
     class Meta(UserSerializer.Meta):
         model = Admin
         fields = UserRegisterSerializer.Meta.fields + ['date_entree', 'institution']

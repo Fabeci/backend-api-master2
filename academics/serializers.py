@@ -1,28 +1,51 @@
+
+import secrets
+import string
 from rest_framework import serializers
 from academics.models import AnneeScolaire, Classe, DomaineEtude, Filiere, Groupe, Inscription, Institution, Matiere, Specialite
-from users.models import Admin
+from users.models import Admin, UserRole
 from users.serializers import AdminSerializer
+from django.db import transaction
+from django.core.exceptions import ValidationError
 
+
+def generate_random_password(length=8):
+    # Utilisation de secrets pour générer un mot de passe aléatoire
+    alphabet = string.ascii_letters + string.digits + string.punctuation
+    return ''.join(secrets.choice(alphabet) for i in range(length))
 
 class InstitutionSerializer(serializers.ModelSerializer):
-    administrateur = AdminSerializer(write_only=True)  # Champ pour les détails de l'Admin
+    admin_account = AdminSerializer(write_only=True)  # Champ pour les détails de l'Admin
+    admin_account_data = AdminSerializer(read_only=True, source='admin')
 
     class Meta:
         model = Institution
-        fields = ['nom', 'pays', 'adresse', 'telephone', 'email', 'logo', 'description', 'statut', 'type_institution', 
-                  'nombre_etudiants', 'site_web', 'accreditations', 'administrateur']
+        fields = ['nom', 'pays', 'adresse', 'telephone_1', 'telephone_2', 'email', 'logo', 
+                  'description', 'statut', 'type_institution', 'nombre_etudiants', 'site_web', 
+                  'accreditations', 'date_creation', 'admin_account', 'admin_account_data']
 
     def create(self, validated_data):
-        admin_data = validated_data.pop('administrateur')
+        admin_data = validated_data.pop('admin_account')
+        # Vérification si l'email de l'administrateur existe déjà
+        if Admin.objects.filter(email=admin_data['email']).exists():
+            raise ValidationError({'admin_account': {'email': 'Un utilisateur avec cet email existe déjà.'}})
         
-        # Création de l'Institution
-        institution = Institution.objects.create(**validated_data)
+        # Génération d'un mot de passe aléatoire si aucun mot de passe n'est fourni
+        if 'password' not in admin_data:
+            admin_data['password'] = generate_random_password()
         
-        # Création de l'Admin associé à cette Institution
-        admin_data['institution'] = institution
-        admin_data['is_admin'] = True  # On marque cet utilisateur comme admin
-        admin = Admin.objects.create(**admin_data)
-
+        try:
+            admin_data['role'] = UserRole.objects.get(name="Admin")
+        except UserRole.DoesNotExist:
+            raise ValidationError({'admin_account': {'role': "Le rôle 'Admin' est introuvable."}})
+        
+        with transaction.atomic():
+            institution = Institution.objects.create(**validated_data)
+            # Création de l'Admin associé à cette Institution
+            admin_data['institution'] = institution
+            admin = Admin.objects.create_user(**admin_data)
+            institution.admin = admin
+            
         return institution
     
     
