@@ -1,35 +1,42 @@
-from django.urls import path
+from django.urls import path, include
 from django.contrib.auth import views as auth_views
+from rest_framework.routers import DefaultRouter
 from .views import (
-    ActivateAccountAPIView,
-    ActivateUserAPIView,
     LogoutAPIView,
-    PasswordResetAPIView,
-    PasswordResetConfirmAPIView,
     RegisterAPIView,
-    SuperAdminListCreateAPIView,
-    ParentListCreateAPIView,
-    FormateurListCreateAPIView,
-    ResponsableAcademiqueListCreateAPIView,
-    AdminListCreateAPIView,  # Déjà définis
-    ApprenantListCreateAPIView,
+    ResendCodeAPIView,
     UserLoginAPIView,
+    VerifyEmailAPIView,
+    AdminViewSet,
+    ParentViewSet,
+    ApprenantViewSet,
+    FormateurViewSet,
+    ResponsableAcademiqueViewSet,
 )
+
+
+router = DefaultRouter()
+
+router.register(r'admins', AdminViewSet, basename='admins')
+router.register(r'parents', ParentViewSet, basename='parents')
+router.register(r'apprenants', ApprenantViewSet, basename='apprenants')
+router.register(r'formateurs', FormateurViewSet, basename='formateurs')
+router.register(r'responsables-academiques', ResponsableAcademiqueViewSet, basename='responsables-academiques')
 
 urlpatterns = [
     path('login/', UserLoginAPIView.as_view(), name='user-login'),
-    path("register/", RegisterAPIView.as_view(), name="register"),
-    path("activate/<uuid:token>/", ActivateAccountAPIView.as_view(), name="activate"),
+
+    # Nouveau flow unifié
+    path('register/', RegisterAPIView.as_view(), name='register'),
+    path('verify-email/', VerifyEmailAPIView.as_view(), name='verify_email'),
+    path('resend-code/', ResendCodeAPIView.as_view(), name='resend_code'),
     path('logout/', LogoutAPIView.as_view(), name='logout'),
-    # path('admins/', AdminListCreateAPIView.as_view(), name='admin-list-create'),
-    # path('apprenants/', ApprenantListCreateAPIView.as_view(), name='apprenant-list-create'),
-    # path('superadmins/', SuperAdminListCreateAPIView.as_view(), name='superadmin-list-create'),
-    # path('parents/', ParentListCreateAPIView.as_view(), name='parent-list-create'),
-    # path('formateurs/', FormateurListCreateAPIView.as_view(), name='formateur-list-create'),
-    # path('responsables-academiques/', ResponsableAcademiqueListCreateAPIView.as_view(), name='responsable-list-create'),
-    path('activate/<uidb64>/<token>/', ActivateUserAPIView.as_view(), name='activate_user'),
-    path('password-reset/', PasswordResetAPIView.as_view(), name='password_reset'),
-    path(
-        'password-reset-confirm/<uidb64>/<token>/', PasswordResetConfirmAPIView.as_view(), name='password_reset_confirm',
-    ),
+
+    path('', include(router.urls)),
+
+    
+
+    # Password reset (si déjà en place)
+    # path('password-reset/', PasswordResetAPIView.as_view(), name='password_reset'),
+    # path('password-reset-confirm/<uidb64>/<token>/', PasswordResetConfirmAPIView.as_view(), name='password_reset_confirm'),
 ]

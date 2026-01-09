@@ -28,4 +28,7 @@ urlpatterns = [
     
     path('api/inscriptions/', views.InscriptionListCreateAPIView.as_view(), name='inscription-list-create'),
     path('api/inscriptions/<int:pk>/', views.InscriptionDetailAPIView.as_view(), name='inscription-detail'),
+
+    path("departements/", views.DepartementListCreateAPIView.as_view(), name="departement-list-create"),
+    path("departements/<int:pk>/", views.DepartementDetailAPIView.as_view(), name="departement-detail"),
 ]

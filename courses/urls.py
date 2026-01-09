@@ -1,10 +1,12 @@
 from django.urls import path
 from .views import (
-    SequenceListCreateAPIView, ModuleListCreateAPIView, InscriptionCoursListCreateAPIView,
+    CoursDetailAPIView, CoursListCreateAPIView, SequenceListCreateAPIView, ModuleListCreateAPIView, InscriptionCoursListCreateAPIView,
     SuiviListCreateAPIView, SessionListCreateAPIView, ParticipationListCreateAPIView
 )
 
 urlpatterns = [
+     path("cours/", CoursListCreateAPIView.as_view(), name="cours-list-create"),
+    path("cours/<int:pk>/", CoursDetailAPIView.as_view(), name="cours-detail"),
     path('sequences/', SequenceListCreateAPIView.as_view(), name='sequence-list-create'),
     path('modules/', ModuleListCreateAPIView.as_view(), name='module-list-create'),
     path('inscriptions-cours/', InscriptionCoursListCreateAPIView.as_view(), name='inscription-cours-list-create'),

@@ -7,7 +7,6 @@ from locations.models import Pays
 class Institution(models.Model):
     nom = models.CharField(max_length=200)
     pays = models.ForeignKey(Pays, on_delete=models.CASCADE, related_name='etablissements')
-    formateurs = models.ManyToManyField('users.Formateur', related_name='institutions_academics')
     adresse = models.CharField(max_length=255, null=True, blank=True)
     date_creation = models.DateTimeField(auto_now=True)
     telephone_1 = models.CharField(max_length=15, null=True, blank=True)
@@ -81,7 +80,6 @@ class Classe(models.Model):
     filieres = models.ManyToManyField(Filiere, related_name='classes')
     matieres = models.ManyToManyField(Matiere, related_name='classes')
     groupes = models.ForeignKey(Groupe, on_delete=models.CASCADE, related_name='classe', null=True, blank=True)
-    apprenants = models.ForeignKey('users.Apprenant', on_delete=models.CASCADE, related_name='apprenants_classe_institution', null=True, blank=True)
 
     def __str__(self):
         return self.nom
@@ -112,6 +110,7 @@ class AnneeScolaire(models.Model):
         blank=True,
         help_text="Date de fin de l'année scolaire si période spécifique"
     )
+    
     description = models.TextField(null=True, blank=True)
 
     def __str__(self):
@@ -126,22 +125,44 @@ class AnneeScolaire(models.Model):
 
 
 class Inscription(models.Model):
-    apprenant = models.ForeignKey('users.Apprenant', on_delete=models.CASCADE)
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE)
-    annee_scolaire = models.ForeignKey(AnneeScolaire, on_delete=models.CASCADE)
+    apprenant = models.ForeignKey(
+        'users.Apprenant',
+        on_delete=models.CASCADE,
+        related_name="inscriptions_scolaires",
+        related_query_name="inscription_scolaire",
+    )
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="inscriptions")
+    annee_scolaire = models.ForeignKey(AnneeScolaire, on_delete=models.CASCADE, related_name="inscriptions")
+
+    # Ajout : la classe de l'apprenant pour cette année
+    classe = models.ForeignKey(
+        "academics.Classe",
+        on_delete=models.CASCADE,
+        related_name="inscriptions",
+        null=True,
+        blank=True
+    )
+
     statut = models.CharField(max_length=20, choices=[
         ('actif', 'Actif'),
         ('diplome', 'Diplômé'),
         ('retire', 'Retiré'),
     ])
     statut_paiement = models.CharField(max_length=20, choices=[
-    ('en_attente', 'En attente'),
-    ('payé', 'Payé'),
-    ('annulé', 'Annulé'),
+        ('en_attente', 'En attente'),
+        ('payé', 'Payé'),
+        ('annulé', 'Annulé'),
     ], default='en_attente')
 
+    class Meta:
+        # 1 seule classe par année pour un apprenant
+        constraints = [
+            models.UniqueConstraint(fields=["apprenant", "annee_scolaire"], name="uniq_apprenant_par_annee"),
+        ]
+
     def __str__(self):
-        return f"{self.apprenant} - {self.institution} ({self.annee_scolaire})"
+        return f"{self.apprenant} - {self.classe} - {self.annee_scolaire}"
 
 
 
