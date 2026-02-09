@@ -1,23 +1,25 @@
 from academics.models import DomaineEtude, Matiere
 from academics.models import AnneeScolaire, DomaineEtude, Matiere, Specialite
 from academics.serializers import AnneeScolaireSerializer, DomaineEtudeSerializer, MatiereSerializer, SpecialiteSerializer
-from rest_framework import viewsets, status # type: ignore
+from rest_framework import viewsets, status
 
-class DomaineEtudeViewSet(viewsets.ModelViewSet):
+from users.utils import BaseModelViewSet # type: ignore
+
+class DomaineEtudeViewSet(BaseModelViewSet):
     queryset = DomaineEtude.objects.all()
     serializer_class = DomaineEtudeSerializer
-    
 
-class MatiereViewSet(viewsets.ModelViewSet):
+
+class MatiereViewSet(BaseModelViewSet):
     queryset = Matiere.objects.all()
     serializer_class = MatiereSerializer
-    
-    
-class SpecialiteViewSet(viewsets.ModelViewSet):
+
+
+class SpecialiteViewSet(BaseModelViewSet):
     queryset = Specialite.objects.all()
     serializer_class = SpecialiteSerializer
-    
-    
-class AnneeScolaireViewSet(viewsets.ModelViewSet):
+
+
+class AnneeScolaireViewSet(BaseModelViewSet):
     queryset = AnneeScolaire.objects.all()
     serializer_class = AnneeScolaireSerializer

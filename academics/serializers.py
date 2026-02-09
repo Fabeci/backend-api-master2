@@ -3,6 +3,8 @@ import secrets
 import string
 from rest_framework import serializers
 from academics.models import AnneeScolaire, Classe, Departement, DomaineEtude, Filiere, Groupe, Inscription, Institution, Matiere, Specialite
+from locations.models import Pays
+from locations.serializers import PaysSerializer
 from users.models import Admin, Apprenant, Formateur, Parent, ResponsableAcademique, UserRole, VerificationCode
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
@@ -30,101 +32,363 @@ class AdminAccountInlineSerializer(serializers.Serializer):
         required=False, allow_null=True
     )
 
+# academics/serializers.py
+# Section InstitutionSerializer - COPIER-COLLER CETTE PARTIE COMPLÈTE
+
+import secrets
+import string
+from rest_framework import serializers
+from academics.models import Institution
+from locations.models import Pays
+from locations.serializers import PaysSerializer
+from users.models import Admin, UserRole, VerificationCode
+from django.db import transaction
+from rest_framework.exceptions import ValidationError
+from django.core.mail import send_mail
+from django.conf import settings
+
+
+def generate_random_password(length=12):
+    """Génère un mot de passe aléatoire sécurisé"""
+    alphabet = string.ascii_letters + string.digits + string.punctuation
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+
+class AdminAccountInlineSerializer(serializers.Serializer):
+    """Serializer pour créer un compte admin inline lors de la création d'une institution"""
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True, min_length=8)
+    nom = serializers.CharField(max_length=30)
+    prenom = serializers.CharField(max_length=30)
+    telephone = serializers.CharField(max_length=15, required=False, allow_blank=True, allow_null=True)
+    pays_residence = serializers.PrimaryKeyRelatedField(
+        queryset=Pays.objects.all(),
+        required=False,
+        allow_null=True
+    )
+
+
 class InstitutionSerializer(serializers.ModelSerializer):
-    # On remplace l'ancien AdminSerializer par un inline minimal
-    admin_account = AdminAccountInlineSerializer(write_only=True, required=True)
-    # admin_account_data = serializers.SerializerMethodField(read_only=True)
-    # ou si ton modèle Institution a un FK/OneToOne "admin" vers Admin :
+    # ===== LECTURE : objets complets =====
+    pays = PaysSerializer(read_only=True)
     admin_account_data = serializers.SerializerMethodField(read_only=True)
+
+    # ===== ÉCRITURE : IDs =====
+    pays_id = serializers.PrimaryKeyRelatedField(
+        source="pays",
+        queryset=Pays.objects.all(),
+        write_only=True,
+        required=True,
+    )
+
+    # Admin: deux modes possibles
+    admin_account = AdminAccountInlineSerializer(write_only=True, required=False)
+    existing_admin_id = serializers.IntegerField(write_only=True, required=False)
 
     class Meta:
         model = Institution
         fields = [
-            'nom', 'pays', 'adresse', 'telephone_1', 'telephone_2', 'email', 'logo',
-            'description', 'statut', 'type_institution', 'nombre_etudiants', 'site_web',
-            'accreditations', 'date_creation',
-            'admin_account', 'admin_account_data'
+            "id",
+            "nom",
+            "pays",
+            "pays_id",
+            "adresse",
+            "telephone_1",
+            "telephone_2",
+            "email",
+            "logo",
+            "description",
+            "statut",
+            "type_institution",
+            "nombre_etudiants",
+            "site_web",
+            "accreditations",
+            "date_creation",
+            "admin_account",
+            "existing_admin_id",
+            "admin_account_data",
         ]
+        read_only_fields = ["id", "date_creation"]
 
     def get_admin_account_data(self, obj):
-        admin = getattr(obj, 'admin', None)
-        if not admin:
-            return None
-        return {
-            "id": admin.id,
-            "email": admin.email,
-            "nom": admin.nom,
-            "prenom": admin.prenom,
-            "telephone": admin.telephone,
-            "role": getattr(admin.role, "name", None),
-            "is_active": admin.is_active,
-        }
+        # 1) FK directe: institution.admin
+        admin = getattr(obj, "admin", None)
+        if admin:
+            return {
+                "id": admin.id,
+                "email": admin.email,
+                "nom": admin.nom,
+                "prenom": admin.prenom,
+                "telephone": admin.telephone,
+                "role": getattr(admin.role, "name", None),
+                "is_active": admin.is_active,
+            }
+
+        # 2) Relation inverse via related_name (si défini)
+        for rel_name in ("admins", "administrateurs", "admin_set"):
+            rel = getattr(obj, rel_name, None)
+            if rel is not None:
+                admin = rel.order_by("-id").first()
+                if admin:
+                    return {
+                        "id": admin.id,
+                        "email": admin.email,
+                        "nom": admin.nom,
+                        "prenom": admin.prenom,
+                        "telephone": admin.telephone,
+                        "role": getattr(admin.role, "name", None),
+                        "is_active": admin.is_active,
+                    }
+
+        # 3) Fallback: essayer plusieurs noms de FK dans Admin
+        try:
+            admin = (
+                Admin.objects.filter(institution=obj).order_by("-id").first()
+            )
+            if admin:
+                return {
+                    "id": admin.id,
+                    "email": admin.email,
+                    "nom": admin.nom,
+                    "prenom": admin.prenom,
+                    "telephone": admin.telephone,
+                    "role": getattr(admin.role, "name", None),
+                    "is_active": admin.is_active,
+                }
+        except Exception:
+            pass
+
+        try:
+            admin = (
+                Admin.objects.filter(etablissement=obj).order_by("-id").first()
+            )
+            if admin:
+                return {
+                    "id": admin.id,
+                    "email": admin.email,
+                    "nom": admin.nom,
+                    "prenom": admin.prenom,
+                    "telephone": admin.telephone,
+                    "role": getattr(admin.role, "name", None),
+                    "is_active": admin.is_active,
+                }
+        except Exception:
+            pass
+
+        return None
+
+
+    def validate(self, attrs):
+        """
+        Validation:
+        - Admin totalement optionnel (CREATE et UPDATE)
+        - Si fourni, on interdit de fournir les deux modes en même temps
+        """
+        admin_data = attrs.get("admin_account", None)
+        existing_admin_id = attrs.get("existing_admin_id", None)
+
+        # Si DRF place existing_admin_id dans attrs, il y sera.
+        # Si tu constates qu'il n'y est pas (selon ton impl), récupère aussi depuis initial_data.
+        if existing_admin_id is None:
+            try:
+                existing_admin_id = self.initial_data.get("existing_admin_id")
+            except Exception:
+                pass
+
+        # Interdire les deux en même temps
+        if admin_data and existing_admin_id:
+            raise ValidationError(
+                {
+                    "admin": (
+                        "Vous ne pouvez pas à la fois créer un admin (admin_account) "
+                        "et en sélectionner un existant (existing_admin_id). Choisissez une seule option."
+                    )
+                }
+            )
+
+        # IMPORTANT: on ne force PAS admin (optionnel)
+        return attrs
 
     def create(self, validated_data):
-        admin_data = validated_data.pop('admin_account', None)
-        if not admin_data:
-            raise ValidationError({"admin_account": "Les informations de l’administrateur sont requises."})
+        """
+        Création d'une institution avec admin optionnel
 
-        # Vérif email unique sur l’ensemble des Users (Admin hérite de User)
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        if User.objects.filter(email=admin_data['email']).exists():
-            raise ValidationError({'admin_account': {'email': 'Un utilisateur avec cet email existe déjà.'}})
+        3 modes possibles:
+        1. Sans admin (institution créée sans admin)
+        2. Avec admin existant (existing_admin_id)
+        3. Avec nouvel admin (admin_account)
+        """
+        admin_data = validated_data.pop("admin_account", None)
+        existing_admin_id = validated_data.pop("existing_admin_id", None)
 
-        # Mot de passe : généré si absent
-        password = admin_data.get('password') or generate_random_password()
-
-        # Rôle FK "Admin"
-        try:
-            role = UserRole.objects.get(name="Admin")
-        except UserRole.DoesNotExist:
-            role = UserRole.objects.create(name="Admin")
+        # En cas où existing_admin_id n'est pas injecté dans validated_data
+        if existing_admin_id is None:
+            existing_admin_id = self.initial_data.get("existing_admin_id")
 
         with transaction.atomic():
-            # 1) Créer l’institution
             institution = Institution.objects.create(**validated_data)
 
-            # 2) Créer l’Admin (multi-table inheritance : on instancie directement Admin)
-            admin = Admin(
-                email=admin_data['email'],
-                nom=admin_data['nom'],
-                prenom=admin_data['prenom'],
-                telephone=admin_data.get('telephone'),
-                pays_residence=admin_data.get('pays_residence'),
-                is_active=False,          # inactif tant que l’email n’est pas vérifié
-                is_staff=True,            # généralement true pour un Admin d’institution
-                is_superuser=False,
-                role=role,
-                institution=institution,  # si ton modèle Admin a bien ce FK
-            )
-            admin.set_password(password)
-            admin.save()
+            admin = None
 
-            # 3) Lier l’admin à l’institution (si champ présent côté Institution)
-            #   - Si ton modèle Institution a un champ: admin = models.OneToOneField(Admin, ...)
-            #   - Ou admin = models.ForeignKey(Admin, ...)
-            if hasattr(institution, "admin"):
+            if existing_admin_id:
+                # MODE SÉLECTION : assigne un admin existant
+                try:
+                    admin = Admin.objects.select_related("institution").get(id=existing_admin_id)
+
+                    # Détacher d'une ancienne institution si nécessaire
+                    if admin.institution and admin.institution != institution:
+                        old_institution = admin.institution
+                        # Si Institution a un champ admin (FK) et qu'il pointe vers cet admin
+                        if hasattr(old_institution, "admin") and old_institution.admin_id == admin.id:
+                            old_institution.admin = None
+                            old_institution.save(update_fields=["admin"])
+
+                    # Assigner à la nouvelle institution
+                    admin.institution = institution
+                    admin.save(update_fields=["institution"])
+
+                except Admin.DoesNotExist:
+                    raise ValidationError({"existing_admin_id": "Administrateur introuvable."})
+
+            elif admin_data:
+                # MODE CRÉATION : créer un nouvel admin
+                from django.contrib.auth import get_user_model
+
+                User = get_user_model()
+
+                if User.objects.filter(email=admin_data["email"]).exists():
+                    raise ValidationError(
+                        {"admin_account": {"email": "Un utilisateur avec cet email existe déjà."}}
+                    )
+
+                password = admin_data.get("password") or generate_random_password()
+                role, _ = UserRole.objects.get_or_create(name="Admin")
+
+                admin = Admin(
+                    email=admin_data["email"],
+                    nom=admin_data["nom"],
+                    prenom=admin_data["prenom"],
+                    telephone=admin_data.get("telephone"),
+                    pays_residence=admin_data.get("pays_residence"),
+                    is_active=False,
+                    is_staff=True,
+                    is_superuser=False,
+                    role=role,
+                    institution=institution,
+                )
+                admin.set_password(password)
+                admin.save()
+
+                # Code d'activation + email
+                v = VerificationCode.create_activation_code(admin)
+                send_mail(
+                    subject="Somapro - Compte administrateur : code d'activation",
+                    message=(
+                        f"Bonjour {admin.prenom},\n\n"
+                        f"Votre compte administrateur pour l'institution « {institution.nom} » a été créé.\n"
+                        f"Code d'activation : {v.code} (valide 15 minutes).\n\n"
+                        f"Identifiant : {admin.email}\n"
+                        f"Mot de passe provisoire : {password}\n\n"
+                        f"Merci de valider votre compte et de modifier votre mot de passe après connexion."
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[admin.email],
+                    fail_silently=False,
+                )
+
+            # Lier l'admin à l'institution (si le champ existe)
+            if admin and hasattr(institution, "admin"):
                 institution.admin = admin
                 institution.save(update_fields=["admin"])
 
-            # 4) Générer le code 6 chiffres + envoi email
-            v = VerificationCode.create_activation_code(admin)  # TTL 15 min par défaut
-            send_mail(
-                subject="Somapro - Compte administrateur : code d’activation",
-                message=(
-                    f"Bonjour {admin.prenom},\n\n"
-                    f"Votre compte administrateur pour l’institution « {institution.nom} » a été créé.\n"
-                    f"Code d’activation : {v.code} (valide 15 minutes).\n\n"
-                    f"Identifiant : {admin.email}\n"
-                    f"Mot de passe provisoire : {password}\n\n"
-                    f"Merci de valider votre compte et de modifier votre mot de passe après connexion."
-                ),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[admin.email],
-                fail_silently=False,
-            )
-
         return institution
+
+    def update(self, instance, validated_data):
+        """
+        Mise à jour d'une institution
+        - Si admin_account ou existing_admin_id fourni: change l'admin
+        - Sinon: met juste à jour les infos de l'institution
+        """
+        admin_data = validated_data.pop("admin_account", None)
+        existing_admin_id = validated_data.pop("existing_admin_id", None)
+
+        if existing_admin_id is None:
+            existing_admin_id = self.initial_data.get("existing_admin_id")
+
+        with transaction.atomic():
+            # 1) Update champs Institution
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
+
+            # 2) Changement admin (optionnel)
+            if existing_admin_id:
+                try:
+                    new_admin = Admin.objects.get(id=existing_admin_id)
+
+                    # Détacher l'ancien admin si la relation existe
+                    if hasattr(instance, "admin") and instance.admin:
+                        old_admin = instance.admin
+                        old_admin.institution = None
+                        old_admin.save(update_fields=["institution"])
+
+                    new_admin.institution = instance
+                    new_admin.save(update_fields=["institution"])
+
+                    if hasattr(instance, "admin"):
+                        instance.admin = new_admin
+                        instance.save(update_fields=["admin"])
+
+                except Admin.DoesNotExist:
+                    raise ValidationError({"existing_admin_id": "Administrateur introuvable."})
+
+            elif admin_data:
+                from django.contrib.auth import get_user_model
+
+                User = get_user_model()
+
+                if User.objects.filter(email=admin_data["email"]).exists():
+                    raise ValidationError(
+                        {"admin_account": {"email": "Un utilisateur avec cet email existe déjà."}}
+                    )
+
+                password = admin_data.get("password") or generate_random_password()
+                role, _ = UserRole.objects.get_or_create(name="Admin")
+
+                admin = Admin(
+                    email=admin_data["email"],
+                    nom=admin_data["nom"],
+                    prenom=admin_data["prenom"],
+                    telephone=admin_data.get("telephone"),
+                    pays_residence=admin_data.get("pays_residence"),
+                    is_active=False,
+                    is_staff=True,
+                    role=role,
+                    institution=instance,
+                )
+                admin.set_password(password)
+                admin.save()
+
+                v = VerificationCode.create_activation_code(admin)
+                send_mail(
+                    subject="Somapro - Nouveau compte administrateur",
+                    message=(
+                        f"Bonjour {admin.prenom},\n\n"
+                        f"Un nouveau compte administrateur pour l'institution « {instance.nom} » a été créé.\n"
+                        f"Code d'activation : {v.code} (valide 15 minutes).\n\n"
+                        f"Identifiant : {admin.email}\n"
+                        f"Mot de passe provisoire : {password}\n"
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[admin.email],
+                    fail_silently=False,
+                )
+
+                if hasattr(instance, "admin"):
+                    instance.admin = admin
+                    instance.save(update_fields=["admin"])
+
+        return instance
     
     
 class DomaineEtudeSerializer(serializers.ModelSerializer):

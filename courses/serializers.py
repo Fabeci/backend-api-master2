@@ -1,18 +1,36 @@
-from rest_framework import serializers
-
-from users.serializers import ApprenantSerializer, FormateurSerializer
-from .models import Cours, InscriptionCours, Module, Participation, Sequence, Session, Suivi
-        
-        
 # courses/serializers.py
+
 from rest_framework import serializers
 from academics.models import Groupe, Matiere
-from users.models import Formateur
-from .models import Cours
+from users.models import Apprenant, Formateur
+from users.serializers import ApprenantSerializer, FormateurSerializer
 
+from .models import (
+    BlocProgress,
+    Cours,
+    CoursProgress,
+    InscriptionCours,
+    Module,
+    ModuleProgress,
+    Participation,
+    Sequence,
+    SequenceContent,
+    SequenceProgress,
+    Session,
+    Suivi,
+    BlocContenu,
+    RessourceSequence,
+)
+
+
+# ============================================================================
+# COURS
+# ============================================================================
 
 class CoursSerializer(serializers.ModelSerializer):
-    # Read-only “labels” utiles côté UI
+    """Serializer pour les cours"""
+    
+    # Read-only "labels" utiles côté UI
     groupe_nom = serializers.CharField(source="groupe.nom", read_only=True)
     matiere_nom = serializers.CharField(source="matiere.nom", read_only=True)
     enseignant_nom = serializers.SerializerMethodField(read_only=True)
@@ -48,7 +66,6 @@ class CoursSerializer(serializers.ModelSerializer):
         }
 
     def get_enseignant_nom(self, obj):
-        # Adaptation selon ton modèle Formateur (si prénom/nom existent)
         ens = getattr(obj, "enseignant", None)
         if not ens:
             return None
@@ -58,10 +75,7 @@ class CoursSerializer(serializers.ModelSerializer):
         return full or str(ens)
 
     def validate(self, attrs):
-        """
-        - date_fin >= date_debut si les deux sont fournis
-        - unicité groupe+matiere+enseignant (proprement en API)
-        """
+        """Validation des dates et unicité"""
         date_debut = attrs.get("date_debut", getattr(self.instance, "date_debut", None))
         date_fin = attrs.get("date_fin", getattr(self.instance, "date_fin", None))
 
@@ -70,7 +84,7 @@ class CoursSerializer(serializers.ModelSerializer):
                 {"date_fin": "La date_fin doit être postérieure ou égale à date_debut."}
             )
 
-        # Validation d'unicité (évite 500/IntegrityError)
+        # Validation d'unicité
         groupe = attrs.get("groupe", getattr(self.instance, "groupe", None))
         matiere = attrs.get("matiere", getattr(self.instance, "matiere", None))
         enseignant = attrs.get("enseignant", getattr(self.instance, "enseignant", None))
@@ -91,7 +105,13 @@ class CoursSerializer(serializers.ModelSerializer):
         return attrs
 
 
+# ============================================================================
+# MODULES
+# ============================================================================
+
 class ModuleSerializer(serializers.ModelSerializer):
+    """Serializer pour les modules"""
+    
     cours = serializers.PrimaryKeyRelatedField(queryset=Cours.objects.all())
 
     class Meta:
@@ -99,46 +119,298 @@ class ModuleSerializer(serializers.ModelSerializer):
         fields = ["id", "titre", "description", "cours"]
 
 
+# ============================================================================
+# BLOCS DE CONTENU
+# ============================================================================
+
+class BlocContenuSerializer(serializers.ModelSerializer):
+    """Serializer pour les blocs de contenu"""
+    
+    icone_type = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = BlocContenu
+        fields = [
+            'id', 'sequence', 'titre', 'type_bloc', 'ordre',
+            'contenu_texte', 'contenu_html', 'contenu_markdown',
+            'video_url', 'audio_url', 'image', 'fichier',
+            'lien_externe', 'code_source', 'langage_code',
+            'objectifs', 'duree_estimee_minutes',
+            'est_obligatoire', 'est_visible',
+            'icone_type', 'date_creation', 'date_modification'
+        ]
+        read_only_fields = ['id', 'date_creation', 'date_modification']
+
+
+class BlocContenuCreateSerializer(serializers.ModelSerializer):
+    """Serializer pour créer un bloc de contenu"""
+    
+    class Meta:
+        model = BlocContenu
+        fields = [
+            'sequence', 'titre', 'type_bloc', 'ordre',
+            'contenu_texte', 'contenu_html', 'contenu_markdown',
+            'video_url', 'audio_url', 'image', 'fichier',
+            'lien_externe', 'code_source', 'langage_code',
+            'objectifs', 'duree_estimee_minutes',
+            'est_obligatoire', 'est_visible'
+        ]
+
+
+# ============================================================================
+# RESSOURCES SÉQUENCES
+# ============================================================================
+
+class RessourceSequenceSerializer(serializers.ModelSerializer):
+    """Serializer pour les ressources/pièces jointes"""
+    
+    taille_lisible = serializers.ReadOnlyField()
+    extension = serializers.ReadOnlyField()
+    icone_extension = serializers.ReadOnlyField()
+    ajoute_par_nom = serializers.SerializerMethodField(read_only=True)
+    
+    class Meta:
+        model = RessourceSequence
+        fields = [
+            'id', 'sequence', 'titre', 'description', 'fichier',
+            'type_ressource', 'taille_fichier', 'taille_lisible',
+            'extension', 'icone_extension', 'est_telechargeable',
+            'nombre_telechargements', 'ordre', 'date_ajout',
+            'date_modification', 'ajoute_par', 'ajoute_par_nom'
+        ]
+        read_only_fields = [
+            'id', 'taille_fichier', 'nombre_telechargements',
+            'date_ajout', 'date_modification'
+        ]
+    
+    def get_ajoute_par_nom(self, obj):
+        if obj.ajoute_par:
+            return obj.ajoute_par.get_full_name()
+        return None
+
+
+class RessourceSequenceCreateSerializer(serializers.ModelSerializer):
+    """Serializer pour créer une ressource"""
+    
+    class Meta:
+        model = RessourceSequence
+        fields = [
+            'sequence', 'titre', 'description', 'fichier',
+            'type_ressource', 'est_telechargeable', 'ordre'
+        ]
+
+
+# ============================================================================
+# SÉQUENCES
+# ============================================================================
+
 class SequenceSerializer(serializers.ModelSerializer):
-    # Sérialiser l'attribut module lié (clé étrangère)
+    """Serializer simple pour les séquences"""
+    
     module = serializers.PrimaryKeyRelatedField(queryset=Module.objects.all())
 
     class Meta:
         model = Sequence
         fields = ['id', 'titre', 'module']
 
+
+class SequenceDetailSerializer(serializers.ModelSerializer):
+    """Serializer détaillé avec blocs et ressources"""
+    
+    blocs_contenu = BlocContenuSerializer(many=True, read_only=True)
+    ressources_sequences = RessourceSequenceSerializer(many=True, read_only=True)
+    module_titre = serializers.CharField(source='module.titre', read_only=True)
+    
+    # Statistiques calculées
+    nombre_blocs = serializers.SerializerMethodField()
+    nombre_ressources = serializers.SerializerMethodField()
+    duree_totale_minutes = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Sequence
+        fields = [
+            'id', 'titre', 'module', 'module_titre',
+            'nombre_blocs', 'nombre_ressources', 'duree_totale_minutes',
+            'blocs_contenu', 'ressources_sequences'
+        ]
+    
+    def get_nombre_blocs(self, obj):
+        return obj.blocs_contenu.count()
+    
+    def get_nombre_ressources(self, obj):
+        return obj.ressources_sequences.count()
+    
+    def get_duree_totale_minutes(self, obj):
+        return sum(
+            bloc.duree_estimee_minutes 
+            for bloc in obj.blocs_contenu.all()
+        )
+
+
+# ============================================================================
+# INSCRIPTIONS, SUIVIS, SESSIONS, PARTICIPATIONS (inchangés)
+# ============================================================================
+
 class InscriptionCoursSerializer(serializers.ModelSerializer):
-    # Sérialiser les relations apprenant et cours avec des serializers imbriqués
-    apprenant = ApprenantSerializer()
-    cours = CoursSerializer()
+    apprenant = ApprenantSerializer(read_only=True)
+    cours = CoursSerializer(read_only=True)
+    
+    # Pour la création
+    apprenant_id = serializers.PrimaryKeyRelatedField(
+        queryset=Apprenant.objects.all(),
+        source='apprenant',
+        write_only=True
+    )
+    cours_id = serializers.PrimaryKeyRelatedField(
+        queryset=Cours.objects.all(),
+        source='cours',
+        write_only=True
+    )
 
     class Meta:
         model = InscriptionCours
-        fields = ['id', 'apprenant', 'cours', 'date_inscription', 'statut']
-        
-        
+        fields = [
+            'id', 'apprenant', 'apprenant_id', 'cours', 'cours_id',
+            'date_inscription', 'statut'
+        ]
+
+
 class SuiviSerializer(serializers.ModelSerializer):
-    apprenant = ApprenantSerializer()
-    cours = CoursSerializer()
+    apprenant = ApprenantSerializer(read_only=True)
+    cours = CoursSerializer(read_only=True)
+    
+    # Pour la création
+    apprenant_id = serializers.PrimaryKeyRelatedField(
+        queryset=Apprenant.objects.all(),
+        source='apprenant',
+        write_only=True
+    )
+    cours_id = serializers.PrimaryKeyRelatedField(
+        queryset=Cours.objects.all(),
+        source='cours',
+        write_only=True
+    )
 
     class Meta:
         model = Suivi
-        fields = ['id', 'apprenant', 'cours', 'date_debut', 'progression', 'note', 'commentaires']
-        
-        
+        fields = [
+            'id', 'apprenant', 'apprenant_id', 'cours', 'cours_id',
+            'date_debut', 'progression', 'note', 'commentaires'
+        ]
+
+
 class SessionSerializer(serializers.ModelSerializer):
-    formateur = FormateurSerializer()
-    cours = CoursSerializer()
+    formateur = FormateurSerializer(read_only=True)
+    cours = CoursSerializer(read_only=True)
+    
+    # Pour la création
+    formateur_id = serializers.PrimaryKeyRelatedField(
+        queryset=Formateur.objects.all(),
+        source='formateur',
+        write_only=True
+    )
+    cours_id = serializers.PrimaryKeyRelatedField(
+        queryset=Cours.objects.all(),
+        source='cours',
+        write_only=True
+    )
+    
+    duree_minutes = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Session
-        fields = ['id', 'titre', 'date_debut', 'date_fin', 'formateur', 'cours']
-        
-        
+        fields = [
+            'id', 'titre', 'date_debut', 'date_fin',
+            'formateur', 'formateur_id', 'cours', 'cours_id',
+            'participation_mode', 'duree_minutes'
+        ]
+        read_only_fields = ['id', 'duree_minutes']
+
+
+class SessionLiteSerializer(serializers.ModelSerializer):
+    """Serializer léger pour les sessions"""
+    
+    class Meta:
+        model = Session
+        fields = [
+            "id", "titre", "date_debut", "date_fin",
+            "cours", "formateur", "participation_mode"
+        ]
+
+class SequenceContentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SequenceContent
+        fields = [
+            "id",
+            "sequence",
+            "contenu_texte",
+            "contenu_html",
+            "video_url",
+            "lien_externe",
+            "objectifs",
+            "duree_estimee_minutes",
+            "est_publie",
+            "date_creation",
+            "date_modification",
+        ]
+
 class ParticipationSerializer(serializers.ModelSerializer):
-    session = SessionSerializer()  # Sérialiser la session liée
-    apprenant = ApprenantSerializer()  # Sérialiser l'apprenant lié
+    session = SessionSerializer(read_only=True)
+    apprenant = ApprenantSerializer(read_only=True)
+    
+    # Pour la création
+    session_id = serializers.PrimaryKeyRelatedField(
+        queryset=Session.objects.all(),
+        source='session',
+        write_only=True
+    )
+    apprenant_id = serializers.PrimaryKeyRelatedField(
+        queryset=Apprenant.objects.all(),
+        source='apprenant',
+        write_only=True
+    )
 
     class Meta:
         model = Participation
-        fields = ['id', 'session', 'apprenant', 'date_participation']
+        fields = [
+            "id", "session", "session_id", "apprenant", "apprenant_id",
+            "source", "statut", "created_at", "completed_at"
+        ]
+        read_only_fields = ['id', 'created_at']
+
+
+# ============================================================================
+# PROGRESSION
+# ============================================================================
+
+class BlocProgressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BlocProgress
+        fields = ["id", "bloc", "est_termine", "completed_at", "updated_at"]
+        read_only_fields = ["id", "completed_at", "updated_at"]
+
+
+class SequenceProgressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SequenceProgress
+        fields = ["id", "sequence", "est_termine", "completed_at", "updated_at"]
+        read_only_fields = ["id", "completed_at", "updated_at"]
+
+
+class ModuleProgressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ModuleProgress
+        fields = ["id", "module", "est_termine", "completed_at", "updated_at"]
+        read_only_fields = ["id", "completed_at", "updated_at"]
+
+
+class CoursProgressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoursProgress
+        fields = ["id", "cours", "est_termine", "completed_at", "updated_at"]
+        read_only_fields = ["id", "completed_at", "updated_at"]
+
+
+# Serializer “action” (PUT) simple pour set terminé/non terminé
+class ProgressToggleSerializer(serializers.Serializer):
+    est_termine = serializers.BooleanField()
