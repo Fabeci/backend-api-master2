@@ -18,14 +18,18 @@ from .views import (
     EvaluationListCreateAPIView,
     EvaluationDetailAPIView,
     EvaluationPublierAPIView,
+    EvaluationAccessibiliteAPIView,
     
-    # Passages d'évaluations
-    PassageEvaluationListCreateAPIView,
-    PassageEvaluationDetailAPIView,
+    # Passages d'évaluations (NOUVELLE LOGIQUE)
+    PassageEvaluationDemarrerAPIView,
+    PassageEvaluationReprendreAPIView,
+    PassageEvaluationSauvegarderAPIView,
     PassageEvaluationSoumettreAPIView,
+    PassageEvaluationListAPIView,
+    PassageEvaluationDetailAPIView,
     
     # Réponses aux questions
-    ReponseQuestionSubmitAPIView,
+    ReponseQuestionSauvegarderAPIView,
     ReponseQuestionDetailAPIView,
     
     # Correction
@@ -105,27 +109,54 @@ urlpatterns = [
     path('evaluations/<int:pk>/publier/', 
          EvaluationPublierAPIView.as_view(), 
          name='evaluation-publier'),
+    path('evaluations/<int:pk>/accessibilite/', 
+         EvaluationAccessibiliteAPIView.as_view(), 
+         name='evaluation-accessibilite'),
     
-    # Passages d'évaluations (par les apprenants)
-    path('passages-evaluations/', 
-         PassageEvaluationListCreateAPIView.as_view(), 
-         name='passage-evaluation-list-create'),
-    path('passages-evaluations/<int:pk>/', 
-         PassageEvaluationDetailAPIView.as_view(), 
-         name='passage-evaluation-detail'),
+    
+    # ============================================================================
+    # PASSAGES D'ÉVALUATIONS (NOUVELLE LOGIQUE)
+    # ============================================================================
+    
+    # Démarrer une évaluation
+    path('passages-evaluations/demarrer/', 
+         PassageEvaluationDemarrerAPIView.as_view(), 
+         name='passage-evaluation-demarrer'),
+    
+    # Reprendre une évaluation en cours
+    path('passages-evaluations/<int:pk>/reprendre/', 
+         PassageEvaluationReprendreAPIView.as_view(), 
+         name='passage-evaluation-reprendre'),
+    
+    # Sauvegarder la progression (évaluation simple)
+    path('passages-evaluations/<int:pk>/sauvegarder/', 
+         PassageEvaluationSauvegarderAPIView.as_view(), 
+         name='passage-evaluation-sauvegarder'),
+    
+    # Soumettre l'évaluation (bascule irréversible)
     path('passages-evaluations/<int:pk>/soumettre/', 
          PassageEvaluationSoumettreAPIView.as_view(), 
          name='passage-evaluation-soumettre'),
     
-    # Réponses aux questions d'évaluation
-    path('reponses-questions/submit/', 
-         ReponseQuestionSubmitAPIView.as_view(), 
-         name='reponse-question-submit'),
-     path(
-        'reponses-questions/<int:pk>/',
-        ReponseQuestionSubmitAPIView.as_view(),
-        name='reponse-question-update'
-    ),
+    # Liste et détails des passages
+    path('passages-evaluations/', 
+         PassageEvaluationListAPIView.as_view(), 
+         name='passage-evaluation-list'),
+    path('passages-evaluations/<int:pk>/', 
+         PassageEvaluationDetailAPIView.as_view(), 
+         name='passage-evaluation-detail'),
+    
+    
+    # ============================================================================
+    # RÉPONSES AUX QUESTIONS
+    # ============================================================================
+    
+    # Sauvegarder une réponse (pendant l'évaluation)
+    path('reponses-questions/sauvegarder/', 
+         ReponseQuestionSauvegarderAPIView.as_view(), 
+         name='reponse-question-sauvegarder'),
+    
+    # Détails d'une réponse
     path('reponses-questions/<int:pk>/', 
          ReponseQuestionDetailAPIView.as_view(), 
          name='reponse-question-detail'),

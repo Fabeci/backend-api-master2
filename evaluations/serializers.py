@@ -57,9 +57,10 @@ class QuestionSerializer(serializers.ModelSerializer):
             'quiz',
             'evaluation',
             'reponses_predefinies',
-            'necessite_correction_manuelle'
+            'necessite_correction_manuelle',
+            'est_qcm'
         ]
-        read_only_fields = ['id', 'necessite_correction_manuelle']
+        read_only_fields = ['id', 'necessite_correction_manuelle', 'est_qcm']
 
 
 class QuestionCreateSerializer(serializers.ModelSerializer):
@@ -101,6 +102,10 @@ class QuizSerializer(serializers.ModelSerializer):
         source='questions.count', 
         read_only=True
     )
+    sequence_titre = serializers.CharField(
+        source='sequence.titre',
+        read_only=True
+    )
     
     class Meta:
         model = Quiz
@@ -108,7 +113,8 @@ class QuizSerializer(serializers.ModelSerializer):
             'id', 
             'titre', 
             'description',
-            'sequence', 
+            'sequence',
+            'sequence_titre',
             'date_creation',
             'date_modification',
             'nombre_questions'
@@ -119,6 +125,10 @@ class QuizSerializer(serializers.ModelSerializer):
 class QuizDetailSerializer(serializers.ModelSerializer):
     """Serializer détaillé pour un quiz avec toutes ses questions"""
     questions = QuestionSerializer(many=True, read_only=True)
+    sequence_titre = serializers.CharField(
+        source='sequence.titre',
+        read_only=True
+    )
     
     class Meta:
         model = Quiz
@@ -126,7 +136,8 @@ class QuizDetailSerializer(serializers.ModelSerializer):
             'id', 
             'titre', 
             'description',
-            'sequence', 
+            'sequence',
+            'sequence_titre',
             'date_creation',
             'date_modification',
             'questions'
@@ -140,6 +151,10 @@ class ReponseQuizSerializer(serializers.ModelSerializer):
         source='question.enonce_texte', 
         read_only=True
     )
+    question_points = serializers.FloatField(
+        source='question.points',
+        read_only=True
+    )
     pourcentage = serializers.SerializerMethodField()
     
     class Meta:
@@ -149,6 +164,7 @@ class ReponseQuizSerializer(serializers.ModelSerializer):
             'passage_quiz',
             'question',
             'question_texte',
+            'question_points',
             'choix_selectionnes',
             'points_obtenus',
             'date_reponse',
@@ -165,10 +181,7 @@ class ReponseQuizSerializer(serializers.ModelSerializer):
 class PassageQuizSerializer(serializers.ModelSerializer):
     """Serializer pour un passage de quiz"""
     quiz_titre = serializers.CharField(source='quiz.titre', read_only=True)
-    apprenant_nom = serializers.CharField(
-        source='apprenant.user.get_full_name', 
-        read_only=True
-    )
+    apprenant_nom = serializers.SerializerMethodField()
     pourcentage = serializers.SerializerMethodField()
     
     class Meta:
@@ -185,6 +198,12 @@ class PassageQuizSerializer(serializers.ModelSerializer):
             'pourcentage'
         ]
         read_only_fields = ['id', 'score', 'date_passage']
+    
+    def get_apprenant_nom(self, obj):
+        try:
+            return f"{obj.apprenant.prenom} {obj.apprenant.nom}"
+        except:
+            return str(obj.apprenant)
     
     def get_pourcentage(self, obj):
         total_points = sum(q.points for q in obj.quiz.questions.all())
@@ -212,11 +231,11 @@ class EvaluationSerializer(serializers.ModelSerializer):
         read_only=True
     )
     cours_titre = serializers.CharField(source='cours.titre', read_only=True)
-    enseignant_nom = serializers.CharField(
-        source='enseignant.user.get_full_name', 
-        read_only=True
-    )
+    enseignant_nom = serializers.SerializerMethodField()
     nombre_questions = serializers.IntegerField(read_only=True)
+    est_accessible = serializers.SerializerMethodField()
+    peut_soumettre = serializers.SerializerMethodField()
+    est_auto_corrigeable = serializers.SerializerMethodField()
     
     class Meta:
         model = Evaluation
@@ -238,14 +257,35 @@ class EvaluationSerializer(serializers.ModelSerializer):
             'date_creation',
             'date_modification',
             'est_publiee',
-            'nombre_questions'
+            'nombre_questions',
+            'est_accessible',
+            'peut_soumettre',
+            'est_auto_corrigeable'
         ]
         read_only_fields = [
             'id', 
             'date_creation', 
             'date_modification', 
-            'nombre_questions'
+            'nombre_questions',
+            'est_accessible',
+            'peut_soumettre',
+            'est_auto_corrigeable'
         ]
+    
+    def get_enseignant_nom(self, obj):
+        try:
+            return f"{obj.enseignant.prenom} {obj.enseignant.nom}"
+        except:
+            return str(obj.enseignant)
+    
+    def get_est_accessible(self, obj):
+        return obj.est_accessible()
+    
+    def get_peut_soumettre(self, obj):
+        return obj.peut_soumettre()
+    
+    def get_est_auto_corrigeable(self, obj):
+        return obj.est_auto_corrigeable()
 
 
 class EvaluationDetailSerializer(serializers.ModelSerializer):
@@ -255,13 +295,20 @@ class EvaluationDetailSerializer(serializers.ModelSerializer):
         source='get_type_evaluation_display', 
         read_only=True
     )
+    cours_titre = serializers.CharField(source='cours.titre', read_only=True)
+    enseignant_nom = serializers.SerializerMethodField()
+    est_accessible = serializers.SerializerMethodField()
+    peut_soumettre = serializers.SerializerMethodField()
+    est_auto_corrigeable = serializers.SerializerMethodField()
     
     class Meta:
         model = Evaluation
         fields = [
             'id',
             'cours',
+            'cours_titre',
             'enseignant',
+            'enseignant_nom',
             'titre',
             'type_evaluation',
             'type_evaluation_display',
@@ -274,9 +321,40 @@ class EvaluationDetailSerializer(serializers.ModelSerializer):
             'date_creation',
             'date_modification',
             'est_publiee',
-            'questions'
+            'questions',
+            'est_accessible',
+            'peut_soumettre',
+            'est_auto_corrigeable'
         ]
         read_only_fields = ['id', 'date_creation', 'date_modification']
+    
+    def get_enseignant_nom(self, obj):
+        try:
+            return f"{obj.enseignant.prenom} {obj.enseignant.nom}"
+        except:
+            return str(obj.enseignant)
+    
+    def get_est_accessible(self, obj):
+        return obj.est_accessible()
+    
+    def get_peut_soumettre(self, obj):
+        return obj.peut_soumettre()
+    
+    def get_est_auto_corrigeable(self, obj):
+        return obj.est_auto_corrigeable()
+
+
+class EvaluationAccessibiliteSerializer(serializers.Serializer):
+    """Serializer pour les informations d'accessibilité d'une évaluation"""
+    evaluation_id = serializers.IntegerField()
+    est_publiee = serializers.BooleanField()
+    est_accessible = serializers.BooleanField()
+    peut_soumettre = serializers.BooleanField()
+    date_debut = serializers.DateTimeField(allow_null=True)
+    date_fin = serializers.DateTimeField(allow_null=True)
+    passage_existe = serializers.BooleanField()
+    passage = serializers.DictField(allow_null=True)
+    action_possible = serializers.CharField(allow_null=True)
 
 
 class ReponseQuestionSerializer(serializers.ModelSerializer):
@@ -287,6 +365,14 @@ class ReponseQuestionSerializer(serializers.ModelSerializer):
     )
     question_points = serializers.FloatField(
         source='question.points', 
+        read_only=True
+    )
+    question_type = serializers.CharField(
+        source='question.type_question',
+        read_only=True
+    )
+    question_mode_correction = serializers.CharField(
+        source='question.mode_correction',
         read_only=True
     )
     statut_display = serializers.CharField(
@@ -303,6 +389,8 @@ class ReponseQuestionSerializer(serializers.ModelSerializer):
             'question',
             'question_enonce',
             'question_points',
+            'question_type',
+            'question_mode_correction',
             'statut',
             'statut_display',
             'choix_selectionnes',
@@ -311,13 +399,15 @@ class ReponseQuestionSerializer(serializers.ModelSerializer):
             'points_obtenus',
             'commentaire_correcteur',
             'date_reponse',
+            'date_modification',
             'date_correction',
             'pourcentage_reussite'
         ]
         read_only_fields = [
             'id', 
             'points_obtenus', 
-            'date_reponse', 
+            'date_reponse',
+            'date_modification',
             'date_correction'
         ]
 
@@ -362,10 +452,11 @@ class PassageEvaluationSerializer(serializers.ModelSerializer):
         source='evaluation.bareme', 
         read_only=True
     )
-    apprenant_nom = serializers.CharField(
-        source='apprenant.user.get_full_name', 
+    evaluation_type = serializers.CharField(
+        source='evaluation.type_evaluation',
         read_only=True
     )
+    apprenant_nom = serializers.SerializerMethodField()
     statut_display = serializers.CharField(
         source='get_statut_display', 
         read_only=True
@@ -373,6 +464,8 @@ class PassageEvaluationSerializer(serializers.ModelSerializer):
     pourcentage = serializers.SerializerMethodField()
     est_corrige = serializers.BooleanField(read_only=True)
     necessite_correction = serializers.BooleanField(read_only=True)
+    peut_etre_repris = serializers.SerializerMethodField()
+    peut_etre_soumis = serializers.SerializerMethodField()
     
     class Meta:
         model = PassageEvaluation
@@ -383,6 +476,7 @@ class PassageEvaluationSerializer(serializers.ModelSerializer):
             'evaluation',
             'evaluation_titre',
             'evaluation_bareme',
+            'evaluation_type',
             'statut',
             'statut_display',
             'reponse_texte',
@@ -394,7 +488,9 @@ class PassageEvaluationSerializer(serializers.ModelSerializer):
             'date_correction',
             'pourcentage',
             'est_corrige',
-            'necessite_correction'
+            'necessite_correction',
+            'peut_etre_repris',
+            'peut_etre_soumis'
         ]
         read_only_fields = [
             'id', 
@@ -403,16 +499,47 @@ class PassageEvaluationSerializer(serializers.ModelSerializer):
             'date_correction'
         ]
     
+    def get_apprenant_nom(self, obj):
+        try:
+            return f"{obj.apprenant.prenom} {obj.apprenant.nom}"
+        except:
+            return str(obj.apprenant)
+    
     def get_pourcentage(self, obj):
         return obj.pourcentage()
+    
+    def get_peut_etre_repris(self, obj):
+        return obj.peut_etre_repris()
+    
+    def get_peut_etre_soumis(self, obj):
+        return obj.peut_etre_soumis()
 
 
 class PassageEvaluationDetailSerializer(PassageEvaluationSerializer):
     """Serializer détaillé avec toutes les réponses aux questions"""
     reponses_questions = ReponseQuestionSerializer(many=True, read_only=True)
+    evaluation_details = serializers.SerializerMethodField()
     
     class Meta(PassageEvaluationSerializer.Meta):
-        fields = PassageEvaluationSerializer.Meta.fields + ['reponses_questions']
+        fields = PassageEvaluationSerializer.Meta.fields + [
+            'reponses_questions',
+            'evaluation_details'
+        ]
+    
+    def get_evaluation_details(self, obj):
+        """Retourne les détails complets de l'évaluation"""
+        return {
+            'id': obj.evaluation.id,
+            'titre': obj.evaluation.titre,
+            'type_evaluation': obj.evaluation.type_evaluation,
+            'bareme': obj.evaluation.bareme,
+            'duree_minutes': obj.evaluation.duree_minutes,
+            'consigne_texte': obj.evaluation.consigne_texte,
+            'fichier_sujet': obj.evaluation.fichier_sujet.url if obj.evaluation.fichier_sujet else None,
+            'date_debut': obj.evaluation.date_debut,
+            'date_fin': obj.evaluation.date_fin,
+            'est_auto_corrigeable': obj.evaluation.est_auto_corrigeable()
+        }
 
 
 class PassageEvaluationCreateSerializer(serializers.ModelSerializer):
@@ -453,21 +580,19 @@ class CorrectionReponseSerializer(serializers.ModelSerializer):
             'commentaire_correcteur'
         ]
     
-    def update(self, instance, validated_data):
-        instance.points_obtenus = validated_data.get(
-            'points_obtenus', 
-            instance.points_obtenus
-        )
-        instance.commentaire_correcteur = validated_data.get(
-            'commentaire_correcteur', 
-            instance.commentaire_correcteur
-        )
-        instance.statut = 'corrige'
-        instance.date_correction = serializers.DateTimeField().to_representation(
-            serializers.DateTimeField.now()
-        )
-        instance.save()
-        return instance
+    def validate_points_obtenus(self, value):
+        """Valider que les points ne dépassent pas le maximum"""
+        instance = self.instance
+        if instance and value > instance.question.points:
+            raise serializers.ValidationError(
+                f"Les points obtenus ({value}) ne peuvent pas dépasser "
+                f"les points de la question ({instance.question.points})."
+            )
+        if value < 0:
+            raise serializers.ValidationError(
+                "Les points obtenus ne peuvent pas être négatifs."
+            )
+        return value
 
 
 class CorrectionEvaluationSerializer(serializers.ModelSerializer):
@@ -478,22 +603,22 @@ class CorrectionEvaluationSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'note',
-            'commentaire_enseignant',
-            'statut'
+            'commentaire_enseignant'
         ]
     
-    def update(self, instance, validated_data):
-        instance.note = validated_data.get('note', instance.note)
-        instance.commentaire_enseignant = validated_data.get(
-            'commentaire_enseignant', 
-            instance.commentaire_enseignant
-        )
-        instance.statut = 'corrige'
-        instance.date_correction = serializers.DateTimeField().to_representation(
-            serializers.DateTimeField.now()
-        )
-        instance.save()
-        return instance
+    def validate_note(self, value):
+        """Valider que la note ne dépasse pas le barème"""
+        instance = self.instance
+        if instance and value > instance.evaluation.bareme:
+            raise serializers.ValidationError(
+                f"La note ({value}) ne peut pas dépasser "
+                f"le barème ({instance.evaluation.bareme})."
+            )
+        if value < 0:
+            raise serializers.ValidationError(
+                "La note ne peut pas être négative."
+            )
+        return value
 
 
 # ============================================================================
@@ -503,7 +628,6 @@ class CorrectionEvaluationSerializer(serializers.ModelSerializer):
 class StatistiquesApprenantSerializer(serializers.Serializer):
     """Serializer pour les statistiques d'un apprenant"""
     apprenant_id = serializers.IntegerField()
-    apprenant_nom = serializers.CharField()
     
     # Quiz
     nombre_quiz_passes = serializers.IntegerField()
@@ -512,18 +636,17 @@ class StatistiquesApprenantSerializer(serializers.Serializer):
     # Évaluations
     nombre_evaluations_passees = serializers.IntegerField()
     nombre_evaluations_corrigees = serializers.IntegerField()
+    nombre_evaluations_en_attente = serializers.IntegerField()
     note_moyenne = serializers.FloatField()
-    pourcentage_reussite = serializers.FloatField()
 
 
 class StatistiquesEvaluationSerializer(serializers.Serializer):
     """Serializer pour les statistiques d'une évaluation"""
     evaluation_id = serializers.IntegerField()
-    evaluation_titre = serializers.CharField()
     
     nombre_passages = serializers.IntegerField()
-    nombre_corriges = serializers.IntegerField()
     note_moyenne = serializers.FloatField()
     note_min = serializers.FloatField()
     note_max = serializers.FloatField()
-    taux_reussite = serializers.FloatField()  # % ayant >= 10/20
+    taux_reussite = serializers.FloatField()
+    bareme = serializers.FloatField()

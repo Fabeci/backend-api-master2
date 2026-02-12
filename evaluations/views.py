@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
 
 from .models import (
@@ -20,6 +20,7 @@ from .models import (
 )
 
 from .serializers import (
+    EvaluationAccessibiliteSerializer,
     QuizSerializer,
     QuizDetailSerializer,
     QuestionSerializer,
@@ -41,7 +42,7 @@ from .serializers import (
 
 
 # ============================================================================
-# FONCTIONS UTILITAIRES (vos méthodes standards)
+# FONCTIONS UTILITAIRES
 # ============================================================================
 
 def api_success(message: str, data=None, http_status=status.HTTP_200_OK):
@@ -81,7 +82,6 @@ class QuizListCreateAPIView(APIView):
     def get(self, request):
         """Récupère la liste de tous les quiz"""
         try:
-            # Filtrer par séquence si fournie
             sequence_id = request.query_params.get('sequence')
             
             quizz = Quiz.objects.select_related('sequence').all()
@@ -168,7 +168,6 @@ class PassageQuizListCreateAPIView(APIView):
     def get(self, request):
         """Récupère la liste des passages de quiz"""
         try:
-            # Filtrer par apprenant ou quiz
             apprenant_id = request.query_params.get('apprenant')
             quiz_id = request.query_params.get('quiz')
             
@@ -240,14 +239,7 @@ class ReponseQuizSubmitAPIView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
-        """
-        Soumet une réponse à une question de quiz
-        Body: {
-            "passage_quiz": 1,
-            "question": 5,
-            "choix_selectionnes": [2, 3]
-        }
-        """
+        """Soumet une réponse à une question de quiz"""
         try:
             passage_quiz_id = request.data.get('passage_quiz')
             question_id = request.data.get('question')
@@ -330,7 +322,6 @@ class QuestionListCreateAPIView(APIView):
     def get(self, request):
         """Récupère la liste des questions"""
         try:
-            # Filtrer par quiz ou évaluation
             quiz_id = request.query_params.get('quiz')
             evaluation_id = request.query_params.get('evaluation')
             
@@ -420,7 +411,6 @@ class ReponseListCreateAPIView(APIView):
     def get(self, request):
         """Récupère la liste des réponses prédéfinies"""
         try:
-            # Filtrer par question
             question_id = request.query_params.get('question')
             
             reponses = Reponse.objects.select_related('question').all()
@@ -511,7 +501,6 @@ class EvaluationListCreateAPIView(APIView):
     def get(self, request):
         """Récupère la liste des évaluations"""
         try:
-            # Filtrer par cours ou enseignant
             cours_id = request.query_params.get('cours')
             enseignant_id = request.query_params.get('enseignant')
             est_publiee = request.query_params.get('publiee')
@@ -608,7 +597,7 @@ class EvaluationPublierAPIView(APIView):
         """Publie ou dépublie une évaluation"""
         try:
             evaluation = get_object_or_404(Evaluation, pk=pk)
-            action = request.data.get('action', 'publier')  # 'publier' ou 'depublier'
+            action = request.data.get('action', 'publier')
             
             if action not in ['publier', 'depublier']:
                 return api_error(
@@ -631,18 +620,339 @@ class EvaluationPublierAPIView(APIView):
             )
 
 
+class EvaluationAccessibiliteAPIView(APIView):
+    """Vérifier l'accessibilité d'une évaluation pour un apprenant"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, pk):
+        """
+        Retourne les informations d'accessibilité d'une évaluation
+        Inclut: est_accessible, peut_commencer, peut_reprendre, passage existant, etc.
+        """
+        try:
+            evaluation = get_object_or_404(Evaluation, pk=pk)
+            apprenant_id = request.query_params.get('apprenant')
+            
+            if not apprenant_id:
+                return api_error(
+                    "Le paramètre 'apprenant' est requis",
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Vérifier si un passage existe
+            passage = PassageEvaluation.objects.filter(
+                evaluation=evaluation,
+                apprenant_id=apprenant_id
+            ).first()
+            
+            data = {
+                'evaluation_id': evaluation.id,
+                'est_publiee': evaluation.est_publiee,
+                'est_accessible': evaluation.est_accessible(),
+                'peut_soumettre': evaluation.peut_soumettre(),
+                'date_debut': evaluation.date_debut,
+                'date_fin': evaluation.date_fin,
+                'passage_existe': passage is not None,
+                'passage': None,
+                'action_possible': None
+            }
+            
+            if passage:
+                data['passage'] = {
+                    'id': passage.id,
+                    'statut': passage.statut,
+                    'date_debut': passage.date_debut,
+                    'peut_etre_repris': passage.peut_etre_repris(),
+                    'peut_etre_soumis': passage.peut_etre_soumis(),
+                    'note': passage.note,
+                    'est_corrige': passage.est_corrige
+                }
+                
+                # Déterminer l'action possible
+                if passage.statut == 'en_cours':
+                    if passage.peut_etre_repris():
+                        data['action_possible'] = 'reprendre'
+                    else:
+                        data['action_possible'] = 'date_expiree'
+                elif passage.statut == 'soumis':
+                    data['action_possible'] = 'en_attente_correction'
+                elif passage.statut == 'corrige':
+                    data['action_possible'] = 'voir_resultat'
+            else:
+                # Pas de passage
+                if evaluation.est_accessible():
+                    data['action_possible'] = 'commencer'
+                else:
+                    data['action_possible'] = 'non_accessible'
+            
+            serializer = EvaluationAccessibiliteSerializer(data)
+            return api_success(
+                "Informations d'accessibilité récupérées",
+                serializer.data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la vérification d'accessibilité",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
 # ============================================================================
-# VUES POUR PASSAGES D'ÉVALUATIONS
+# VUES POUR PASSAGES D'ÉVALUATIONS (NOUVELLE LOGIQUE)
 # ============================================================================
 
-class PassageEvaluationListCreateAPIView(APIView):
-    """Liste des passages d'évaluations ou création d'un nouveau passage"""
+class PassageEvaluationDemarrerAPIView(APIView):
+    """Démarrer une nouvelle évaluation"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Démarre une évaluation pour un apprenant
+        Body: {"apprenant": 1, "evaluation": 5}
+        """
+        try:
+            apprenant_id = request.data.get('apprenant')
+            evaluation_id = request.data.get('evaluation')
+            
+            if not apprenant_id or not evaluation_id:
+                return api_error(
+                    "Les champs 'apprenant' et 'evaluation' sont requis",
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            evaluation = get_object_or_404(Evaluation, pk=evaluation_id)
+            
+            # Vérifier qu'il n'existe pas déjà un passage
+            passage_existant = PassageEvaluation.objects.filter(
+                apprenant_id=apprenant_id,
+                evaluation=evaluation
+            ).first()
+            
+            if passage_existant:
+                return api_error(
+                    f"Un passage existe déjà avec le statut: {passage_existant.statut}",
+                    data={'passage_id': passage_existant.id, 'statut': passage_existant.statut},
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Vérifier l'accessibilité
+            if not evaluation.est_accessible():
+                return api_error(
+                    "Cette évaluation n'est pas accessible actuellement",
+                    http_status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Créer le passage
+            passage = PassageEvaluation.objects.create(
+                apprenant_id=apprenant_id,
+                evaluation=evaluation,
+                statut='en_cours'
+            )
+            
+            # Pour évaluations structurées, créer les réponses vides
+            if evaluation.type_evaluation == 'structuree':
+                for question in evaluation.questions.all():
+                    ReponseQuestion.objects.create(
+                        passage_evaluation=passage,
+                        question=question,
+                        statut='non_repondu'
+                    )
+            
+            serializer = PassageEvaluationDetailSerializer(passage)
+            return api_success(
+                "Évaluation démarrée avec succès",
+                serializer.data,
+                status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors du démarrage de l'évaluation",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class PassageEvaluationReprendreAPIView(APIView):
+    """Reprendre une évaluation en cours"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, pk):
+        """
+        Récupère un passage en cours pour le reprendre
+        Vérifie que le statut est 'en_cours' et que la date_fin n'est pas dépassée
+        """
+        try:
+            passage = get_object_or_404(PassageEvaluation, pk=pk)
+            
+            if passage.statut != 'en_cours':
+                return api_error(
+                    f"Ce passage ne peut pas être repris (statut: {passage.statut})",
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if not passage.peut_etre_repris():
+                return api_error(
+                    "La date limite pour cette évaluation est dépassée",
+                    http_status=status.HTTP_403_FORBIDDEN
+                )
+            
+            serializer = PassageEvaluationDetailSerializer(passage)
+            return api_success(
+                "Passage récupéré pour reprise",
+                serializer.data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la reprise de l'évaluation",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class PassageEvaluationSauvegarderAPIView(APIView):
+    """Sauvegarder la progression (pour évaluations simples)"""
+    permission_classes = [IsAuthenticated]
+    
+    def put(self, request, pk):
+        """
+        Sauvegarde les réponses d'une évaluation simple en cours
+        Body: {"reponse_texte": "...", "fichier_reponse": file}
+        """
+        try:
+            passage = get_object_or_404(PassageEvaluation, pk=pk)
+            
+            if passage.statut != 'en_cours':
+                return api_error(
+                    "Impossible de sauvegarder après soumission",
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if passage.evaluation.type_evaluation != 'simple':
+                return api_error(
+                    "Cette route est uniquement pour les évaluations simples",
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Mise à jour partielle
+            serializer = PassageEvaluationSerializer(
+                passage, 
+                data=request.data, 
+                partial=True
+            )
+            
+            if serializer.is_valid():
+                passage = serializer.save()
+                return api_success(
+                    "Progression sauvegardée",
+                    PassageEvaluationSerializer(passage).data,
+                    status.HTTP_200_OK
+                )
+            
+            return api_error(
+                "Erreur de validation",
+                errors=serializer.errors,
+                http_status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la sauvegarde",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class PassageEvaluationSoumettreAPIView(APIView):
+    """Soumettre une évaluation (bascule irréversible)"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, pk):
+        """
+        Soumet une évaluation pour correction
+        - Vérifie que le statut est 'en_cours'
+        - Vérifie que la date_fin n'est pas dépassée
+        - Auto-corrige si 100% QCM
+        - Sinon, passe en statut 'soumis'
+        """
+        try:
+            passage = get_object_or_404(PassageEvaluation, pk=pk)
+            
+            # Vérifications
+            if passage.statut != 'en_cours':
+                return api_error(
+                    f"Cette évaluation a déjà été soumise (statut: {passage.statut})",
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if not passage.peut_etre_soumis():
+                return api_error(
+                    "La date limite pour soumettre cette évaluation est dépassée",
+                    http_status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Vérifications spécifiques selon le type
+            if passage.evaluation.type_evaluation == 'structuree':
+                # Vérifier qu'au moins une question a été répondue (optionnel)
+                questions_repondues = passage.reponses_questions.exclude(
+                    statut='non_repondu'
+                ).count()
+                
+                if questions_repondues == 0:
+                    return api_error(
+                        "Aucune question n'a été répondue",
+                        http_status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            elif passage.evaluation.type_evaluation == 'simple':
+                # Vérifier qu'il y a au moins une réponse
+                if not passage.reponse_texte and not passage.fichier_reponse:
+                    return api_error(
+                        "Aucune réponse fournie",
+                        http_status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Passer en statut soumis
+            passage.statut = 'soumis'
+            passage.date_soumission = timezone.now()
+            passage.save()
+            
+            # Tentative d'auto-correction
+            if passage.evaluation.type_evaluation == 'structuree':
+                if passage.evaluation.est_auto_corrigeable():
+                    # Auto-correction complète
+                    passage.auto_corriger()
+                    message = "Évaluation soumise et corrigée automatiquement"
+                else:
+                    # Auto-correction des QCM uniquement
+                    passage.auto_corriger_qcm_uniquement()
+                    message = "Évaluation soumise, en attente de correction"
+            else:
+                # Évaluation simple : toujours correction manuelle
+                message = "Évaluation soumise, en attente de correction"
+            
+            serializer = PassageEvaluationDetailSerializer(passage)
+            return api_success(
+                message,
+                serializer.data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la soumission de l'évaluation",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class PassageEvaluationListAPIView(APIView):
+    """Liste des passages d'évaluations avec filtres"""
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
         """Récupère la liste des passages d'évaluations"""
         try:
-            # Filtrer par apprenant, évaluation ou statut
             apprenant_id = request.query_params.get('apprenant')
             evaluation_id = request.query_params.get('evaluation')
             statut = request.query_params.get('statut')
@@ -671,23 +981,6 @@ class PassageEvaluationListCreateAPIView(APIView):
                 errors={'detail': str(e)},
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-    
-    def post(self, request):
-        """Créer un nouveau passage d'évaluation"""
-        serializer = PassageEvaluationCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            passage = serializer.save()
-            
-            return api_success(
-                "Passage d'évaluation créé avec succès",
-                PassageEvaluationDetailSerializer(passage).data,
-                status.HTTP_201_CREATED
-            )
-        return api_error(
-            "Erreur de validation",
-            errors=serializer.errors,
-            http_status=status.HTTP_400_BAD_REQUEST
-        )
 
 
 class PassageEvaluationDetailAPIView(APIView):
@@ -703,145 +996,84 @@ class PassageEvaluationDetailAPIView(APIView):
             serializer.data,
             status.HTTP_200_OK
         )
-    
-    def put(self, request, pk):
-        """Mettre à jour un passage (pour évaluation simple)"""
-        passage = get_object_or_404(PassageEvaluation, pk=pk)
-        serializer = PassageEvaluationSerializer(passage, data=request.data, partial=True)
-        if serializer.is_valid():
-            passage = serializer.save()
-            return api_success(
-                "Passage d'évaluation mis à jour avec succès",
-                PassageEvaluationSerializer(passage).data,
-                status.HTTP_200_OK
-            )
-        return api_error(
-            "Erreur de validation",
-            errors=serializer.errors,
-            http_status=status.HTTP_400_BAD_REQUEST
-        )
-
-
-class PassageEvaluationSoumettreAPIView(APIView):
-    """Soumettre une évaluation"""
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request, pk):
-        """Soumet une évaluation pour correction"""
-        try:
-            passage = get_object_or_404(PassageEvaluation, pk=pk)
-            
-            if passage.statut != 'en_cours':
-                return api_error(
-                    "Cette évaluation a déjà été soumise",
-                    http_status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Vérifier que toutes les questions ont été répondues (pour structurée)
-            if passage.evaluation.type_evaluation == 'structuree':
-                questions_non_repondues = passage.reponses_questions.filter(
-                    statut='non_repondu'
-                ).count()
-                
-                if questions_non_repondues > 0:
-                    return api_error(
-                        f"{questions_non_repondues} question(s) non répondue(s)",
-                        http_status=status.HTTP_400_BAD_REQUEST
-                    )
-            
-            # Soumettre
-            passage.statut = 'soumis'
-            passage.date_soumission = timezone.now()
-            passage.save()
-            
-            # Auto-correction des QCM
-            for reponse in passage.reponses_questions.filter(
-                question__mode_correction='automatique'
-            ):
-                reponse.calculer_points_automatique()
-            
-            # Calculer la note si tout est auto-corrigé
-            if not passage.necessite_correction:
-                total_points = sum(
-                    r.points_obtenus 
-                    for r in passage.reponses_questions.all()
-                )
-                passage.note = total_points
-                passage.statut = 'corrige'
-                passage.date_correction = timezone.now()
-                passage.save()
-            
-            serializer = PassageEvaluationDetailSerializer(passage)
-            return api_success(
-                "Évaluation soumise avec succès",
-                serializer.data,
-                status.HTTP_200_OK
-            )
-        except Exception as e:
-            return api_error(
-                "Erreur lors de la soumission de l'évaluation",
-                errors={'detail': str(e)},
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 
 
 # ============================================================================
 # VUES POUR RÉPONSES AUX QUESTIONS D'ÉVALUATION
 # ============================================================================
 
-class ReponseQuestionSubmitAPIView(APIView):
-    """Soumettre une réponse à une question d'évaluation"""
+class ReponseQuestionSauvegarderAPIView(APIView):
+    """Sauvegarder une réponse à une question (pendant l'évaluation)"""
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
         """
-        Soumet une réponse à une question d'évaluation
+        Crée ou met à jour une réponse à une question
         Body: {
             "passage_evaluation": 1,
             "question": 5,
-            "choix_selectionnes": [2],  // Pour QCM
-            "reponse_texte": "...",     // Pour texte
-            "fichier_reponse": file     // Pour fichier
+            "choix_selectionnes": [2],
+            "reponse_texte": "...",
+            "fichier_reponse": file
         }
         """
-        serializer = ReponseQuestionCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            reponse = serializer.save()
-            return api_success(
-                "Réponse enregistrée avec succès",
-                ReponseQuestionSerializer(reponse).data,
-                status.HTTP_201_CREATED
+        try:
+            passage_evaluation_id = request.data.get('passage_evaluation')
+            question_id = request.data.get('question')
+            
+            if not passage_evaluation_id or not question_id:
+                return api_error(
+                    "Les champs 'passage_evaluation' et 'question' sont requis",
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            passage = get_object_or_404(PassageEvaluation, pk=passage_evaluation_id)
+            
+            # Vérifier que le passage est en cours
+            if passage.statut != 'en_cours':
+                return api_error(
+                    "Impossible de modifier après soumission",
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Récupérer ou créer la réponse
+            reponse, created = ReponseQuestion.objects.get_or_create(
+                passage_evaluation_id=passage_evaluation_id,
+                question_id=question_id
             )
-        return api_error(
-            "Erreur de validation",
-            errors=serializer.errors,
-            http_status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    def put(self, request, pk):
-        """Modifier une réponse existante"""
-        reponse = get_object_or_404(ReponseQuestion, pk=pk)
-        
-        # Vérifier que l'évaluation n'est pas encore soumise
-        if reponse.passage_evaluation.statut != 'en_cours':
-            return api_error(
-                "Impossible de modifier après soumission",
-                http_status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        serializer = ReponseQuestionSerializer(reponse, data=request.data, partial=True)
-        if serializer.is_valid():
-            reponse = serializer.save()
+            
+            # Mise à jour
+            if 'choix_selectionnes' in request.data:
+                reponse.choix_selectionnes.set(request.data['choix_selectionnes'])
+            
+            if 'reponse_texte' in request.data:
+                reponse.reponse_texte = request.data['reponse_texte']
+            
+            if 'fichier_reponse' in request.FILES:
+                reponse.fichier_reponse = request.FILES['fichier_reponse']
+            
+            # Marquer comme répondu si pas vide
+            if (reponse.choix_selectionnes.exists() or 
+                reponse.reponse_texte or 
+                reponse.fichier_reponse):
+                reponse.statut = 'repondu'
+            else:
+                reponse.statut = 'non_repondu'
+            
+            reponse.save()
+            
+            serializer = ReponseQuestionSerializer(reponse)
             return api_success(
-                "Réponse mise à jour avec succès",
-                ReponseQuestionSerializer(reponse).data,
+                "Réponse sauvegardée avec succès",
+                serializer.data,
                 status.HTTP_200_OK
             )
-        return api_error(
-            "Erreur de validation",
-            errors=serializer.errors,
-            http_status=status.HTTP_400_BAD_REQUEST
-        )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la sauvegarde de la réponse",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class ReponseQuestionDetailAPIView(APIView):
@@ -885,12 +1117,23 @@ class CorrectionReponseAPIView(APIView):
                     http_status=status.HTTP_400_BAD_REQUEST
                 )
             
+            # Vérifier que le passage est soumis
+            if reponse.passage_evaluation.statut != 'soumis':
+                return api_error(
+                    "Le passage doit être soumis pour être corrigé",
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+            
             serializer = CorrectionReponseSerializer(reponse, data=request.data, partial=True)
             if serializer.is_valid():
                 reponse = serializer.save()
+                reponse.statut = 'corrige'
+                reponse.date_correction = timezone.now()
+                reponse.save()
+                
                 return api_success(
                     "Réponse corrigée avec succès",
-                    CorrectionReponseSerializer(reponse).data,
+                    ReponseQuestionSerializer(reponse).data,
                     status.HTTP_200_OK
                 )
             return api_error(
@@ -921,30 +1164,54 @@ class CorrectionEvaluationAPIView(APIView):
         try:
             passage = get_object_or_404(PassageEvaluation, pk=pk)
             
-            # Vérifier que toutes les réponses manuelles sont corrigées
-            reponses_non_corrigees = passage.reponses_questions.filter(
-                question__mode_correction='manuelle',
-                statut__in=['non_repondu', 'repondu']
-            ).count()
-            
-            if reponses_non_corrigees > 0:
+            # Vérifier que le passage est soumis
+            if passage.statut != 'soumis':
                 return api_error(
-                    f"{reponses_non_corrigees} réponse(s) non corrigée(s)",
+                    "Le passage doit être soumis pour être corrigé",
                     http_status=status.HTTP_400_BAD_REQUEST
                 )
             
-            serializer = CorrectionEvaluationSerializer(passage, data=request.data, partial=True)
-            if serializer.is_valid():
-                passage = serializer.save()
-                return api_success(
-                    "Évaluation corrigée avec succès",
-                    PassageEvaluationDetailSerializer(passage).data,
-                    status.HTTP_200_OK
+            # Pour évaluations structurées, vérifier que toutes les réponses manuelles sont corrigées
+            if passage.evaluation.type_evaluation == 'structuree':
+                reponses_non_corrigees = passage.reponses_questions.filter(
+                    question__mode_correction='manuelle',
+                    statut__in=['non_repondu', 'repondu']
+                ).count()
+                
+                if reponses_non_corrigees > 0:
+                    return api_error(
+                        f"{reponses_non_corrigees} réponse(s) manuelle(s) non corrigée(s)",
+                        http_status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Calculer la note automatiquement basée sur les réponses
+                note_calculee = sum(
+                    float(r.points_obtenus or 0) 
+                    for r in passage.reponses_questions.all()
                 )
-            return api_error(
-                "Erreur de validation",
-                errors=serializer.errors,
-                http_status=status.HTTP_400_BAD_REQUEST
+                
+                # Utiliser la note fournie ou la note calculée
+                note_finale = request.data.get('note', note_calculee)
+            else:
+                # Pour évaluation simple, utiliser la note fournie
+                note_finale = request.data.get('note')
+                if note_finale is None:
+                    return api_error(
+                        "La note est requise pour les évaluations simples",
+                        http_status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            passage.note = note_finale
+            passage.commentaire_enseignant = request.data.get('commentaire_enseignant', '')
+            passage.statut = 'corrige'
+            passage.date_correction = timezone.now()
+            passage.save()
+            
+            serializer = PassageEvaluationDetailSerializer(passage)
+            return api_success(
+                "Évaluation corrigée avec succès",
+                serializer.data,
+                status.HTTP_200_OK
             )
         except Exception as e:
             return api_error(
@@ -961,7 +1228,6 @@ class EvaluationsACorrigerAPIView(APIView):
     def get(self, request):
         """Récupère les évaluations en attente de correction"""
         try:
-            # Filtrer par enseignant
             enseignant_id = request.query_params.get('enseignant')
             
             passages = PassageEvaluation.objects.select_related(

@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
+from django.utils import timezone
 from courses.models import Sequence, Cours
 
 
@@ -116,12 +117,52 @@ class Evaluation(models.Model):
         """Retourne le nombre de questions (pour évaluations structurées)"""
         return self.questions.count() if self.type_evaluation == 'structuree' else 0
 
+    def est_accessible(self):
+        """Vérifie si l'évaluation est accessible pour passer"""
+        if not self.est_publiee:
+            return False
+        
+        now = timezone.now()
+        
+        if self.date_debut and now < self.date_debut:
+            return False
+        
+        if self.date_fin and now > self.date_fin:
+            return False
+        
+        return True
+
+    def peut_soumettre(self):
+        """Vérifie si on peut encore soumettre (respecte date_fin)"""
+        if not self.est_publiee:
+            return False
+        
+        now = timezone.now()
+        
+        if self.date_fin and now > self.date_fin:
+            return False
+        
+        return True
+
+    def est_auto_corrigeable(self):
+        """Détermine si l'évaluation est 100% auto-corrigeable (QCM uniquement)"""
+        if self.type_evaluation == 'simple':
+            return False
+        
+        questions = self.questions.all()
+        if not questions.exists():
+            return False
+        
+        # Vérifie que TOUTES les questions sont des QCM
+        return all(
+            q.type_question in ['choix_unique', 'choix_multiple'] 
+            for q in questions
+        )
+
 
 # ============================================================================
 # QUESTIONS (Pour Quiz et Évaluations structurées)
 # ============================================================================
-
-# evaluations/models.py
 
 class Question(models.Model):
     TYPE_CHOICES_QUIZ = [
@@ -176,7 +217,6 @@ class Question(models.Model):
         max_length=20, 
         choices=MODE_CORRECTION,
         default='automatique',
-        # ← NE PAS mettre editable=False
     )
     
     points = models.FloatField(
@@ -346,6 +386,12 @@ class Reponse(models.Model):
 # ============================================================================
 
 class PassageEvaluation(models.Model):
+    """
+    Statuts clarifiés selon nouvelle logique:
+    - en_cours: L'apprenant a démarré, peut sauvegarder et reprendre
+    - soumis: L'apprenant a soumis, plus aucune modification possible
+    - corrige: La note finale est validée (automatique ou enseignant)
+    """
     STATUT_CHOICES = [
         ('en_cours', 'En cours'),
         ('soumis', 'Soumis'),
@@ -415,7 +461,7 @@ class PassageEvaluation(models.Model):
                     f"La note ({self.note}) ne peut pas dépasser le barème ({self.evaluation.bareme})."
                 )
         
-        # Pour évaluation simple, il faut au moins une réponse
+        # Pour évaluation simple soumise, il faut au moins une réponse
         if self.evaluation.type_evaluation == 'simple' and self.statut == 'soumis':
             if not self.reponse_texte and not self.fichier_reponse:
                 raise ValidationError(
@@ -447,12 +493,65 @@ class PassageEvaluation(models.Model):
             question__mode_correction='manuelle'
         ).exists()
 
+    def peut_etre_repris(self):
+        """Détermine si le passage peut être repris (statut en_cours + dans la fenêtre)"""
+        if self.statut != 'en_cours':
+            return False
+        
+        return self.evaluation.peut_soumettre()
+
+    def peut_etre_soumis(self):
+        """Détermine si le passage peut être soumis"""
+        if self.statut != 'en_cours':
+            return False
+        
+        return self.evaluation.peut_soumettre()
+
+    def auto_corriger(self):
+        """
+        Auto-correction pour les évaluations 100% QCM
+        Retourne True si l'auto-correction a été effectuée, False sinon
+        """
+        if not self.evaluation.est_auto_corrigeable():
+            return False
+        
+        # Auto-corriger toutes les questions QCM
+        for reponse in self.reponses_questions.all():
+            if reponse.question.mode_correction == 'automatique':
+                reponse.calculer_points_automatique()
+        
+        # Calculer la note finale
+        total_points = sum(
+            float(r.points_obtenus or 0) 
+            for r in self.reponses_questions.all()
+        )
+        
+        self.note = total_points
+        self.statut = 'corrige'
+        self.date_correction = timezone.now()
+        self.save()
+        
+        return True
+
+    def auto_corriger_qcm_uniquement(self):
+        """Auto-corriger uniquement les QCM (pour évaluations mixtes)"""
+        for reponse in self.reponses_questions.filter(
+            question__mode_correction='automatique'
+        ):
+            reponse.calculer_points_automatique()
+
 
 # ============================================================================
 # RÉPONSES AUX QUESTIONS (Pour évaluations structurées)
 # ============================================================================
 
 class ReponseQuestion(models.Model):
+    """
+    Statuts clarifiés:
+    - non_repondu: Question pas encore traitée
+    - repondu: Question répondue mais pas encore corrigée
+    - corrige: Question corrigée (auto ou manuelle)
+    """
     STATUT_CHOICES = [
         ('non_repondu', 'Non répondu'),
         ('repondu', 'Répondu'),
@@ -511,6 +610,7 @@ class ReponseQuestion(models.Model):
     )
     
     date_reponse = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
     date_correction = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -585,6 +685,7 @@ class ReponseQuestion(models.Model):
                 self.points_obtenus = max(0, score * self.question.points)
         
         self.statut = 'corrige'
+        self.date_correction = timezone.now()
         self.save()
         return self.points_obtenus
 
