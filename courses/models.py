@@ -2,7 +2,8 @@
 from django.db import models
 from django.forms import ValidationError
 from django.utils import timezone
-
+from django.core.validators import FileExtensionValidator, MinValueValidator
+from django.conf import settings
 from academics.models import Groupe, Matiere
 
 
@@ -110,6 +111,309 @@ class Sequence(models.Model):
 
     def __str__(self):
         return self.titre
+    
+
+class BlocContenu(models.Model):
+   
+    TYPE_BLOC_CHOICES = [
+        ('texte', 'Texte / Explication'),
+        ('video', 'Vidéo'),
+        ('audio', 'Audio'),
+        ('image', 'Image'),
+        ('code', 'Exemple de code'),
+        ('exercice', 'Exercice pratique'),
+        ('quiz', 'Quiz intégré'),
+        ('lien', 'Lien externe'),
+        ('pdf', 'Document PDF'),
+        ('markdown', 'Contenu Markdown'),
+    ]
+    
+    sequence = models.ForeignKey(
+        Sequence,
+        on_delete=models.CASCADE,
+        related_name="blocs_contenu",
+        help_text="Séquence parente"
+    )
+    
+    titre = models.CharField(
+        max_length=255,
+        help_text="Titre du bloc (ex: 'Introduction aux variables')"
+    )
+    
+    type_bloc = models.CharField(
+        max_length=20,
+        choices=TYPE_BLOC_CHOICES,
+        default='texte'
+    )
+    
+    ordre = models.PositiveIntegerField(
+        default=0,
+        help_text="Ordre d'affichage dans la séquence"
+    )
+    
+    # Contenu textuel
+    contenu_texte = models.TextField(
+        blank=True,
+        default="",
+        help_text="Contenu texte brut"
+    )
+    
+    contenu_html = models.TextField(
+        blank=True,
+        default="",
+        help_text="Contenu HTML enrichi"
+    )
+    
+    contenu_markdown = models.TextField(
+        blank=True,
+        default="",
+        help_text="Contenu en Markdown"
+    )
+    
+    # Médias
+    video_url = models.URLField(
+        null=True,
+        blank=True,
+        help_text="URL YouTube, Vimeo, etc."
+    )
+    
+    audio_url = models.URLField(
+        null=True,
+        blank=True,
+        help_text="URL fichier audio"
+    )
+    
+    image = models.ImageField(
+        upload_to='sequences/images/%Y/%m/',
+        null=True,
+        blank=True,
+        help_text="Image illustrative"
+    )
+    
+    fichier = models.FileField(
+        upload_to='sequences/fichiers/%Y/%m/',
+        null=True,
+        blank=True,
+        help_text="Fichier attaché (PDF, ZIP, etc.)"
+    )
+    
+    lien_externe = models.URLField(
+        null=True,
+        blank=True,
+        help_text="Lien vers une ressource externe"
+    )
+    
+    # Code source
+    code_source = models.TextField(
+        blank=True,
+        default="",
+        help_text="Code source à afficher"
+    )
+    
+    langage_code = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text="Langage du code (python, javascript, etc.)"
+    )
+    
+    # Métadonnées
+    objectifs = models.TextField(
+        blank=True,
+        default="",
+        help_text="Objectifs pédagogiques de ce bloc"
+    )
+    
+    duree_estimee_minutes = models.PositiveIntegerField(
+        default=0,
+        validators=[MinValueValidator(0)],
+        help_text="Durée estimée pour ce bloc"
+    )
+    
+    est_obligatoire = models.BooleanField(
+        default=True,
+        help_text="Ce bloc doit-il être consulté obligatoirement ?"
+    )
+    
+    est_visible = models.BooleanField(
+        default=True,
+        help_text="Le bloc est-il visible pour les apprenants ?"
+    )
+    
+    # Dates
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['sequence', 'ordre']
+        verbose_name = "Bloc de contenu"
+        verbose_name_plural = "Blocs de contenu"
+        unique_together = [['sequence', 'ordre']]
+        indexes = [
+            models.Index(fields=['sequence', 'ordre']),
+            models.Index(fields=['type_bloc']),
+        ]
+    
+    def __str__(self):
+        return f"{self.sequence.titre} - Bloc {self.ordre}: {self.titre}"
+    
+    @property
+    def icone_type(self):
+        """Retourne une icône selon le type de bloc"""
+        icones = {
+            'texte': '📝',
+            'video': '🎥',
+            'audio': '🎵',
+            'image': '🖼️',
+            'code': '💻',
+            'exercice': '✏️',
+            'quiz': '❓',
+            'lien': '🔗',
+            'pdf': '📄',
+            'markdown': '📋',
+        }
+        return icones.get(self.type_bloc, '📦')
+
+
+class RessourceSequence(models.Model):
+    """
+    Ressources (pièces jointes) liées à une séquence
+    """
+    TYPE_RESSOURCE_CHOICES = [
+        ('cours', 'Support de cours'),
+        ('exercice', 'Fichier d\'exercice'),
+        ('correction', 'Correction'),
+        ('supplementaire', 'Ressource supplémentaire'),
+        ('reference', 'Document de référence'),
+    ]
+    
+    sequence = models.ForeignKey(
+        Sequence,
+        on_delete=models.CASCADE,
+        related_name='ressources_sequences',
+        help_text="Séquence parente"
+    )
+    
+    titre = models.CharField(
+        max_length=255,
+        help_text="Nom de la ressource"
+    )
+    
+    description = models.TextField(
+        blank=True,
+        default="",
+        help_text="Description de la ressource"
+    )
+    
+    fichier = models.FileField(
+        upload_to='sequences/ressources/%Y/%m/',
+        validators=[
+            FileExtensionValidator(
+                allowed_extensions=[
+                    'pdf', 'doc', 'docx', 'ppt', 'pptx', 
+                    'xls', 'xlsx', 'zip', 'rar', 
+                    'jpg', 'jpeg', 'png', 'gif',
+                    'txt', 'md', 'py', 'js', 'html', 'css'
+                ]
+            )
+        ],
+        help_text="Fichier de la ressource"
+    )
+    
+    type_ressource = models.CharField(
+        max_length=20,
+        choices=TYPE_RESSOURCE_CHOICES,
+        default='supplementaire'
+    )
+    
+    taille_fichier = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="Taille en octets (calculée automatiquement)"
+    )
+    
+    est_telechargeable = models.BooleanField(
+        default=True,
+        help_text="Le fichier peut-il être téléchargé ?"
+    )
+    
+    nombre_telechargements = models.IntegerField(
+        default=0,
+        help_text="Nombre de téléchargements"
+    )
+    
+    ordre = models.PositiveIntegerField(
+        default=0,
+        help_text="Ordre d'affichage"
+    )
+    
+    # Métadonnées
+    date_ajout = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+    ajoute_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ressources_sequences_ajoutees'
+    )
+    
+    class Meta:
+        ordering = ['sequence', 'ordre']
+        verbose_name = "Ressource de séquence"
+        verbose_name_plural = "Ressources de séquences"
+        indexes = [
+            models.Index(fields=['sequence', 'type_ressource']),
+        ]
+    
+    def __str__(self):
+        return f"{self.sequence.titre} - {self.titre}"
+    
+    def save(self, *args, **kwargs):
+        """Calcule automatiquement la taille du fichier"""
+        if self.fichier:
+            self.taille_fichier = self.fichier.size
+        super().save(*args, **kwargs)
+    
+    @property
+    def taille_lisible(self):
+        """Retourne la taille en format lisible"""
+        if not self.taille_fichier:
+            return "N/A"
+        
+        taille = self.taille_fichier
+        for unit in ['octets', 'Ko', 'Mo', 'Go']:
+            if taille < 1024.0:
+                return f"{taille:.1f} {unit}"
+            taille /= 1024.0
+        return f"{taille:.1f} To"
+    
+    @property
+    def extension(self):
+        """Retourne l'extension du fichier"""
+        import os
+        return os.path.splitext(self.fichier.name)[1].lower()
+    
+    @property
+    def icone_extension(self):
+        """Retourne une icône selon l'extension"""
+        ext = self.extension
+        icones = {
+            '.pdf': '📄',
+            '.doc': '📝', '.docx': '📝',
+            '.xls': '📊', '.xlsx': '📊',
+            '.ppt': '📽️', '.pptx': '📽️',
+            '.zip': '🗜️', '.rar': '🗜️',
+            '.jpg': '🖼️', '.jpeg': '🖼️', '.png': '🖼️',
+            '.py': '🐍',
+            '.js': '📜',
+        }
+        return icones.get(ext, '📎')
+    
+    def incrementer_telechargements(self):
+        """Incrémente le compteur de téléchargements"""
+        self.nombre_telechargements += 1
+        self.save(update_fields=['nombre_telechargements'])
 
 
 class Session(models.Model):
@@ -168,6 +472,108 @@ class Session(models.Model):
 
     def __str__(self):
         return f"{self.titre} • {self.cours} ({self.date_debut} - {self.date_fin})"
+
+
+class SequenceContent(models.Model):
+    sequence = models.OneToOneField(
+        Sequence,
+        on_delete=models.CASCADE,
+        related_name="contenu"
+    )
+    contenu_texte = models.TextField(blank=True, default="")
+    contenu_html = models.TextField(blank=True, default="")
+    video_url = models.URLField(null=True, blank=True)
+    lien_externe = models.URLField(null=True, blank=True)
+    objectifs = models.TextField(blank=True, default="")
+    duree_estimee_minutes = models.PositiveIntegerField(default=0)
+    est_publie = models.BooleanField(default=False)
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Contenu - {self.sequence.titre}"
+    
+class BlocProgress(models.Model):
+    apprenant = models.ForeignKey(
+        "users.Apprenant",
+        on_delete=models.CASCADE,
+        related_name="blocs_progress",
+    )
+    bloc = models.ForeignKey(
+        "courses.BlocContenu",
+        on_delete=models.CASCADE,
+        related_name="progressions",
+    )
+    est_termine = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["apprenant", "bloc"],
+                name="uniq_progress_apprenant_bloc",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["apprenant", "bloc"]),
+            models.Index(fields=["apprenant", "est_termine"]),
+        ]
+
+    def clean(self):
+        # Optionnel mais conseillé: bloc visible + apprenant inscrit au cours du bloc
+        if self.bloc_id and self.apprenant_id:
+            cours = self.bloc.sequence.module.cours
+            if not InscriptionCours.objects.filter(apprenant=self.apprenant, cours=cours).exists():
+                raise ValidationError("L'apprenant n'est pas inscrit au cours de ce bloc.")
+
+    def mark_completed(self):
+        self.est_termine = True
+        self.completed_at = timezone.now()
+        self.save(update_fields=["est_termine", "completed_at", "updated_at"])
+
+    def mark_uncompleted(self):
+        self.est_termine = False
+        self.completed_at = None
+        self.save(update_fields=["est_termine", "completed_at", "updated_at"])
+    
+class SequenceProgress(models.Model):
+    apprenant = models.ForeignKey("users.Apprenant", on_delete=models.CASCADE, related_name="sequences_progress")
+    sequence = models.ForeignKey(
+        "courses.Sequence",
+        on_delete=models.CASCADE,
+        related_name="courses_progressions",       # ✅ unique
+        related_query_name="courses_progression",  # ✅ optionnel mais propre
+    )
+    est_termine = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+class ModuleProgress(models.Model):
+    apprenant = models.ForeignKey("users.Apprenant", on_delete=models.CASCADE, related_name="modules_progress")
+    module = models.ForeignKey(
+        "courses.Module",
+        on_delete=models.CASCADE,
+        related_name="courses_progressions",       # ✅ unique
+        related_query_name="courses_progression",
+    )
+    est_termine = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class CoursProgress(models.Model):
+    apprenant = models.ForeignKey("users.Apprenant", on_delete=models.CASCADE, related_name="cours_progress")
+    cours = models.ForeignKey(
+        "courses.Cours",
+        on_delete=models.CASCADE,
+        related_name="courses_progressions",       # ✅ unique
+        related_query_name="courses_progression",
+    )
+    est_termine = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
 
 
 class InscriptionCours(models.Model):

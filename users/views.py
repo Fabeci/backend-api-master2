@@ -6,6 +6,8 @@ from rest_framework import status, permissions, viewsets
 from rest_framework.authtoken.models import Token
 from django.shortcuts import get_object_or_404
 
+from users.utils import BaseModelViewSet
+
 from .serializers import (
     RegisterSerializer,
     VerifyEmailSerializer,
@@ -161,31 +163,31 @@ class IsStaffOrReadOnly(permissions.BasePermission):
 # CRUD – ViewSets
 # =========================
 
-class AdminViewSet(viewsets.ModelViewSet):
+class AdminViewSet(BaseModelViewSet):
     queryset = Admin.objects.all()
     serializer_class = AdminCrudSerializer
     permission_classes = [IsStaffOrReadOnly]
 
 
-class ParentViewSet(viewsets.ModelViewSet):
+class ParentViewSet(BaseModelViewSet):
     queryset = Parent.objects.all()
     serializer_class = ParentCrudSerializer
     permission_classes = [IsStaffOrReadOnly]
 
 
-class ApprenantViewSet(viewsets.ModelViewSet):
+class ApprenantViewSet(BaseModelViewSet):
     queryset = Apprenant.objects.all()
     serializer_class = ApprenantCrudSerializer
     permission_classes = [IsStaffOrReadOnly]
 
 
-class FormateurViewSet(viewsets.ModelViewSet):
+class FormateurViewSet(BaseModelViewSet):
     queryset = Formateur.objects.all()
     serializer_class = FormateurCrudSerializer
     permission_classes = [IsStaffOrReadOnly]
 
 
-class ResponsableAcademiqueViewSet(viewsets.ModelViewSet):
+class ResponsableAcademiqueViewSet(BaseModelViewSet):
     queryset = ResponsableAcademique.objects.all()
     serializer_class = ResponsableAcademiqueCrudSerializer
     permission_classes = [IsStaffOrReadOnly]

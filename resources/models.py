@@ -2,14 +2,24 @@ from django.db import models
 from courses.models import Sequence
 
 
-class Ressource(models.Model):
-    titre = models.CharField(max_length=255)
-    fichier = models.FileField(upload_to='ressources/')
-    sequence = models.ForeignKey(Sequence, on_delete=models.CASCADE, related_name='ressources')
-    date_ajout = models.DateTimeField(auto_now_add=True)
+# class Ressource(models.Model):
+#     titre = models.CharField(max_length=255)
+#     fichier = models.FileField(upload_to='ressources/')
+#     sequence = models.ForeignKey(Sequence, on_delete=models.CASCADE, related_name='ressources')
+#     date_ajout = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return self.titre
+#     def __str__(self):
+#         return self.titre
+    
+
+class Ressource(models.Model):
+    sequence = models.ForeignKey(Sequence, on_delete=models.CASCADE, related_name="ressources")
+    titre = models.CharField(max_length=255)
+    fichier = models.FileField(upload_to="ressources/")
+    description = models.TextField(blank=True, default="")
+    est_supplementaire = models.BooleanField(default=False)
+    apprenant = models.ForeignKey("users.Apprenant", null=True, blank=True, on_delete=models.SET_NULL)
+    date_ajout = models.DateTimeField(auto_now_add=True)
 
 
 class RessourceSupplementaire(models.Model):

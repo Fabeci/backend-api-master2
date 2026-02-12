@@ -5,9 +5,11 @@ from django.utils.http import urlencode
 from rest_framework.views import exception_handler
 from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, viewsets
 from django.utils.http import urlsafe_base64_encode
 from django.contrib.auth.tokens import default_token_generator
+
+from academics.views import api_error, api_success
 
 def send_verification_email(user):
     """
@@ -81,3 +83,65 @@ def send_activation_email(user, subject, url):
         fail_silently=False,
     )
     
+
+class BaseModelViewSet(viewsets.ModelViewSet):
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        return api_success(
+            "Liste récupérée avec succès",
+            data=serializer.data,
+            http_status=status.HTTP_200_OK,
+        )
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return api_success(
+            "Élément récupéré avec succès",
+            data=serializer.data,
+            http_status=status.HTTP_200_OK,
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            obj = serializer.save()
+            return api_success(
+                "Création effectuée avec succès",
+                data=self.get_serializer(obj).data,
+                http_status=status.HTTP_201_CREATED,
+            )
+        return api_error(
+            "Erreur de validation",
+            errors=serializer.errors,
+            http_status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+
+        if serializer.is_valid():
+            obj = serializer.save()
+            return api_success(
+                "Mise à jour effectuée avec succès",
+                data=self.get_serializer(obj).data,
+                http_status=status.HTTP_200_OK,
+            )
+        return api_error(
+            "Erreur de validation",
+            errors=serializer.errors,
+            http_status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return api_success(
+            "Suppression effectuée avec succès",
+            data=None,
+            http_status=status.HTTP_204_NO_CONTENT,
+        )
