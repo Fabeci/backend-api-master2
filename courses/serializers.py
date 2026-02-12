@@ -1,7 +1,7 @@
 # courses/serializers.py
 
 from rest_framework import serializers
-from academics.models import Groupe, Matiere
+from academics.models import Groupe, Matiere, Institution, AnneeScolaire
 from users.models import Apprenant, Formateur
 from users.serializers import ApprenantSerializer, FormateurSerializer
 
@@ -34,6 +34,8 @@ class CoursSerializer(serializers.ModelSerializer):
     groupe_nom = serializers.CharField(source="groupe.nom", read_only=True)
     matiere_nom = serializers.CharField(source="matiere.nom", read_only=True)
     enseignant_nom = serializers.SerializerMethodField(read_only=True)
+    institution_nom = serializers.CharField(source="institution.nom", read_only=True)
+    annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
 
     # Stats calculées (properties)
     total_minutes_realises = serializers.IntegerField(read_only=True)
@@ -51,6 +53,10 @@ class CoursSerializer(serializers.ModelSerializer):
             "enseignant_nom",
             "matiere",
             "matiere_nom",
+            "institution",
+            "institution_nom",
+            "annee_scolaire",
+            "annee_scolaire_nom",
             "volume_horaire",
             "date_debut",
             "date_fin",
@@ -88,16 +94,22 @@ class CoursSerializer(serializers.ModelSerializer):
         groupe = attrs.get("groupe", getattr(self.instance, "groupe", None))
         matiere = attrs.get("matiere", getattr(self.instance, "matiere", None))
         enseignant = attrs.get("enseignant", getattr(self.instance, "enseignant", None))
+        annee_scolaire = attrs.get("annee_scolaire", getattr(self.instance, "annee_scolaire", None))
 
-        if groupe and matiere and enseignant:
-            qs = Cours.objects.filter(groupe=groupe, matiere=matiere, enseignant=enseignant)
+        if groupe and matiere and enseignant and annee_scolaire:
+            qs = Cours.objects.filter(
+                groupe=groupe, 
+                matiere=matiere, 
+                enseignant=enseignant,
+                annee_scolaire=annee_scolaire
+            )
             if self.instance and self.instance.pk:
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise serializers.ValidationError(
                     {
                         "non_field_errors": [
-                            "Un cours avec ce groupe, cette matière et cet enseignant existe déjà."
+                            "Un cours avec ce groupe, cette matière et cet enseignant existe déjà pour cette année scolaire."
                         ]
                     }
                 )
@@ -113,10 +125,22 @@ class ModuleSerializer(serializers.ModelSerializer):
     """Serializer pour les modules"""
     
     cours = serializers.PrimaryKeyRelatedField(queryset=Cours.objects.all())
+    institution_nom = serializers.CharField(source="institution.nom", read_only=True)
+    annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
 
     class Meta:
         model = Module
-        fields = ["id", "titre", "description", "cours"]
+        fields = [
+            "id", 
+            "titre", 
+            "description", 
+            "cours",
+            "institution",
+            "institution_nom",
+            "annee_scolaire",
+            "annee_scolaire_nom"
+        ]
+        read_only_fields = ["institution", "annee_scolaire"]
 
 
 # ============================================================================
@@ -208,10 +232,21 @@ class SequenceSerializer(serializers.ModelSerializer):
     """Serializer simple pour les séquences"""
     
     module = serializers.PrimaryKeyRelatedField(queryset=Module.objects.all())
+    institution_nom = serializers.CharField(source="institution.nom", read_only=True)
+    annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
 
     class Meta:
         model = Sequence
-        fields = ['id', 'titre', 'module']
+        fields = [
+            'id', 
+            'titre', 
+            'module',
+            'institution',
+            'institution_nom',
+            'annee_scolaire',
+            'annee_scolaire_nom'
+        ]
+        read_only_fields = ["institution", "annee_scolaire"]
 
 
 class SequenceDetailSerializer(serializers.ModelSerializer):
@@ -220,6 +255,8 @@ class SequenceDetailSerializer(serializers.ModelSerializer):
     blocs_contenu = BlocContenuSerializer(many=True, read_only=True)
     ressources_sequences = RessourceSequenceSerializer(many=True, read_only=True)
     module_titre = serializers.CharField(source='module.titre', read_only=True)
+    institution_nom = serializers.CharField(source="institution.nom", read_only=True)
+    annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
     
     # Statistiques calculées
     nombre_blocs = serializers.SerializerMethodField()
@@ -230,9 +267,12 @@ class SequenceDetailSerializer(serializers.ModelSerializer):
         model = Sequence
         fields = [
             'id', 'titre', 'module', 'module_titre',
+            'institution', 'institution_nom',
+            'annee_scolaire', 'annee_scolaire_nom',
             'nombre_blocs', 'nombre_ressources', 'duree_totale_minutes',
             'blocs_contenu', 'ressources_sequences'
         ]
+        read_only_fields = ["institution", "annee_scolaire"]
     
     def get_nombre_blocs(self, obj):
         return obj.blocs_contenu.count()
@@ -248,12 +288,14 @@ class SequenceDetailSerializer(serializers.ModelSerializer):
 
 
 # ============================================================================
-# INSCRIPTIONS, SUIVIS, SESSIONS, PARTICIPATIONS (inchangés)
+# INSCRIPTIONS, SUIVIS, SESSIONS, PARTICIPATIONS
 # ============================================================================
 
 class InscriptionCoursSerializer(serializers.ModelSerializer):
     apprenant = ApprenantSerializer(read_only=True)
     cours = CoursSerializer(read_only=True)
+    institution_nom = serializers.CharField(source="institution.nom", read_only=True)
+    annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
     
     # Pour la création
     apprenant_id = serializers.PrimaryKeyRelatedField(
@@ -271,13 +313,18 @@ class InscriptionCoursSerializer(serializers.ModelSerializer):
         model = InscriptionCours
         fields = [
             'id', 'apprenant', 'apprenant_id', 'cours', 'cours_id',
-            'date_inscription', 'statut'
+            'date_inscription', 'statut',
+            'institution', 'institution_nom',
+            'annee_scolaire', 'annee_scolaire_nom'
         ]
+        read_only_fields = ['institution', 'annee_scolaire']
 
 
 class SuiviSerializer(serializers.ModelSerializer):
     apprenant = ApprenantSerializer(read_only=True)
     cours = CoursSerializer(read_only=True)
+    institution_nom = serializers.CharField(source="institution.nom", read_only=True)
+    annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
     
     # Pour la création
     apprenant_id = serializers.PrimaryKeyRelatedField(
@@ -295,13 +342,18 @@ class SuiviSerializer(serializers.ModelSerializer):
         model = Suivi
         fields = [
             'id', 'apprenant', 'apprenant_id', 'cours', 'cours_id',
-            'date_debut', 'progression', 'note', 'commentaires'
+            'date_debut', 'progression', 'note', 'commentaires',
+            'institution', 'institution_nom',
+            'annee_scolaire', 'annee_scolaire_nom'
         ]
+        read_only_fields = ['institution', 'annee_scolaire']
 
 
 class SessionSerializer(serializers.ModelSerializer):
     formateur = FormateurSerializer(read_only=True)
     cours = CoursSerializer(read_only=True)
+    institution_nom = serializers.CharField(source="institution.nom", read_only=True)
+    annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
     
     # Pour la création
     formateur_id = serializers.PrimaryKeyRelatedField(
@@ -322,9 +374,11 @@ class SessionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'titre', 'date_debut', 'date_fin',
             'formateur', 'formateur_id', 'cours', 'cours_id',
-            'participation_mode', 'duree_minutes'
+            'participation_mode', 'duree_minutes',
+            'institution', 'institution_nom',
+            'annee_scolaire', 'annee_scolaire_nom'
         ]
-        read_only_fields = ['id', 'duree_minutes']
+        read_only_fields = ['id', 'duree_minutes', 'institution', 'annee_scolaire']
 
 
 class SessionLiteSerializer(serializers.ModelSerializer):
@@ -334,7 +388,8 @@ class SessionLiteSerializer(serializers.ModelSerializer):
         model = Session
         fields = [
             "id", "titre", "date_debut", "date_fin",
-            "cours", "formateur", "participation_mode"
+            "cours", "formateur", "participation_mode",
+            "institution", "annee_scolaire"
         ]
 
 class SequenceContentSerializer(serializers.ModelSerializer):
@@ -357,6 +412,8 @@ class SequenceContentSerializer(serializers.ModelSerializer):
 class ParticipationSerializer(serializers.ModelSerializer):
     session = SessionSerializer(read_only=True)
     apprenant = ApprenantSerializer(read_only=True)
+    institution_nom = serializers.CharField(source="institution.nom", read_only=True)
+    annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
     
     # Pour la création
     session_id = serializers.PrimaryKeyRelatedField(
@@ -374,9 +431,11 @@ class ParticipationSerializer(serializers.ModelSerializer):
         model = Participation
         fields = [
             "id", "session", "session_id", "apprenant", "apprenant_id",
-            "source", "statut", "created_at", "completed_at"
+            "source", "statut", "created_at", "completed_at",
+            "institution", "institution_nom",
+            "annee_scolaire", "annee_scolaire_nom"
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'created_at', 'institution', 'annee_scolaire']
 
 
 # ============================================================================
@@ -411,6 +470,6 @@ class CoursProgressSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "completed_at", "updated_at"]
 
 
-# Serializer “action” (PUT) simple pour set terminé/non terminé
+# Serializer "action" (PUT) simple pour set terminé/non terminé
 class ProgressToggleSerializer(serializers.Serializer):
     est_termine = serializers.BooleanField()

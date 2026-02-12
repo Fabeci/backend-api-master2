@@ -36,11 +36,12 @@ class Evaluation(models.Model):
     TYPE_CHOICES = [
         ('simple', 'Évaluation simple (texte ou fichier unique)'),
         ('structuree', 'Évaluation structurée (plusieurs questions)'),
+        ('mixte', 'Évaluation mixte (consigne/fichier + questions)'),
     ]
-    
+
     cours = models.ForeignKey(
-        Cours, 
-        on_delete=models.CASCADE, 
+        Cours,
+        on_delete=models.CASCADE,
         related_name='evaluations'
     )
     enseignant = models.ForeignKey(
@@ -49,24 +50,24 @@ class Evaluation(models.Model):
         related_name='evaluations_creees',
         default=1
     )
-    
+
     titre = models.CharField(max_length=255, null=True)
     type_evaluation = models.CharField(
-        max_length=20, 
+        max_length=20,
         choices=TYPE_CHOICES,
         default='structuree'
     )
     bareme = models.FloatField(help_text="Note maximale possible")
     duree_minutes = models.PositiveIntegerField(
-        null=True, 
+        null=True,
         blank=True,
         help_text="Durée limite en minutes (optionnel)"
     )
-    
-    # Pour les évaluations simples
+
+    # Pour les évaluations simples (et mixte aussi)
     consigne_texte = models.TextField(
         blank=True,
-        help_text="Consigne de l'évaluation (pour type simple)"
+        help_text="Consigne de l'évaluation (pour type simple/mixte)"
     )
     fichier_sujet = models.FileField(
         upload_to='evaluations/sujets/%Y/%m/',
@@ -75,9 +76,9 @@ class Evaluation(models.Model):
         validators=[FileExtensionValidator(
             allowed_extensions=['pdf', 'docx', 'doc', 'txt', 'jpg', 'jpeg', 'png']
         )],
-        help_text="Fichier sujet (pour type simple)"
+        help_text="Fichier sujet (pour type simple/mixte)"
     )
-    
+
     date_debut = models.DateTimeField(
         null=True,
         blank=True,
@@ -88,7 +89,7 @@ class Evaluation(models.Model):
         blank=True,
         help_text="Date de fin de disponibilité"
     )
-    
+
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)
     est_publiee = models.BooleanField(default=False)
@@ -102,21 +103,38 @@ class Evaluation(models.Model):
                 raise ValidationError(
                     "Une évaluation simple doit avoir soit une consigne texte, soit un fichier sujet."
                 )
-        
-        if self.date_debut and self.date_fin:
-            if self.date_fin <= self.date_debut:
+
+        if self.type_evaluation == 'mixte':
+            if not self.consigne_texte and not self.fichier_sujet:
                 raise ValidationError(
-                    "La date de fin doit être postérieure à la date de début."
+                    "Une évaluation mixte doit avoir soit une consigne texte, soit un fichier sujet."
                 )
+            
+            if self.pk and not self.questions.exists():
+                raise ValidationError(
+                    "Une évaluation mixte doit contenir au moins une question."
+                )
+
+        if self.type_evaluation == 'structuree':
+            if self.pk and not self.questions.exists():
+                raise ValidationError(
+                    "Une évaluation structurée doit contenir au moins une question."
+                )
+
+        # 4) dates
+        if self.date_debut and self.date_fin and self.date_fin <= self.date_debut:
+            raise ValidationError(
+                "La date de fin doit être postérieure à la date de début."
+            )
 
     def __str__(self):
         return f"{self.titre} - {self.cours.titre} ({self.get_type_evaluation_display()})"
 
     @property
     def nombre_questions(self):
-        """Retourne le nombre de questions (pour évaluations structurées)"""
-        return self.questions.count() if self.type_evaluation == 'structuree' else 0
-
+        """Retourne le nombre de questions (structuree + mixte)"""
+        return self.questions.count() if self.type_evaluation in ('structuree', 'mixte') else 0
+    
     def est_accessible(self):
         """Vérifie si l'évaluation est accessible pour passer"""
         if not self.est_publiee:
@@ -159,6 +177,7 @@ class Evaluation(models.Model):
             for q in questions
         )
 
+    
 
 # ============================================================================
 # QUESTIONS (Pour Quiz et Évaluations structurées)

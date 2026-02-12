@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 import os
 from pathlib import Path
-
+from decouple import config
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -22,9 +22,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-$s4b+_ug=(xi0ul0(8u-^-8pxn@z=t08y@-e&5_3g#1tam2wl6'
+# SECRET_KEY = config('DJANGO_SECRET_KEY')
+DEBUG = config('DEBUG', default=False, cast=bool)
+ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost:4200', 'localhost', 'somaproapi.gconnectapp.com', 'www.somaproapi.gconnectapp.com']
 
@@ -57,6 +60,9 @@ INSTALLED_APPS = [
     'progress',
     'resources',
     'users',
+    "analytics",
+    'django_celery_results',  # ← Ajouter
+    'django_celery_beat',
 ]
 
 SITE_ID = 1
@@ -71,7 +77,12 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware', 
+
+    'core.middleware.InstitutionMiddleware',
+    'core.middleware.AnneeScolaireMiddleware',
 ]
+
+CELERY_RESULT_BACKEND = 'django-db'
 
 ROOT_URLCONF = 'master_backend_api.urls'
 
@@ -157,6 +168,40 @@ ACCOUNT_LOGOUT_ON_GET = True  # Se déconnecter immédiatement sur demande
 AUTH_USER_MODEL = 'users.User'
 FRONTEND_URL = "http://localhost:3000"
 
+# ========================================
+# CELERY CONFIGURATION
+# ========================================
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Africa/Dakar'
+
+# CELERY_BROKER_URL = 'django-db+sqlite:///db.sqlite3'
+DB_PATH = BASE_DIR / 'db.sqlite3'
+CELERY_BROKER_URL = f'sqla+sqlite:///{DB_PATH}'
+CELERY_RESULT_BACKEND = 'db+sqlite:///db.sqlite3'
+
+CELERY_TASK_ALWAYS_EAGER = False  # False = tâches asynchrones
+CELERY_TASK_EAGER_PROPAGATES = True
+
+# Configuration pour le développement
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+
+# Configuration du cache
+CELERY_CACHE_BACKEND = 'django-cache'
+CELERY_RESULT_EXPIRES = 3600  # 1 heure
+
+# ← AJOUTER cette ligne pour supprimer le warning
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# ========================================
+# ANTHROPIC API (Claude AI)
+# ========================================
+# À mettre dans un fichier .env pour plus de sécurité
+# ANTHROPIC_API_KEY = 'votre_cle_api_anthropic'
+
+USE_AI_MOCK = True
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 

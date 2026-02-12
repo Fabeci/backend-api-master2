@@ -7,6 +7,12 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
+import csv
+from io import BytesIO
+from django.http import HttpResponse
+from django.db.models import Prefetch
+
+from .models import Evaluation, PassageEvaluation, ReponseQuestion
 
 from .models import (
     Quiz, 
@@ -1352,3 +1358,245 @@ class StatistiquesEvaluationAPIView(APIView):
                 errors={'detail': str(e)},
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+        
+class EvaluationExportAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        evaluation = get_object_or_404(Evaluation, pk=pk)
+
+        export_format = request.query_params.get("format", "csv").lower()
+        detail = request.query_params.get("detail", "false").lower() == "true"
+
+        # Récupérer passages + apprenants
+        passages = (
+            PassageEvaluation.objects
+            .select_related("apprenant", "apprenant__user", "evaluation", "evaluation__cours")
+            .filter(evaluation=evaluation)
+            .order_by("apprenant__user__last_name", "apprenant__user__first_name")
+        )
+
+        if export_format == "csv":
+            if detail:
+                return self._export_detail_csv(evaluation, passages)
+            return self._export_resume_csv(evaluation, passages)
+
+        if export_format == "xlsx":
+            if detail:
+                return self._export_detail_xlsx(evaluation, passages)
+            return self._export_resume_xlsx(evaluation, passages)
+
+        return api_error(
+            "Format non supporté",
+            errors={"format": "Utilise csv ou xlsx"},
+            http_status=status.HTTP_400_BAD_REQUEST
+        )
+
+    def _export_resume_csv(self, evaluation, passages):
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="evaluation_{evaluation.id}_resume.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            "evaluation_id", "evaluation", "cours",
+            "apprenant_id", "nom", "prenom", "email",
+            "statut", "note", "bareme", "pourcentage",
+            "date_debut", "date_soumission", "date_correction"
+        ])
+
+        for p in passages:
+            user = getattr(p.apprenant, "user", None)
+            nom = getattr(user, "last_name", "") if user else ""
+            prenom = getattr(user, "first_name", "") if user else ""
+            email = getattr(user, "email", "") if user else ""
+
+            writer.writerow([
+                evaluation.id,
+                evaluation.titre,
+                evaluation.cours.titre if evaluation.cours else "",
+                p.apprenant_id,
+                nom,
+                prenom,
+                email,
+                p.statut,
+                p.note if p.note is not None else "",
+                evaluation.bareme,
+                p.pourcentage() if p.pourcentage() is not None else "",
+                p.date_debut,
+                p.date_soumission,
+                p.date_correction,
+            ])
+
+        return response
+
+    def _export_detail_csv(self, evaluation, passages):
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="evaluation_{evaluation.id}_detail.csv"'
+        writer = csv.writer(response)
+
+        writer.writerow([
+            "evaluation_id", "evaluation", "cours",
+            "apprenant_id", "nom", "prenom", "email",
+            "statut_passage",
+            "question_id", "ordre", "type_question",
+            "enonce",
+            "statut_reponse", "points_obtenus", "points_question",
+            "reponse_texte", "fichier_reponse", "choix_selectionnes"
+        ])
+
+        # Charger réponses questions en batch
+        passage_ids = list(passages.values_list("id", flat=True))
+        reponses = (
+            ReponseQuestion.objects
+            .select_related(
+                "passage_evaluation", "passage_evaluation__apprenant", "passage_evaluation__apprenant__user",
+                "question"
+            )
+            .prefetch_related("choix_selectionnes")
+            .filter(passage_evaluation_id__in=passage_ids)
+            .order_by("passage_evaluation__apprenant__user__last_name", "question__ordre")
+        )
+
+        # Map passage_id -> PassageEvaluation pour accéder au statut + user
+        passage_map = {p.id: p for p in passages}
+
+        for rq in reponses:
+            p = passage_map.get(rq.passage_evaluation_id)
+            user = getattr(p.apprenant, "user", None) if p else None
+
+            choix_txt = "; ".join(list(rq.choix_selectionnes.values_list("texte", flat=True)))
+
+            writer.writerow([
+                evaluation.id,
+                evaluation.titre,
+                evaluation.cours.titre if evaluation.cours else "",
+                p.apprenant_id if p else "",
+                getattr(user, "last_name", "") if user else "",
+                getattr(user, "first_name", "") if user else "",
+                getattr(user, "email", "") if user else "",
+                p.statut if p else "",
+                rq.question_id,
+                rq.question.ordre,
+                rq.question.type_question,
+                (rq.question.enonce_texte or "")[:200],  # limiter la taille
+                rq.statut,
+                rq.points_obtenus,
+                rq.question.points,
+                (rq.reponse_texte or "")[:200],
+                rq.fichier_reponse.url if rq.fichier_reponse else "",
+                choix_txt,
+            ])
+
+        return response
+
+    # -------- XLSX (nécessite openpyxl) --------
+    def _export_resume_xlsx(self, evaluation, passages):
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Résumé"
+
+        ws.append([
+            "evaluation_id", "evaluation", "cours",
+            "apprenant_id", "nom", "prenom", "email",
+            "statut", "note", "bareme", "pourcentage",
+            "date_debut", "date_soumission", "date_correction"
+        ])
+
+        for p in passages:
+            user = getattr(p.apprenant, "user", None)
+            ws.append([
+                evaluation.id,
+                evaluation.titre,
+                evaluation.cours.titre if evaluation.cours else "",
+                p.apprenant_id,
+                getattr(user, "last_name", "") if user else "",
+                getattr(user, "first_name", "") if user else "",
+                getattr(user, "email", "") if user else "",
+                p.statut,
+                p.note if p.note is not None else "",
+                evaluation.bareme,
+                p.pourcentage() if p.pourcentage() is not None else "",
+                p.date_debut,
+                p.date_soumission,
+                p.date_correction,
+            ])
+
+        buff = BytesIO()
+        wb.save(buff)
+        buff.seek(0)
+
+        response = HttpResponse(
+            buff.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="evaluation_{evaluation.id}_resume.xlsx"'
+        return response
+
+    def _export_detail_xlsx(self, evaluation, passages):
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Détail"
+
+        ws.append([
+            "evaluation_id", "evaluation", "cours",
+            "apprenant_id", "nom", "prenom", "email",
+            "statut_passage",
+            "question_id", "ordre", "type_question",
+            "enonce",
+            "statut_reponse", "points_obtenus", "points_question",
+            "reponse_texte", "fichier_reponse", "choix_selectionnes"
+        ])
+
+        passage_ids = list(passages.values_list("id", flat=True))
+        reponses = (
+            ReponseQuestion.objects
+            .select_related(
+                "passage_evaluation", "passage_evaluation__apprenant", "passage_evaluation__apprenant__user",
+                "question"
+            )
+            .prefetch_related("choix_selectionnes")
+            .filter(passage_evaluation_id__in=passage_ids)
+            .order_by("passage_evaluation__apprenant__user__last_name", "question__ordre")
+        )
+        passage_map = {p.id: p for p in passages}
+
+        for rq in reponses:
+            p = passage_map.get(rq.passage_evaluation_id)
+            user = getattr(p.apprenant, "user", None) if p else None
+            choix_txt = "; ".join(list(rq.choix_selectionnes.values_list("texte", flat=True)))
+
+            ws.append([
+                evaluation.id,
+                evaluation.titre,
+                evaluation.cours.titre if evaluation.cours else "",
+                p.apprenant_id if p else "",
+                getattr(user, "last_name", "") if user else "",
+                getattr(user, "first_name", "") if user else "",
+                getattr(user, "email", "") if user else "",
+                p.statut if p else "",
+                rq.question_id,
+                rq.question.ordre,
+                rq.question.type_question,
+                (rq.question.enonce_texte or "")[:200],
+                rq.statut,
+                rq.points_obtenus,
+                rq.question.points,
+                (rq.reponse_texte or "")[:200],
+                rq.fichier_reponse.url if rq.fichier_reponse else "",
+                choix_txt,
+            ])
+
+        buff = BytesIO()
+        wb.save(buff)
+        buff.seek(0)
+
+        response = HttpResponse(
+            buff.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="evaluation_{evaluation.id}_detail.xlsx"'
+        return response

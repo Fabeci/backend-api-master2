@@ -225,18 +225,26 @@ class PassageQuizDetailSerializer(PassageQuizSerializer):
 # ============================================================================
 
 class EvaluationSerializer(serializers.ModelSerializer):
-    """Serializer pour les évaluations"""
     type_evaluation_display = serializers.CharField(
-        source='get_type_evaluation_display', 
+        source='get_type_evaluation_display',
         read_only=True
     )
     cours_titre = serializers.CharField(source='cours.titre', read_only=True)
+
     enseignant_nom = serializers.SerializerMethodField()
     nombre_questions = serializers.IntegerField(read_only=True)
     est_accessible = serializers.SerializerMethodField()
     peut_soumettre = serializers.SerializerMethodField()
     est_auto_corrigeable = serializers.SerializerMethodField()
     
+
+    # ✅ Nouveau: pour pouvoir lier des questions à la création / update
+    questions_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+
     class Meta:
         model = Evaluation
         fields = [
@@ -269,7 +277,8 @@ class EvaluationSerializer(serializers.ModelSerializer):
             'nombre_questions',
             'est_accessible',
             'peut_soumettre',
-            'est_auto_corrigeable'
+            'est_auto_corrigeable',
+            'questions_ids',
         ]
     
     def get_enseignant_nom(self, obj):
@@ -287,6 +296,68 @@ class EvaluationSerializer(serializers.ModelSerializer):
     def get_est_auto_corrigeable(self, obj):
         return obj.est_auto_corrigeable()
 
+
+    def validate(self, attrs):
+        type_eval = attrs.get('type_evaluation', getattr(self.instance, 'type_evaluation', None))
+        consigne = attrs.get('consigne_texte', getattr(self.instance, 'consigne_texte', ''))
+        fichier = attrs.get('fichier_sujet', getattr(self.instance, 'fichier_sujet', None))
+        q_ids = attrs.get('questions_ids', None)
+
+        # simple => consigne/fichier requis
+        if type_eval == 'simple':
+            if not consigne and not fichier:
+                raise serializers.ValidationError({
+                    'consigne_texte': "Une évaluation simple doit avoir une consigne texte ou un fichier sujet.",
+                    'fichier_sujet': "Une évaluation simple doit avoir une consigne texte ou un fichier sujet.",
+                })
+
+        # structuree => au moins une question (à la création: questions_ids requis)
+        if type_eval == 'structuree':
+            if self.instance:
+                # update: si pas fourni, on accepte (les questions peuvent déjà exister)
+                if q_ids is not None and len(q_ids) == 0:
+                    raise serializers.ValidationError({'questions_ids': "Ajoute au moins une question."})
+            else:
+                if not q_ids or len(q_ids) == 0:
+                    raise serializers.ValidationError({'questions_ids': "Une évaluation structurée doit contenir au moins une question."})
+
+        # mixte => consigne/fichier ET au moins une question
+        if type_eval == 'mixte':
+            if not consigne and not fichier:
+                raise serializers.ValidationError({
+                    'consigne_texte': "Une évaluation mixte doit avoir une consigne texte ou un fichier sujet.",
+                    'fichier_sujet': "Une évaluation mixte doit avoir une consigne texte ou un fichier sujet.",
+                })
+            if self.instance:
+                if q_ids is not None and len(q_ids) == 0:
+                    raise serializers.ValidationError({'questions_ids': "Une évaluation mixte doit contenir au moins une question."})
+            else:
+                if not q_ids or len(q_ids) == 0:
+                    raise serializers.ValidationError({'questions_ids': "Une évaluation mixte doit contenir au moins une question."})
+
+        return attrs
+
+    def create(self, validated_data):
+        q_ids = validated_data.pop('questions_ids', [])
+        evaluation = super().create(validated_data)
+
+        if q_ids:
+            # ⚠️ suppose que Question a FK evaluation (related_name='questions')
+            evaluation.questions.filter(id__in=q_ids).update(evaluation=evaluation)
+            # ou si relation M2M, il faut evaluation.questions.set(q_ids)
+
+        return evaluation
+
+    def update(self, instance, validated_data):
+        q_ids = validated_data.pop('questions_ids', None)
+        instance = super().update(instance, validated_data)
+
+        if q_ids is not None:
+            instance.questions.exclude(id__in=q_ids).update(evaluation=None)
+            instance.questions.filter(id__in=q_ids).update(evaluation=instance)
+            # si M2M: instance.questions.set(q_ids)
+
+        return instance
 
 class EvaluationDetailSerializer(serializers.ModelSerializer):
     """Serializer détaillé pour une évaluation avec ses questions"""

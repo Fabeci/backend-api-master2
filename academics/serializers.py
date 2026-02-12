@@ -398,9 +398,18 @@ class DomaineEtudeSerializer(serializers.ModelSerializer):
         
 
 class MatiereSerializer(serializers.ModelSerializer):
+    institution = serializers.PrimaryKeyRelatedField(read_only=True)
+
     class Meta:
         model = Matiere
-        fields = '__all__'
+        fields = "__all__"
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        user = request.user
+        if not user.is_superuser:
+            validated_data["institution_id"] = user.institution_id
+        return super().create(validated_data)
         
         
 class SpecialiteSerializer(serializers.ModelSerializer):
@@ -459,18 +468,22 @@ class FiliereSerializer(serializers.ModelSerializer):
     # Écriture : ID du domaine
     domaine_etude = serializers.PrimaryKeyRelatedField(queryset=DomaineEtude.objects.all(), write_only=True)
 
+    # class Meta:
+    #     model = Filiere
+    #     fields = [
+    #         "id",
+    #         "nom",
+    #         "domaine_etude",        # write-only (ID)
+    #         "domaine_etude_label",  # read-only (nom)
+    #         "description",
+    #         "date_creation",
+    #         "statut",
+    #     ]
+    #     read_only_fields = ["id", "date_creation"]
+
     class Meta:
-        model = Filiere
-        fields = [
-            "id",
-            "nom",
-            "domaine_etude",        # write-only (ID)
-            "domaine_etude_label",  # read-only (nom)
-            "description",
-            "date_creation",
-            "statut",
-        ]
-        read_only_fields = ["id", "date_creation"]
+            model = Matiere
+            fields = "__all__"
 
 
 class GroupeSerializer(serializers.ModelSerializer):
@@ -489,14 +502,14 @@ class ClasseSerializer(serializers.ModelSerializer):
     # ===== WRITE (IDs) =====
     filieres = serializers.PrimaryKeyRelatedField(queryset=Filiere.objects.all(), many=True)
     matieres = serializers.PrimaryKeyRelatedField(queryset=Matiere.objects.all(), many=True)
-    groupes = serializers.PrimaryKeyRelatedField(queryset=Groupe.objects.all(), required=False, allow_null=True)
-    apprenants = serializers.PrimaryKeyRelatedField(queryset=Apprenant.objects.all(), required=False, allow_null=True)
 
+    groupes = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
     # ===== READ (détails) =====
     filieres_data = FiliereSerializer(source="filieres", many=True, read_only=True)
     matieres_data = MatiereSerializer(source="matieres", many=True, read_only=True)
-    groupes_data = GroupeSerializer(source="groupes", read_only=True)
-    apprenants_data = ApprenantSerializer(source="apprenants", read_only=True)
+
+    # ✅ ICI il manquait many=True -> sinon RelatedManager.nom
+    groupes_data = GroupeSerializer(source="groupes", many=True, read_only=True)
 
     class Meta:
         model = Classe
@@ -509,17 +522,14 @@ class ClasseSerializer(serializers.ModelSerializer):
             # write
             "filieres",
             "matieres",
-            "groupes",
-            "apprenants",
 
             # read
+            "groupes",
             "filieres_data",
             "matieres_data",
             "groupes_data",
-            "apprenants_data",
         ]
-        read_only_fields = ["id", "date_creation"]
-        
+        read_only_fields = ["id", "date_creation", "groupes"]   
         
 class InscriptionSerializer(serializers.ModelSerializer):
     apprenant = serializers.StringRelatedField()  # Affiche les informations de l'apprenant (par exemple, son nom)

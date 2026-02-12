@@ -6,6 +6,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.db import transaction
+from django.http import FileResponse, Http404
+
+from academics.models import Inscription
+from courses.utils import can_create_in_context, filter_queryset_by_role, get_filtered_object, get_user_context
 from .models import (
     BlocContenu,
     BlocProgress,
@@ -45,7 +49,7 @@ from .serializers import (
 
 
 # ============================================================================
-# FONCTIONS UTILITAIRES (vos méthodes standards)
+# FONCTIONS UTILITAIRES
 # ============================================================================
 
 def api_success(message: str, data=None, http_status=status.HTTP_200_OK):
@@ -74,23 +78,37 @@ def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST
     return Response(payload, status=http_status)
 
 
+
 # ============================================================================
 # COURS
 # ============================================================================
 
 class CoursListCreateAPIView(APIView):
-    """Liste et création de cours"""
+    """
+    Liste et création de cours.
+    
+    FILTRAGE PAR RÔLE :
+    - SuperUser : Tous les cours
+    - Admin : Tous les cours de son institution
+    - Responsable : Cours de son institution + année
+    - Formateur : UNIQUEMENT SES cours (enseignant=lui)
+    - Apprenant : Cours inscrits uniquement
+    """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """Récupère la liste de tous les cours"""
+        """Liste les cours selon le rôle"""
         try:
             qs = Cours.objects.select_related(
-                "groupe", 
-                "matiere", 
-                "enseignant"
-            ).all().order_by("-id")
+                "groupe", "matiere", "enseignant", "institution", "annee_scolaire"
+            ).all()
+            
+            # Filtrage par rôle (incluant Formateur strict)
+            qs = filter_queryset_by_role(qs, request, 'Cours')
+            
+            qs = qs.order_by("-id")
             data = CoursSerializer(qs, many=True).data
+            
             return api_success(
                 "Liste des cours récupérée avec succès", 
                 data, 
@@ -107,12 +125,28 @@ class CoursListCreateAPIView(APIView):
         """Crée un nouveau cours"""
         serializer = CoursSerializer(data=request.data)
         if serializer.is_valid():
+            user = request.user
+            
+            # Auto-assignation pour non-SuperUser
+            if not user.is_superuser:
+                if 'institution' not in request.data and user.institution:
+                    serializer.validated_data['institution'] = user.institution
+                
+                if 'annee_scolaire' not in request.data and user.annee_scolaire_active:
+                    serializer.validated_data['annee_scolaire'] = user.annee_scolaire_active
+                
+                # Pour Formateur : s'auto-assigner comme enseignant
+                role_name = user.role.name if user.role else None
+                if role_name == 'Formateur' and 'enseignant' not in request.data:
+                    serializer.validated_data['enseignant'] = user
+            
             obj = serializer.save()
             return api_success(
                 "Cours créé avec succès",
                 CoursSerializer(obj).data,
                 status.HTTP_201_CREATED
             )
+        
         return api_error(
             "Erreur de validation",
             errors=serializer.errors,
@@ -124,16 +158,12 @@ class CoursDetailAPIView(APIView):
     """Détails, mise à jour et suppression d'un cours"""
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_object(self, pk):
-        """Récupère un cours par son ID"""
-        return get_object_or_404(
-            Cours.objects.select_related("groupe", "matiere", "enseignant"),
-            pk=pk
-        )
+    def get_object(self, pk, request):
+        """Récupère un cours filtré par rôle"""
+        return get_filtered_object(Cours, pk, request, 'Cours')
 
     def get(self, request, pk):
-        """Récupère les détails d'un cours"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         return api_success(
             "Cours trouvé avec succès", 
             CoursSerializer(obj).data, 
@@ -141,8 +171,15 @@ class CoursDetailAPIView(APIView):
         )
 
     def put(self, request, pk):
-        """Met à jour complètement un cours"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
+        
+        # Formateur ne peut modifier que SES cours
+        if not can_create_in_context(request.user, obj):
+            return api_error(
+                "Vous ne pouvez pas modifier ce cours",
+                http_status=status.HTTP_403_FORBIDDEN
+            )
+        
         serializer = CoursSerializer(obj, data=request.data)
         if serializer.is_valid():
             obj = serializer.save()
@@ -158,8 +195,14 @@ class CoursDetailAPIView(APIView):
         )
 
     def patch(self, request, pk):
-        """Met à jour partiellement un cours"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
+        
+        if not can_create_in_context(request.user, obj):
+            return api_error(
+                "Vous ne pouvez pas modifier ce cours",
+                http_status=status.HTTP_403_FORBIDDEN
+            )
+        
         serializer = CoursSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
             obj = serializer.save()
@@ -175,18 +218,212 @@ class CoursDetailAPIView(APIView):
         )
 
     def delete(self, request, pk):
-        """Supprime un cours"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
+        
+        if not can_create_in_context(request.user, obj):
+            return api_error(
+                "Vous ne pouvez pas supprimer ce cours",
+                http_status=status.HTTP_403_FORBIDDEN
+            )
+        
         obj.delete()
         return api_success(
             "Cours supprimé avec succès", 
             data=None, 
             http_status=status.HTTP_204_NO_CONTENT
         )
+class CoursModulesAPIView(APIView):
+    """Liste les modules d'un cours"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, cours_id):
+        try:
+            # Vérifier l'accès au cours
+            cours = get_filtered_object(Cours, cours_id, request, 'Cours')
+            
+            # Récupérer les modules
+            modules = Module.objects.filter(cours=cours).order_by('id')
+            serializer = ModuleSerializer(modules, many=True)
+            
+            return api_success(
+                f"Modules du cours '{cours}' récupérés avec succès",
+                serializer.data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la récupération des modules",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 # ============================================================================
-# SEQUENCES
+# MODULES
+# ============================================================================
+
+class ModuleListCreateAPIView(APIView):
+    """Liste et création de modules"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            qs = Module.objects.select_related(
+                'cours', 'institution', 'annee_scolaire'
+            ).all()
+            
+            # Filtrage par rôle (Formateur voit uniquement modules de SES cours)
+            qs = filter_queryset_by_role(qs, request, 'Module')
+            
+            qs = qs.order_by('-id')
+            serializer = ModuleSerializer(qs, many=True)
+            
+            return api_success(
+                "Liste des modules récupérée avec succès",
+                serializer.data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la récupération des modules",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def post(self, request):
+        serializer = ModuleSerializer(data=request.data)
+        if serializer.is_valid():
+            # Vérifier que l'utilisateur peut créer dans ce cours
+            cours_id = request.data.get('cours')
+            if cours_id:
+                try:
+                    cours = get_filtered_object(Cours, cours_id, request, 'Cours')
+                    if not can_create_in_context(request.user, cours):
+                        return api_error(
+                            "Vous ne pouvez pas créer de module dans ce cours",
+                            http_status=status.HTTP_403_FORBIDDEN
+                        )
+                except:
+                    return api_error(
+                        "Cours non trouvé ou accès refusé",
+                        http_status=status.HTTP_404_NOT_FOUND
+                    )
+            
+            obj = serializer.save()
+            return api_success(
+                "Module créé avec succès",
+                ModuleSerializer(obj).data,
+                status.HTTP_201_CREATED
+            )
+        return api_error(
+            "Erreur de validation",
+            errors=serializer.errors,
+            http_status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+class ModuleDetailAPIView(APIView):
+    """Détails, mise à jour et suppression d'un module"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, pk, request):
+        return get_filtered_object(Module, pk, request, 'Module')
+
+    def get(self, request, pk):
+        obj = self.get_object(pk, request)
+        return api_success(
+            "Module trouvé avec succès",
+            ModuleSerializer(obj).data,
+            status.HTTP_200_OK
+        )
+
+    def put(self, request, pk):
+        obj = self.get_object(pk, request)
+        
+        if not can_create_in_context(request.user, obj):
+            return api_error(
+                "Vous ne pouvez pas modifier ce module",
+                http_status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = ModuleSerializer(obj, data=request.data)
+        if serializer.is_valid():
+            obj = serializer.save()
+            return api_success(
+                "Module mis à jour avec succès",
+                ModuleSerializer(obj).data,
+                status.HTTP_200_OK
+            )
+        return api_error(
+            "Erreur de validation",
+            errors=serializer.errors,
+            http_status=status.HTTP_400_BAD_REQUEST
+        )
+
+    def patch(self, request, pk):
+        obj = self.get_object(pk, request)
+        
+        if not can_create_in_context(request.user, obj):
+            return api_error(
+                "Vous ne pouvez pas modifier ce module",
+                http_status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = ModuleSerializer(obj, data=request.data, partial=True)
+        if serializer.is_valid():
+            obj = serializer.save()
+            return api_success(
+                "Module mis à jour partiellement avec succès",
+                ModuleSerializer(obj).data,
+                status.HTTP_200_OK
+            )
+        return api_error(
+            "Erreur de validation",
+            errors=serializer.errors,
+            http_status=status.HTTP_400_BAD_REQUEST
+        )
+
+    def delete(self, request, pk):
+        obj = self.get_object(pk, request)
+        
+        if not can_create_in_context(request.user, obj):
+            return api_error(
+                "Vous ne pouvez pas supprimer ce module",
+                http_status=status.HTTP_403_FORBIDDEN
+            )
+        
+        obj.delete()
+        return api_success(
+            "Module supprimé avec succès",
+            data=None,
+            http_status=status.HTTP_204_NO_CONTENT
+        )
+
+
+class ModuleSequencesAPIView(APIView):
+    """Liste les séquences d'un module"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, module_id):
+        try:
+            module = get_filtered_object(Module, module_id, request, 'Module')
+            sequences = Sequence.objects.filter(module=module).order_by('id')
+            serializer = SequenceSerializer(sequences, many=True)
+            
+            return api_success(
+                f"Séquences du module '{module}' récupérées avec succès",
+                serializer.data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la récupération des séquences",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+# ============================================================================
+# SÉQUENCES
 # ============================================================================
 
 class SequenceListCreateAPIView(APIView):
@@ -194,10 +431,17 @@ class SequenceListCreateAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """Récupère la liste de toutes les séquences"""
         try:
-            sequences = Sequence.objects.select_related('module').all().order_by('-id')
-            serializer = SequenceSerializer(sequences, many=True)
+            qs = Sequence.objects.select_related(
+                'module', 'institution', 'annee_scolaire'
+            ).all()
+            
+            # Filtrage par rôle (Formateur voit uniquement séquences de SES cours)
+            qs = filter_queryset_by_role(qs, request, 'Sequence')
+            
+            qs = qs.order_by('-id')
+            serializer = SequenceSerializer(qs, many=True)
+            
             return api_success(
                 "Liste des séquences récupérée avec succès",
                 serializer.data,
@@ -211,9 +455,24 @@ class SequenceListCreateAPIView(APIView):
             )
 
     def post(self, request):
-        """Crée une nouvelle séquence"""
         serializer = SequenceSerializer(data=request.data)
         if serializer.is_valid():
+            # Vérifier accès au module parent
+            module_id = request.data.get('module')
+            if module_id:
+                try:
+                    module = get_filtered_object(Module, module_id, request, 'Module')
+                    if not can_create_in_context(request.user, module):
+                        return api_error(
+                            "Vous ne pouvez pas créer de séquence dans ce module",
+                            http_status=status.HTTP_403_FORBIDDEN
+                        )
+                except:
+                    return api_error(
+                        "Module non trouvé ou accès refusé",
+                        http_status=status.HTTP_404_NOT_FOUND
+                    )
+            
             obj = serializer.save()
             return api_success(
                 "Séquence créée avec succès",
@@ -228,65 +487,74 @@ class SequenceListCreateAPIView(APIView):
 
 
 class SequenceDetailAPIView(APIView):
+    """Détails, mise à jour et suppression d'une séquence"""
     permission_classes = [permissions.IsAuthenticated]
-    
-    def get_object(self, pk):
-        """
-        Récupère une séquence par son ID avec optimisation des requêtes
-        """
-        return get_object_or_404(
-            Sequence.objects
-                .select_related('module', 'module__cours')
-                .prefetch_related('blocs_contenu', 'ressources_sequences'),
-            pk=pk
-        )
-    
+
+    def get_object(self, pk, request):
+        return get_filtered_object(Sequence, pk, request, 'Sequence')
+
+    def _check_edit_permission(self, request, sequence):
+        # ✅ IMPORTANT : vérif sur le module parent (comme dans POST)
+        module = sequence.module
+        if not can_create_in_context(request.user, module):
+            return api_error(
+                "Vous ne pouvez pas modifier/supprimer cette séquence",
+                http_status=status.HTTP_403_FORBIDDEN
+            )
+        return None
+
     def get(self, request, pk):
         try:
-            sequence = self.get_object(pk)
+            sequence = self.get_object(pk, request)
             serializer = SequenceDetailSerializer(sequence)
-            return api_success(
-                "Séquence trouvée avec succès",
-                serializer.data,
-                status.HTTP_200_OK
-            )
+            return api_success("Séquence trouvée avec succès", serializer.data, status.HTTP_200_OK)
+
+        except Http404:
+            return api_error("Séquence introuvable", http_status=status.HTTP_404_NOT_FOUND)
+
         except Exception as e:
             return api_error(
                 "Erreur lors de la récupération de la séquence",
-                errors={'detail': str(e)},
+                errors={"detail": str(e)},
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-    
+
     def put(self, request, pk):
         try:
-            sequence = self.get_object(pk)
-            serializer = SequenceSerializer(sequence, data=request.data)
-            
+            sequence = self.get_object(pk, request)
+
+            perm_error = self._check_edit_permission(request, sequence)
+            if perm_error:
+                return perm_error
+
+            # ✅ Pour éviter les échecs si le frontend envoie partiel
+            serializer = SequenceSerializer(sequence, data=request.data, partial=True)
+
             if serializer.is_valid():
                 sequence = serializer.save()
-                return api_success(
-                    "Séquence mise à jour avec succès",
-                    SequenceSerializer(sequence).data,
-                    status.HTTP_200_OK
-                )
-            
-            return api_error(
-                "Erreur de validation",
-                errors=serializer.errors,
-                http_status=status.HTTP_400_BAD_REQUEST
-            )
+                return api_success("Séquence mise à jour avec succès", SequenceSerializer(sequence).data, status.HTTP_200_OK)
+
+            return api_error("Erreur de validation", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)
+
+        except Http404:
+            return api_error("Séquence introuvable", http_status=status.HTTP_404_NOT_FOUND)
+
         except Exception as e:
             return api_error(
                 "Erreur lors de la mise à jour de la séquence",
-                errors={'detail': str(e)},
+                errors={"detail": str(e)},
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-    
+
     def patch(self, request, pk):
         try:
-            sequence = self.get_object(pk)
+            sequence = self.get_object(pk, request)
+
+            perm_error = self._check_edit_permission(request, sequence)
+            if perm_error:
+                return perm_error
+
             serializer = SequenceSerializer(sequence, data=request.data, partial=True)
-            
             if serializer.is_valid():
                 sequence = serializer.save()
                 return api_success(
@@ -294,51 +562,130 @@ class SequenceDetailAPIView(APIView):
                     SequenceSerializer(sequence).data,
                     status.HTTP_200_OK
                 )
-            
-            return api_error(
-                "Erreur de validation",
-                errors=serializer.errors,
-                http_status=status.HTTP_400_BAD_REQUEST
-            )
+
+            return api_error("Erreur de validation", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)
+
+        except Http404:
+            return api_error("Séquence introuvable", http_status=status.HTTP_404_NOT_FOUND)
+
         except Exception as e:
             return api_error(
                 "Erreur lors de la mise à jour partielle de la séquence",
-                errors={'detail': str(e)},
+                errors={"detail": str(e)},
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-    
+
     def delete(self, request, pk):
         try:
-            sequence = self.get_object(pk)
+            sequence = self.get_object(pk, request)
+
+            perm_error = self._check_edit_permission(request, sequence)
+            if perm_error:
+                return perm_error
+
             titre = sequence.titre
             sequence.delete()
-            
+
             return api_success(
                 f"Séquence '{titre}' supprimée avec succès",
                 data=None,
                 http_status=status.HTTP_204_NO_CONTENT
             )
+
+        except Http404:
+            return api_error("Séquence introuvable", http_status=status.HTTP_404_NOT_FOUND)
+
         except Exception as e:
             return api_error(
                 "Erreur lors de la suppression de la séquence",
+                errors={"detail": str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class SequenceBlocsAPIView(APIView):
+    """Liste les blocs de contenu d'une séquence"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, sequence_id):
+        """Récupère les blocs de contenu d'une séquence"""
+        try:
+            context = get_user_context(request)
+            sequence_qs = Sequence.objects.all()
+            if context.get('institution_id'):
+                sequence_qs = sequence_qs.filter(institution_id=context['institution_id'])
+            if context.get('annee_scolaire_id'):
+                sequence_qs = sequence_qs.filter(annee_scolaire_id=context['annee_scolaire_id'])
+            
+            sequence = get_object_or_404(sequence_qs, pk=sequence_id)
+            blocs = BlocContenu.objects.filter(sequence=sequence).order_by('ordre')
+            serializer = BlocContenuSerializer(blocs, many=True)
+            return api_success(
+                f"Blocs de contenu de la séquence '{sequence}' récupérés avec succès",
+                serializer.data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la récupération des blocs",
                 errors={'detail': str(e)},
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
+class SequenceRessourcesAPIView(APIView):
+    """Liste les ressources d'une séquence"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, sequence_id):
+        """Récupère les ressources d'une séquence"""
+        try:
+            context = get_user_context(request)
+            sequence_qs = Sequence.objects.all()
+            if context.get('institution_id'):
+                sequence_qs = sequence_qs.filter(institution_id=context['institution_id'])
+            if context.get('annee_scolaire_id'):
+                sequence_qs = sequence_qs.filter(annee_scolaire_id=context['annee_scolaire_id'])
+            
+            sequence = get_object_or_404(sequence_qs, pk=sequence_id)
+            ressources = RessourceSequence.objects.filter(sequence=sequence).order_by('ordre')
+            serializer = RessourceSequenceSerializer(ressources, many=True)
+            return api_success(
+                f"Ressources de la séquence '{sequence}' récupérées avec succès",
+                serializer.data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la récupération des ressources",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+# ============================================================================
+# BLOCS DE CONTENU
+# ============================================================================
 
 class BlocContenuListCreateAPIView(APIView):
     """Liste et création de blocs de contenu"""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """Récupère les blocs de contenu (filtrés par séquence)"""
+        """Récupère les blocs de contenu filtrés"""
         try:
+            context = get_user_context(request)
             blocs = BlocContenu.objects.select_related('sequence').all()
             
             # Filtrer par séquence si fourni
             sequence_id = request.query_params.get('sequence')
             if sequence_id:
                 blocs = blocs.filter(sequence_id=sequence_id)
+            
+            # Filtrer par contexte via la séquence
+            if context.get('institution_id'):
+                blocs = blocs.filter(sequence__institution_id=context['institution_id'])
+            if context.get('annee_scolaire_id'):
+                blocs = blocs.filter(sequence__annee_scolaire_id=context['annee_scolaire_id'])
             
             blocs = blocs.order_by('sequence', 'ordre')
             serializer = BlocContenuSerializer(blocs, many=True)
@@ -376,10 +723,22 @@ class BlocContenuDetailAPIView(APIView):
     """Détails, mise à jour et suppression d'un bloc"""
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_object(self, pk, request):
+        """Récupère un bloc par son ID avec filtrage contexte"""
+        context = get_user_context(request)
+        qs = BlocContenu.objects.select_related('sequence')
+        
+        if context.get('institution_id'):
+            qs = qs.filter(sequence__institution_id=context['institution_id'])
+        if context.get('annee_scolaire_id'):
+            qs = qs.filter(sequence__annee_scolaire_id=context['annee_scolaire_id'])
+        
+        return get_object_or_404(qs, pk=pk)
+
     def get(self, request, pk):
         """Récupère les détails d'un bloc"""
         try:
-            bloc = get_object_or_404(BlocContenu, pk=pk)
+            bloc = self.get_object(pk, request)
             serializer = BlocContenuSerializer(bloc)
             return api_success(
                 "Bloc de contenu trouvé avec succès",
@@ -396,7 +755,7 @@ class BlocContenuDetailAPIView(APIView):
     def put(self, request, pk):
         """Met à jour complètement un bloc"""
         try:
-            bloc = get_object_or_404(BlocContenu, pk=pk)
+            bloc = self.get_object(pk, request)
             serializer = BlocContenuSerializer(bloc, data=request.data)
             if serializer.is_valid():
                 bloc = serializer.save()
@@ -420,7 +779,7 @@ class BlocContenuDetailAPIView(APIView):
     def patch(self, request, pk):
         """Met à jour partiellement un bloc"""
         try:
-            bloc = get_object_or_404(BlocContenu, pk=pk)
+            bloc = self.get_object(pk, request)
             serializer = BlocContenuSerializer(bloc, data=request.data, partial=True)
             if serializer.is_valid():
                 bloc = serializer.save()
@@ -444,7 +803,7 @@ class BlocContenuDetailAPIView(APIView):
     def delete(self, request, pk):
         """Supprime un bloc"""
         try:
-            bloc = get_object_or_404(BlocContenu, pk=pk)
+            bloc = self.get_object(pk, request)
             bloc.delete()
             return api_success(
                 "Bloc de contenu supprimé avec succès",
@@ -460,7 +819,7 @@ class BlocContenuDetailAPIView(APIView):
 
 
 # ============================================================================
-# VUES RESSOURCES / PIÈCES JOINTES
+# RESSOURCES / PIÈCES JOINTES
 # ============================================================================
 
 class RessourceSequenceListCreateAPIView(APIView):
@@ -468,8 +827,9 @@ class RessourceSequenceListCreateAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """Récupère les ressources (filtrées par séquence)"""
+        """Récupère les ressources filtrées"""
         try:
+            context = get_user_context(request)
             ressources = RessourceSequence.objects.select_related(
                 'sequence', 'ajoute_par'
             ).all()
@@ -483,6 +843,12 @@ class RessourceSequenceListCreateAPIView(APIView):
             type_ressource = request.query_params.get('type')
             if type_ressource:
                 ressources = ressources.filter(type_ressource=type_ressource)
+            
+            # Filtrer par contexte via la séquence
+            if context.get('institution_id'):
+                ressources = ressources.filter(sequence__institution_id=context['institution_id'])
+            if context.get('annee_scolaire_id'):
+                ressources = ressources.filter(sequence__annee_scolaire_id=context['annee_scolaire_id'])
             
             ressources = ressources.order_by('sequence', 'ordre')
             serializer = RessourceSequenceSerializer(ressources, many=True)
@@ -500,13 +866,13 @@ class RessourceSequenceListCreateAPIView(APIView):
             )
 
     def post(self, request):
-        """Ajoute une nouvelle ressource"""
+        """Crée une nouvelle ressource"""
         serializer = RessourceSequenceCreateSerializer(data=request.data)
         if serializer.is_valid():
-            # Associer l'utilisateur actuel
-            ressource = serializer.save(ajoute_par=request.user)
+            # Ajouter l'utilisateur qui ajoute la ressource
+            ressource = serializer.save(ajoute_par=request.user if hasattr(request.user, 'formateur') else None)
             return api_success(
-                "Ressource ajoutée avec succès",
+                "Ressource créée avec succès",
                 RessourceSequenceSerializer(ressource).data,
                 status.HTTP_201_CREATED
             )
@@ -521,10 +887,22 @@ class RessourceSequenceDetailAPIView(APIView):
     """Détails, mise à jour et suppression d'une ressource"""
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_object(self, pk, request):
+        """Récupère une ressource par son ID avec filtrage contexte"""
+        context = get_user_context(request)
+        qs = RessourceSequence.objects.select_related('sequence', 'ajoute_par')
+        
+        if context.get('institution_id'):
+            qs = qs.filter(sequence__institution_id=context['institution_id'])
+        if context.get('annee_scolaire_id'):
+            qs = qs.filter(sequence__annee_scolaire_id=context['annee_scolaire_id'])
+        
+        return get_object_or_404(qs, pk=pk)
+
     def get(self, request, pk):
         """Récupère les détails d'une ressource"""
         try:
-            ressource = get_object_or_404(RessourceSequence, pk=pk)
+            ressource = self.get_object(pk, request)
             serializer = RessourceSequenceSerializer(ressource)
             return api_success(
                 "Ressource trouvée avec succès",
@@ -538,11 +916,11 @@ class RessourceSequenceDetailAPIView(APIView):
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    def patch(self, request, pk):
-        """Met à jour une ressource"""
+    def put(self, request, pk):
+        """Met à jour complètement une ressource"""
         try:
-            ressource = get_object_or_404(RessourceSequence, pk=pk)
-            serializer = RessourceSequenceSerializer(ressource, data=request.data, partial=True)
+            ressource = self.get_object(pk, request)
+            serializer = RessourceSequenceSerializer(ressource, data=request.data)
             if serializer.is_valid():
                 ressource = serializer.save()
                 return api_success(
@@ -562,10 +940,34 @@ class RessourceSequenceDetailAPIView(APIView):
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    def patch(self, request, pk):
+        """Met à jour partiellement une ressource"""
+        try:
+            ressource = self.get_object(pk, request)
+            serializer = RessourceSequenceSerializer(ressource, data=request.data, partial=True)
+            if serializer.is_valid():
+                ressource = serializer.save()
+                return api_success(
+                    "Ressource mise à jour partiellement avec succès",
+                    RessourceSequenceSerializer(ressource).data,
+                    status.HTTP_200_OK
+                )
+            return api_error(
+                "Erreur de validation",
+                errors=serializer.errors,
+                http_status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la mise à jour",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     def delete(self, request, pk):
         """Supprime une ressource"""
         try:
-            ressource = get_object_or_404(RessourceSequence, pk=pk)
+            ressource = self.get_object(pk, request)
             ressource.delete()
             return api_success(
                 "Ressource supprimée avec succès",
@@ -581,339 +983,48 @@ class RessourceSequenceDetailAPIView(APIView):
 
 
 class RessourceTelechargementAPIView(APIView):
-    """Télécharger une ressource (incrémente le compteur)"""
+    """Gère le téléchargement des ressources"""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, pk):
-        """Télécharge une ressource et incrémente le compteur"""
+        """Télécharge une ressource"""
         try:
-            from django.http import FileResponse
+            context = get_user_context(request)
+            qs = RessourceSequence.objects.all()
             
-            ressource = get_object_or_404(RessourceSequence, pk=pk)
+            # Filtrer par contexte
+            if context.get('institution_id'):
+                qs = qs.filter(sequence__institution_id=context['institution_id'])
+            if context.get('annee_scolaire_id'):
+                qs = qs.filter(sequence__annee_scolaire_id=context['annee_scolaire_id'])
             
+            ressource = get_object_or_404(qs, pk=pk)
+            
+            # Vérifier si le téléchargement est autorisé
             if not ressource.est_telechargeable:
                 return api_error(
-                    "Cette ressource n'est pas téléchargeable",
+                    "Le téléchargement de cette ressource n'est pas autorisé",
                     http_status=status.HTTP_403_FORBIDDEN
                 )
             
-            # Incrémenter le compteur
-            ressource.incrementer_telechargements()
+            # Incrémenter le compteur de téléchargements
+            ressource.nombre_telechargements += 1
+            ressource.save(update_fields=['nombre_telechargements'])
             
             # Retourner le fichier
-            return FileResponse(
-                ressource.fichier.open('rb'),
-                as_attachment=True,
-                filename=ressource.fichier.name
-            )
+            if ressource.fichier:
+                response = FileResponse(ressource.fichier.open('rb'))
+                response['Content-Disposition'] = f'attachment; filename="{ressource.fichier.name}"'
+                return response
+            else:
+                return api_error(
+                    "Fichier non trouvé",
+                    http_status=status.HTTP_404_NOT_FOUND
+                )
         except Exception as e:
             return api_error(
                 "Erreur lors du téléchargement",
                 errors={'detail': str(e)},
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-
-# ============================================================================
-# MODIFICATION DE SequenceDetailAPIView
-# ============================================================================
-
-class SequenceDetailAPIView(APIView):
-    """Détails complets d'une séquence avec blocs et ressources"""
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, pk):
-        """Récupère les détails complets d'une séquence"""
-        try:
-            sequence = get_object_or_404(
-                Sequence.objects.select_related('module')
-                                .prefetch_related('blocs_contenu', 'ressources_sequences'),
-                pk=pk
-            )
-            serializer = SequenceDetailSerializer(sequence)
-            return api_success(
-                "Séquence trouvée avec succès",
-                serializer.data,
-                status.HTTP_200_OK
-            )
-        except Exception as e:
-            return api_error(
-                "Erreur lors de la récupération de la séquence",
-                errors={'detail': str(e)},
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-    # ... autres méthodes (put, patch, delete) restent identiques
-
-
-# ============================================================================
-# VUE POUR BLOCS D'UNE SÉQUENCE
-# ============================================================================
-
-class SequenceBlocsAPIView(APIView):
-    """
-    /sequences/<id_sequence>/blocs/
-    - GET : liste des blocs d'une séquence
-    - POST: créer un bloc dans cette séquence
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, sequence_id):
-        """Liste les blocs d'une séquence"""
-        try:
-            sequence = get_object_or_404(Sequence, pk=sequence_id)
-            blocs = sequence.blocs_contenu.all().order_by('ordre')
-            serializer = BlocContenuSerializer(blocs, many=True)
-            return api_success(
-                "Blocs de la séquence récupérés avec succès",
-                serializer.data,
-                status.HTTP_200_OK
-            )
-        except Exception as e:
-            return api_error(
-                "Erreur lors de la récupération des blocs",
-                errors={'detail': str(e)},
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-    def post(self, request, sequence_id):
-        """Crée un bloc dans cette séquence"""
-        try:
-            sequence = get_object_or_404(Sequence, pk=sequence_id)
-            
-            payload = dict(request.data)
-            payload['sequence'] = sequence.id
-            
-            serializer = BlocContenuCreateSerializer(data=payload)
-            if serializer.is_valid():
-                bloc = serializer.save()
-                return api_success(
-                    "Bloc créé dans la séquence avec succès",
-                    BlocContenuSerializer(bloc).data,
-                    status.HTTP_201_CREATED
-                )
-            return api_error(
-                "Erreur de validation",
-                errors=serializer.errors,
-                http_status=status.HTTP_400_BAD_REQUEST
-            )
-        except Exception as e:
-            return api_error(
-                "Erreur lors de la création du bloc",
-                errors={'detail': str(e)},
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-
-# ============================================================================
-# VUE POUR RESSOURCES D'UNE SÉQUENCE
-# ============================================================================
-
-class SequenceRessourcesAPIView(APIView):
-    """
-    /sequences/<id_sequence>/ressources/
-    - GET : liste des ressources d'une séquence
-    - POST: ajouter une ressource à cette séquence
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, sequence_id):
-        """Liste les ressources d'une séquence"""
-        try:
-            sequence = get_object_or_404(Sequence, pk=sequence_id)
-            ressources = sequence.ressources_sequences.all().order_by('ordre')
-            serializer = RessourceSequenceSerializer(ressources, many=True)
-            return api_success(
-                "Ressources de la séquence récupérées avec succès",
-                serializer.data,
-                status.HTTP_200_OK
-            )
-        except Exception as e:
-            return api_error(
-                "Erreur lors de la récupération des ressources",
-                errors={'detail': str(e)},
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-    def post(self, request, sequence_id):
-        """Ajoute une ressource à cette séquence"""
-        try:
-            sequence = get_object_or_404(Sequence, pk=sequence_id)
-            
-            payload = dict(request.data)
-            payload['sequence'] = sequence.id
-            
-            serializer = RessourceSequenceCreateSerializer(data=payload)
-            if serializer.is_valid():
-                ressource = serializer.save(ajoute_par=request.user)
-                return api_success(
-                    "Ressource ajoutée à la séquence avec succès",
-                    RessourceSequenceSerializer(ressource).data,
-                    status.HTTP_201_CREATED
-                )
-            return api_error(
-                "Erreur de validation",
-                errors=serializer.errors,
-                http_status=status.HTTP_400_BAD_REQUEST
-            )
-        except Exception as e:
-            return api_error(
-                "Erreur lors de l'ajout de la ressource",
-                errors={'detail': str(e)},
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-# ============================================================================
-# MODULES
-# ============================================================================
-
-class ModuleListCreateAPIView(APIView):
-    """Liste et création de modules"""
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        """Récupère la liste de tous les modules"""
-        try:
-            modules = Module.objects.select_related('cours').all().order_by('-id')
-            serializer = ModuleSerializer(modules, many=True)
-            return api_success(
-                "Liste des modules récupérée avec succès",
-                serializer.data,
-                status.HTTP_200_OK
-            )
-        except Exception as e:
-            return api_error(
-                "Erreur lors de la récupération des modules",
-                errors={'detail': str(e)},
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-    def post(self, request):
-        """Crée un nouveau module"""
-        serializer = ModuleSerializer(data=request.data)
-        if serializer.is_valid():
-            obj = serializer.save()
-            return api_success(
-                "Module créé avec succès",
-                ModuleSerializer(obj).data,
-                status.HTTP_201_CREATED
-            )
-        return api_error(
-            "Erreur de validation",
-            errors=serializer.errors,
-            http_status=status.HTTP_400_BAD_REQUEST
-        )
-
-
-class ModuleDetailAPIView(APIView):
-    """Détails, mise à jour et suppression d'un module"""
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_object(self, pk):
-        """Récupère un module par son ID"""
-        return get_object_or_404(
-            Module.objects.select_related('cours'),
-            pk=pk
-        )
-
-    def get(self, request, pk):
-        """Récupère les détails d'un module"""
-        obj = self.get_object(pk)
-        return api_success(
-            "Module trouvé avec succès",
-            ModuleSerializer(obj).data,
-            status.HTTP_200_OK
-        )
-
-    def put(self, request, pk):
-        """Met à jour complètement un module"""
-        obj = self.get_object(pk)
-        serializer = ModuleSerializer(obj, data=request.data)
-        if serializer.is_valid():
-            obj = serializer.save()
-            return api_success(
-                "Module mis à jour avec succès",
-                ModuleSerializer(obj).data,
-                status.HTTP_200_OK
-            )
-        return api_error(
-            "Erreur de validation",
-            errors=serializer.errors,
-            http_status=status.HTTP_400_BAD_REQUEST
-        )
-
-    def patch(self, request, pk):
-        """Met à jour partiellement un module"""
-        obj = self.get_object(pk)
-        serializer = ModuleSerializer(obj, data=request.data, partial=True)
-        if serializer.is_valid():
-            obj = serializer.save()
-            return api_success(
-                "Module mis à jour partiellement avec succès",
-                ModuleSerializer(obj).data,
-                status.HTTP_200_OK
-            )
-        return api_error(
-            "Erreur de validation",
-            errors=serializer.errors,
-            http_status=status.HTTP_400_BAD_REQUEST
-        )
-
-    def delete(self, request, pk):
-        """Supprime un module"""
-        obj = self.get_object(pk)
-        obj.delete()
-        return api_success(
-            "Module supprimé avec succès",
-            data=None,
-            http_status=status.HTTP_204_NO_CONTENT
-        )
-    
-
-class SessionParticipantsAPIView(APIView):
-    """
-    Liste des participants (participations) d'une session.
-    GET /api/sessions/<pk>/participants/
-    """
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, pk):
-        try:
-            session = get_object_or_404(
-                Session.objects.select_related("cours", "formateur"),
-                pk=pk
-            )
-
-            qs = (
-                Participation.objects
-                .select_related("session", "session__cours", "session__formateur", "apprenant")
-                .filter(session=session)
-                .order_by("-created_at")
-            )
-
-            data = {
-                "session": {
-                    "id": session.id,
-                    "titre": session.titre,
-                    "date_debut": session.date_debut,
-                    "date_fin": session.date_fin,
-                    "cours": session.cours_id,
-                    "formateur": session.formateur_id,
-                },
-                "participants_count": qs.count(),
-                "participants": ParticipationSerializer(qs, many=True).data,
-            }
-
-            return api_success(
-                "Liste des participants récupérée avec succès",
-                data,
-                status.HTTP_200_OK
-            )
-
-        except Exception as e:
-            return api_error(
-                "Erreur lors de la récupération des participants",
-                errors={"detail": str(e)},
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -927,13 +1038,20 @@ class InscriptionCoursListCreateAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """Récupère la liste de toutes les inscriptions"""
+        """Récupère la liste des inscriptions filtrées par contexte"""
         try:
-            inscriptions = InscriptionCours.objects.select_related(
-                'apprenant', 
-                'cours'
-            ).all().order_by('-date_inscription')
-            serializer = InscriptionCoursSerializer(inscriptions, many=True)
+            context = get_user_context(request)
+            qs = InscriptionCours.objects.select_related(
+                'apprenant', 'cours', 'institution', 'annee_scolaire'
+            ).all()
+            
+            if context.get('institution_id'):
+                qs = qs.filter(institution_id=context['institution_id'])
+            if context.get('annee_scolaire_id'):
+                qs = qs.filter(annee_scolaire_id=context['annee_scolaire_id'])
+            
+            qs = qs.order_by('-date_inscription')
+            serializer = InscriptionCoursSerializer(qs, many=True)
             return api_success(
                 "Liste des inscriptions récupérée avec succès",
                 serializer.data,
@@ -967,16 +1085,22 @@ class InscriptionCoursDetailAPIView(APIView):
     """Détails, mise à jour et suppression d'une inscription"""
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_object(self, pk):
-        """Récupère une inscription par son ID"""
-        return get_object_or_404(
-            InscriptionCours.objects.select_related('apprenant', 'cours'),
-            pk=pk
+    def get_object(self, pk, request):
+        """Récupère une inscription par son ID avec filtrage contexte"""
+        context = get_user_context(request)
+        qs = InscriptionCours.objects.select_related(
+            'apprenant', 'cours', 'institution', 'annee_scolaire'
         )
+        
+        if context.get('institution_id'):
+            qs = qs.filter(institution_id=context['institution_id'])
+        if context.get('annee_scolaire_id'):
+            qs = qs.filter(annee_scolaire_id=context['annee_scolaire_id'])
+        
+        return get_object_or_404(qs, pk=pk)
 
     def get(self, request, pk):
-        """Récupère les détails d'une inscription"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         return api_success(
             "Inscription trouvée avec succès",
             InscriptionCoursSerializer(obj).data,
@@ -984,14 +1108,13 @@ class InscriptionCoursDetailAPIView(APIView):
         )
 
     def put(self, request, pk):
-        """Met à jour complètement une inscription"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         serializer = InscriptionCoursSerializer(obj, data=request.data)
         if serializer.is_valid():
-            obj = serializer.save()
+            serializer.save()
             return api_success(
                 "Inscription mise à jour avec succès",
-                InscriptionCoursSerializer(obj).data,
+                serializer.data,
                 status.HTTP_200_OK
             )
         return api_error(
@@ -1001,14 +1124,13 @@ class InscriptionCoursDetailAPIView(APIView):
         )
 
     def patch(self, request, pk):
-        """Met à jour partiellement une inscription"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         serializer = InscriptionCoursSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
-            obj = serializer.save()
+            serializer.save()
             return api_success(
                 "Inscription mise à jour partiellement avec succès",
-                InscriptionCoursSerializer(obj).data,
+                serializer.data,
                 status.HTTP_200_OK
             )
         return api_error(
@@ -1018,8 +1140,7 @@ class InscriptionCoursDetailAPIView(APIView):
         )
 
     def delete(self, request, pk):
-        """Supprime une inscription"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         obj.delete()
         return api_success(
             "Inscription supprimée avec succès",
@@ -1037,13 +1158,20 @@ class SuiviListCreateAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """Récupère la liste de tous les suivis"""
+        """Récupère la liste des suivis filtrés par contexte"""
         try:
-            suivis = Suivi.objects.select_related(
-                'apprenant', 
-                'cours'
-            ).all().order_by('-date_debut')
-            serializer = SuiviSerializer(suivis, many=True)
+            context = get_user_context(request)
+            qs = Suivi.objects.select_related(
+                'apprenant', 'cours', 'institution', 'annee_scolaire'
+            ).all()
+            
+            if context.get('institution_id'):
+                qs = qs.filter(institution_id=context['institution_id'])
+            if context.get('annee_scolaire_id'):
+                qs = qs.filter(annee_scolaire_id=context['annee_scolaire_id'])
+            
+            qs = qs.order_by('-date_debut')
+            serializer = SuiviSerializer(qs, many=True)
             return api_success(
                 "Liste des suivis récupérée avec succès",
                 serializer.data,
@@ -1077,16 +1205,22 @@ class SuiviDetailAPIView(APIView):
     """Détails, mise à jour et suppression d'un suivi"""
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_object(self, pk):
-        """Récupère un suivi par son ID"""
-        return get_object_or_404(
-            Suivi.objects.select_related('apprenant', 'cours'),
-            pk=pk
+    def get_object(self, pk, request):
+        """Récupère un suivi par son ID avec filtrage contexte"""
+        context = get_user_context(request)
+        qs = Suivi.objects.select_related(
+            'apprenant', 'cours', 'institution', 'annee_scolaire'
         )
+        
+        if context.get('institution_id'):
+            qs = qs.filter(institution_id=context['institution_id'])
+        if context.get('annee_scolaire_id'):
+            qs = qs.filter(annee_scolaire_id=context['annee_scolaire_id'])
+        
+        return get_object_or_404(qs, pk=pk)
 
     def get(self, request, pk):
-        """Récupère les détails d'un suivi"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         return api_success(
             "Suivi trouvé avec succès",
             SuiviSerializer(obj).data,
@@ -1094,14 +1228,13 @@ class SuiviDetailAPIView(APIView):
         )
 
     def put(self, request, pk):
-        """Met à jour complètement un suivi"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         serializer = SuiviSerializer(obj, data=request.data)
         if serializer.is_valid():
-            obj = serializer.save()
+            serializer.save()
             return api_success(
                 "Suivi mis à jour avec succès",
-                SuiviSerializer(obj).data,
+                serializer.data,
                 status.HTTP_200_OK
             )
         return api_error(
@@ -1111,14 +1244,13 @@ class SuiviDetailAPIView(APIView):
         )
 
     def patch(self, request, pk):
-        """Met à jour partiellement un suivi"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         serializer = SuiviSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
-            obj = serializer.save()
+            serializer.save()
             return api_success(
                 "Suivi mis à jour partiellement avec succès",
-                SuiviSerializer(obj).data,
+                serializer.data,
                 status.HTTP_200_OK
             )
         return api_error(
@@ -1128,8 +1260,7 @@ class SuiviDetailAPIView(APIView):
         )
 
     def delete(self, request, pk):
-        """Supprime un suivi"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         obj.delete()
         return api_success(
             "Suivi supprimé avec succès",
@@ -1147,13 +1278,20 @@ class SessionListCreateAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """Récupère la liste de toutes les sessions"""
+        """Récupère la liste des sessions filtrées par contexte"""
         try:
-            sessions = Session.objects.select_related(
-                'cours', 
-                'formateur'
-            ).all().order_by('-date_debut')
-            serializer = SessionSerializer(sessions, many=True)
+            context = get_user_context(request)
+            qs = Session.objects.select_related(
+                'formateur', 'cours', 'institution', 'annee_scolaire'
+            ).all()
+            
+            if context.get('institution_id'):
+                qs = qs.filter(institution_id=context['institution_id'])
+            if context.get('annee_scolaire_id'):
+                qs = qs.filter(annee_scolaire_id=context['annee_scolaire_id'])
+            
+            qs = qs.order_by('-date_debut')
+            serializer = SessionSerializer(qs, many=True)
             return api_success(
                 "Liste des sessions récupérée avec succès",
                 serializer.data,
@@ -1187,16 +1325,22 @@ class SessionDetailAPIView(APIView):
     """Détails, mise à jour et suppression d'une session"""
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_object(self, pk):
-        """Récupère une session par son ID"""
-        return get_object_or_404(
-            Session.objects.select_related('cours', 'formateur'),
-            pk=pk
+    def get_object(self, pk, request):
+        """Récupère une session par son ID avec filtrage contexte"""
+        context = get_user_context(request)
+        qs = Session.objects.select_related(
+            'formateur', 'cours', 'institution', 'annee_scolaire'
         )
+        
+        if context.get('institution_id'):
+            qs = qs.filter(institution_id=context['institution_id'])
+        if context.get('annee_scolaire_id'):
+            qs = qs.filter(annee_scolaire_id=context['annee_scolaire_id'])
+        
+        return get_object_or_404(qs, pk=pk)
 
     def get(self, request, pk):
-        """Récupère les détails d'une session"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         return api_success(
             "Session trouvée avec succès",
             SessionSerializer(obj).data,
@@ -1204,14 +1348,13 @@ class SessionDetailAPIView(APIView):
         )
 
     def put(self, request, pk):
-        """Met à jour complètement une session"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         serializer = SessionSerializer(obj, data=request.data)
         if serializer.is_valid():
-            obj = serializer.save()
+            serializer.save()
             return api_success(
                 "Session mise à jour avec succès",
-                SessionSerializer(obj).data,
+                serializer.data,
                 status.HTTP_200_OK
             )
         return api_error(
@@ -1221,14 +1364,13 @@ class SessionDetailAPIView(APIView):
         )
 
     def patch(self, request, pk):
-        """Met à jour partiellement une session"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         serializer = SessionSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
-            obj = serializer.save()
+            serializer.save()
             return api_success(
                 "Session mise à jour partiellement avec succès",
-                SessionSerializer(obj).data,
+                serializer.data,
                 status.HTTP_200_OK
             )
         return api_error(
@@ -1238,14 +1380,43 @@ class SessionDetailAPIView(APIView):
         )
 
     def delete(self, request, pk):
-        """Supprime une session"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         obj.delete()
         return api_success(
             "Session supprimée avec succès",
             data=None,
             http_status=status.HTTP_204_NO_CONTENT
         )
+
+
+class SessionParticipantsAPIView(APIView):
+    """Liste les participants d'une session"""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        """Récupère les participants d'une session"""
+        try:
+            context = get_user_context(request)
+            session_qs = Session.objects.all()
+            if context.get('institution_id'):
+                session_qs = session_qs.filter(institution_id=context['institution_id'])
+            if context.get('annee_scolaire_id'):
+                session_qs = session_qs.filter(annee_scolaire_id=context['annee_scolaire_id'])
+            
+            session = get_object_or_404(session_qs, pk=pk)
+            participations = Participation.objects.filter(session=session).select_related('apprenant')
+            serializer = ParticipationSerializer(participations, many=True)
+            return api_success(
+                f"Participants de la session '{session}' récupérés avec succès",
+                serializer.data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la récupération des participants",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 # ============================================================================
@@ -1257,13 +1428,20 @@ class ParticipationListCreateAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """Récupère la liste de toutes les participations"""
+        """Récupère la liste des participations filtrées par contexte"""
         try:
-            participations = Participation.objects.select_related(
-                'session', 
-                'apprenant'
-            ).all().order_by('-created_at')
-            serializer = ParticipationSerializer(participations, many=True)
+            context = get_user_context(request)
+            qs = Participation.objects.select_related(
+                'session', 'apprenant', 'institution', 'annee_scolaire'
+            ).all()
+            
+            if context.get('institution_id'):
+                qs = qs.filter(institution_id=context['institution_id'])
+            if context.get('annee_scolaire_id'):
+                qs = qs.filter(annee_scolaire_id=context['annee_scolaire_id'])
+            
+            qs = qs.order_by('-created_at')
+            serializer = ParticipationSerializer(qs, many=True)
             return api_success(
                 "Liste des participations récupérée avec succès",
                 serializer.data,
@@ -1297,16 +1475,22 @@ class ParticipationDetailAPIView(APIView):
     """Détails, mise à jour et suppression d'une participation"""
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_object(self, pk):
-        """Récupère une participation par son ID"""
-        return get_object_or_404(
-            Participation.objects.select_related('session', 'apprenant'),
-            pk=pk
+    def get_object(self, pk, request):
+        """Récupère une participation par son ID avec filtrage contexte"""
+        context = get_user_context(request)
+        qs = Participation.objects.select_related(
+            'session', 'apprenant', 'institution', 'annee_scolaire'
         )
+        
+        if context.get('institution_id'):
+            qs = qs.filter(institution_id=context['institution_id'])
+        if context.get('annee_scolaire_id'):
+            qs = qs.filter(annee_scolaire_id=context['annee_scolaire_id'])
+        
+        return get_object_or_404(qs, pk=pk)
 
     def get(self, request, pk):
-        """Récupère les détails d'une participation"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         return api_success(
             "Participation trouvée avec succès",
             ParticipationSerializer(obj).data,
@@ -1314,14 +1498,13 @@ class ParticipationDetailAPIView(APIView):
         )
 
     def put(self, request, pk):
-        """Met à jour complètement une participation"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         serializer = ParticipationSerializer(obj, data=request.data)
         if serializer.is_valid():
-            obj = serializer.save()
+            serializer.save()
             return api_success(
                 "Participation mise à jour avec succès",
-                ParticipationSerializer(obj).data,
+                serializer.data,
                 status.HTTP_200_OK
             )
         return api_error(
@@ -1331,14 +1514,13 @@ class ParticipationDetailAPIView(APIView):
         )
 
     def patch(self, request, pk):
-        """Met à jour partiellement une participation"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         serializer = ParticipationSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
-            obj = serializer.save()
+            serializer.save()
             return api_success(
                 "Participation mise à jour partiellement avec succès",
-                ParticipationSerializer(obj).data,
+                serializer.data,
                 status.HTTP_200_OK
             )
         return api_error(
@@ -1348,524 +1530,330 @@ class ParticipationDetailAPIView(APIView):
         )
 
     def delete(self, request, pk):
-        """Supprime une participation"""
-        obj = self.get_object(pk)
+        obj = self.get_object(pk, request)
         obj.delete()
         return api_success(
             "Participation supprimée avec succès",
             data=None,
             http_status=status.HTTP_204_NO_CONTENT
         )
-    
-
-class CoursModulesAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, cours_id):
-        cours = get_object_or_404(Cours, pk=cours_id)
-        qs = cours.modules.all().order_by("id")
-        data = ModuleSerializer(qs, many=True).data
-        return api_success("Modules du cours", data, status.HTTP_200_OK)
-
-    def post(self, request, cours_id):
-        cours = get_object_or_404(Cours, pk=cours_id)
-
-        payload = dict(request.data)
-        payload["cours"] = cours.id  # on impose le cours depuis l'URL
-
-        serializer = ModuleSerializer(data=payload)
-        if serializer.is_valid():
-            obj = serializer.save()
-            return api_success("Module créé dans le cours", ModuleSerializer(obj).data, status.HTTP_201_CREATED)
-
-        return api_error("Erreur de validation", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)
 
 
-class ModuleSequencesAPIView(APIView):
-    """
-    /modules/<id_module>/sequences/
-    - GET : liste des séquences d'un module
-    - POST: créer une séquence dans ce module (module forcé par l'URL)
-    """
-    permission_classes = [permissions.IsAuthenticated]
+# ============================================================================
+# PROGRESSION - BLOCS
+# ============================================================================
 
-    def get(self, request, module_id):
-        module = get_object_or_404(Module, pk=module_id)
-        qs = module.sequences.all().order_by("id")
-        data = SequenceSerializer(qs, many=True).data
-        return api_success("Séquences du module", data, status.HTTP_200_OK)
-
-    def post(self, request, module_id):
-        module = get_object_or_404(Module, pk=module_id)
-
-        payload = dict(request.data)
-        payload["module"] = module.id  # on impose le module depuis l'URL
-
-        serializer = SequenceSerializer(data=payload)
-        if serializer.is_valid():
-            obj = serializer.save()
-            return api_success("Séquence créée dans le module", SequenceSerializer(obj).data, status.HTTP_201_CREATED)
-
-        return api_error("Erreur de validation", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)
-
-    
-
-class SequenceContentAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, sequence_id: int):
-        try:
-            sequence = get_object_or_404(Sequence, pk=sequence_id)
-            contenu = getattr(sequence, "contenu", None)
-
-            if not contenu:
-                return api_error(
-                    "Aucun contenu pour cette séquence.",
-                    errors={"detail": "contenu introuvable"},
-                    http_status=status.HTTP_404_NOT_FOUND,
-                )
-
-            data = SequenceContentSerializer(contenu).data
-            return api_success(
-                "Contenu de la séquence récupéré avec succès",
-                data,
-                status.HTTP_200_OK,
-            )
-        except Exception as e:
-            return api_error(
-                "Erreur lors de la récupération du contenu de la séquence",
-                errors={"detail": str(e)},
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-    def post(self, request, sequence_id: int):
-        try:
-            sequence = get_object_or_404(Sequence, pk=sequence_id)
-
-            # Empêcher double contenu (OneToOne)
-            if hasattr(sequence, "contenu"):
-                return api_error(
-                    "Le contenu existe déjà pour cette séquence. Utilisez PATCH pour le modifier.",
-                    errors={"detail": "contenu déjà existant"},
-                    http_status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            payload = dict(request.data)
-            payload["sequence"] = sequence.id
-
-            serializer = SequenceContentSerializer(data=payload)
-            if serializer.is_valid():
-                obj = serializer.save()
-                return api_success(
-                    "Contenu créé avec succès",
-                    SequenceContentSerializer(obj).data,
-                    status.HTTP_201_CREATED,
-                )
-
-            return api_error(
-                "Erreur de validation",
-                errors=serializer.errors,
-                http_status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        except Exception as e:
-            return api_error(
-                "Erreur lors de la création du contenu",
-                errors={"detail": str(e)},
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-    
-    def put(self, request, sequence_id: int):
-        """Met à jour complètement le contenu d'une séquence"""
-        try:
-            sequence = get_object_or_404(Sequence, pk=sequence_id)
-            contenu = getattr(sequence, "contenu", None)
-
-            if not contenu:
-                return api_error(
-                    "Aucun contenu à modifier. Créez-le d'abord avec POST.",
-                    errors={"detail": "contenu introuvable"},
-                    http_status=status.HTTP_404_NOT_FOUND,
-                )
-
-            serializer = SequenceContentSerializer(contenu, data=request.data)
-            if serializer.is_valid():
-                obj = serializer.save()
-                return api_success(
-                    "Contenu mis à jour avec succès",
-                    SequenceContentSerializer(obj).data,
-                    status.HTTP_200_OK,
-                )
-
-            return api_error(
-                "Erreur de validation",
-                errors=serializer.errors,
-                http_status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        except Exception as e:
-            return api_error(
-                "Erreur lors de la mise à jour du contenu",
-                errors={"detail": str(e)},
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-    def patch(self, request, sequence_id: int):
-        try:
-            sequence = get_object_or_404(Sequence, pk=sequence_id)
-            contenu = getattr(sequence, "contenu", None)
-
-            if not contenu:
-                return api_error(
-                    "Aucun contenu à modifier. Créez-le d'abord avec POST.",
-                    errors={"detail": "contenu introuvable"},
-                    http_status=status.HTTP_404_NOT_FOUND,
-                )
-
-            serializer = SequenceContentSerializer(contenu, data=request.data, partial=True)
-            if serializer.is_valid():
-                obj = serializer.save()
-                return api_success(
-                    "Contenu mis à jour avec succès",
-                    SequenceContentSerializer(obj).data,
-                    status.HTTP_200_OK,
-                )
-
-            return api_error(
-                "Erreur de validation",
-                errors=serializer.errors,
-                http_status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        except Exception as e:
-            return api_error(
-                "Erreur lors de la mise à jour du contenu",
-                errors={"detail": str(e)},
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-    def delete(self, request, sequence_id: int):
-        try:
-            sequence = get_object_or_404(Sequence, pk=sequence_id)
-            contenu = getattr(sequence, "contenu", None)
-
-            if not contenu:
-                return api_success(
-                    "Aucun contenu à supprimer (déjà absent).",
-                    data=None,
-                    http_status=status.HTTP_204_NO_CONTENT,
-                )
-
-            contenu.delete()
-            return api_success(
-                "Contenu supprimé avec succès",
-                data=None,
-                http_status=status.HTTP_204_NO_CONTENT,
-            )
-
-        except Exception as e:
-            return api_error(
-                "Erreur lors de la suppression du contenu",
-                errors={"detail": str(e)},
-                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-        
 class BlocProgressListAPIView(APIView):
+    """Liste les progressions sur les blocs de contenu"""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """
-        GET /courses/progress/blocs/?sequence=<id>
-        """
-        apprenant = get_apprenant_from_request(request)
+        try:
+            if hasattr(request.user, "apprenant"):
+                qs = BlocProgress.objects.filter(apprenant=request.user.apprenant)
+            else:
+                apprenant_id = request.query_params.get("apprenant")
+                qs = BlocProgress.objects.filter(apprenant_id=apprenant_id) if apprenant_id else BlocProgress.objects.all()
 
-        sequence_id = request.query_params.get("sequence")
-        qs = BlocProgress.objects.filter(apprenant=apprenant)
-
-        if sequence_id:
-            qs = qs.filter(bloc__sequence_id=sequence_id)
-
-        data = BlocProgressSerializer(qs.order_by("-updated_at"), many=True).data
-        return api_success("Progression des blocs", data, status.HTTP_200_OK)
-
+            qs = qs.select_related("apprenant", "bloc").order_by("-updated_at")
+            return api_success("Liste des progressions de blocs récupérée avec succès", BlocProgressSerializer(qs, many=True).data)
+        except Exception as e:
+            return api_error("Erreur lors de la récupération des progressions", errors={"detail": str(e)}, http_status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class BlocProgressToggleAPIView(APIView):
+    """Marque un bloc comme terminé ou non terminé"""
     permission_classes = [permissions.IsAuthenticated]
 
-    @transaction.atomic
-    def put(self, request, bloc_id: int):
-        """
-        PUT /courses/progress/blocs/<bloc_id>/
-        body: { "est_termine": true/false }
-        """
-        apprenant = get_apprenant_from_request(request)
-        bloc = get_object_or_404(BlocContenu, pk=bloc_id)
-
-        # Vérifie inscription (même règle que clean() mais ici on évite de crash)
-        cours = bloc.sequence.module.cours
-        if not InscriptionCours.objects.filter(apprenant=apprenant, cours=cours).exists():
+    def put(self, request, bloc_id):
+        """Toggle le statut de progression d'un bloc"""
+        try:
+            serializer = ProgressToggleSerializer(data=request.data)
+            if not serializer.is_valid():
+                return api_error(
+                    "Erreur de validation",
+                    errors=serializer.errors,
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Récupérer ou créer la progression
+            apprenant = request.user.apprenant if hasattr(request.user, 'apprenant') else None
+            if not apprenant:
+                return api_error(
+                    "Utilisateur non autorisé",
+                    http_status=status.HTTP_403_FORBIDDEN
+                )
+            
+            progress, created = BlocProgress.objects.get_or_create(
+                apprenant=apprenant,
+                bloc_id=bloc_id,
+                defaults={'est_termine': False}
+            )
+            
+            # Mettre à jour le statut
+            progress.est_termine = serializer.validated_data['est_termine']
+            if progress.est_termine:
+                progress.completed_at = timezone.now()
+            else:
+                progress.completed_at = None
+            progress.save()
+            
+            return api_success(
+                "Progression mise à jour avec succès",
+                BlocProgressSerializer(progress).data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
             return api_error(
-                "L'apprenant n'est pas inscrit à ce cours.",
-                http_status=status.HTTP_403_FORBIDDEN,
+                "Erreur lors de la mise à jour de la progression",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-        payload = ProgressToggleSerializer(data=request.data)
-        if not payload.is_valid():
-            return api_error("Erreur de validation", errors=payload.errors, http_status=status.HTTP_400_BAD_REQUEST)
 
-        done = payload.validated_data["est_termine"]
-
-        bp, _ = BlocProgress.objects.get_or_create(apprenant=apprenant, bloc=bloc)
-        _mark_completed_fields(bp, done)
-
-        # ✅ Cascade: sequence -> module -> cours
-        sequence = bloc.sequence
-        module = sequence.module
-        cours = module.cours
-
-        recompute_sequence_progress(apprenant, sequence)
-        recompute_module_progress(apprenant, module)
-        recompute_cours_progress(apprenant, cours)
-
-        return api_success("Progression bloc mise à jour", BlocProgressSerializer(bp).data, status.HTTP_200_OK)
-
-        
-def get_apprenant_from_request(request):
-    """
-    Robust: selon ton auth, request.user peut être:
-    - Apprenant directement
-    - User avec attribut .apprenant
-    """
-    u = request.user
-    if hasattr(u, "apprenant") and u.apprenant:
-        return u.apprenant
-    # fallback si Apprenant est ton user model
-    return u
-
-
-def _mark_completed_fields(instance, done: bool):
-    if done:
-        instance.est_termine = True
-        if not instance.completed_at:
-            instance.completed_at = timezone.now()
-    else:
-        instance.est_termine = False
-        instance.completed_at = None
-    instance.save(update_fields=["est_termine", "completed_at", "updated_at"])
-
-
-def recompute_sequence_progress(apprenant, sequence):
-    """
-    Sequence terminée si tous les blocs visibles & obligatoires de la séquence sont terminés.
-    """
-    blocs = sequence.blocs_contenu.filter(est_visible=True, est_obligatoire=True)
-    total = blocs.count()
-
-    # Si pas de blocs obligatoires, on considère non terminée (tu peux changer à True si tu préfères)
-    if total == 0:
-        done = False
-    else:
-        done_count = BlocProgress.objects.filter(
-            apprenant=apprenant,
-            bloc__in=blocs,
-            est_termine=True
-        ).count()
-        done = (done_count == total)
-
-    sp, _ = SequenceProgress.objects.get_or_create(apprenant=apprenant, sequence=sequence)
-    _mark_completed_fields(sp, done)
-    return done
-
-
-def recompute_module_progress(apprenant, module):
-    """
-    Module terminé si toutes ses séquences sont terminées.
-    """
-    seqs = module.sequences.all()
-    total = seqs.count()
-    if total == 0:
-        done = False
-    else:
-        done_count = SequenceProgress.objects.filter(
-            apprenant=apprenant,
-            sequence__in=seqs,
-            est_termine=True
-        ).count()
-        done = (done_count == total)
-
-    mp, _ = ModuleProgress.objects.get_or_create(apprenant=apprenant, module=module)
-    _mark_completed_fields(mp, done)
-    return done
-
-
-def recompute_cours_progress(apprenant, cours):
-    """
-    Cours terminé si tous ses modules sont terminés.
-    """
-    mods = cours.modules.all()
-    total = mods.count()
-    if total == 0:
-        done = False
-    else:
-        done_count = ModuleProgress.objects.filter(
-            apprenant=apprenant,
-            module__in=mods,
-            est_termine=True
-        ).count()
-        done = (done_count == total)
-
-    cp, _ = CoursProgress.objects.get_or_create(apprenant=apprenant, cours=cours)
-    _mark_completed_fields(cp, done)
-    return done
+# ============================================================================
+# PROGRESSION - SÉQUENCES
+# ============================================================================
 
 class SequenceProgressListAPIView(APIView):
+    """Liste les progressions sur les séquences"""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """
-        GET /courses/progress/sequences/?module=<id>
-        """
-        apprenant = get_apprenant_from_request(request)
-
-        module_id = request.query_params.get("module")
-        qs = SequenceProgress.objects.filter(apprenant=apprenant)
-
-        if module_id:
-            qs = qs.filter(sequence__module_id=module_id)
-
-        data = SequenceProgressSerializer(qs.order_by("-updated_at"), many=True).data
-        return api_success("Progression des séquences", data, status.HTTP_200_OK)
+        """Récupère la liste des progressions de séquences"""
+        try:
+            apprenant_id = request.query_params.get('apprenant')
+            if apprenant_id:
+                qs = SequenceProgress.objects.filter(apprenant_id=apprenant_id)
+            else:
+                if hasattr(request.user, 'apprenant'):
+                    qs = SequenceProgress.objects.filter(apprenant=request.user.apprenant)
+                else:
+                    qs = SequenceProgress.objects.all()
+            
+            qs = qs.select_related('apprenant', 'sequence').order_by('-updated_at')
+            serializer = SequenceProgressSerializer(qs, many=True)
+            return api_success(
+                "Liste des progressions de séquences récupérée avec succès",
+                serializer.data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la récupération des progressions",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class SequenceProgressToggleAPIView(APIView):
+    """Marque une séquence comme terminée ou non terminée"""
     permission_classes = [permissions.IsAuthenticated]
 
-    @transaction.atomic
-    def put(self, request, sequence_id: int):
-        """
-        PUT /courses/progress/sequences/<sequence_id>/
-        body: { "est_termine": true/false }
-        """
-        apprenant = get_apprenant_from_request(request)
-        sequence = get_object_or_404(Sequence, pk=sequence_id)
+    def put(self, request, sequence_id):
+        """Toggle le statut de progression d'une séquence"""
+        try:
+            serializer = ProgressToggleSerializer(data=request.data)
+            if not serializer.is_valid():
+                return api_error(
+                    "Erreur de validation",
+                    errors=serializer.errors,
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            apprenant = request.user.apprenant if hasattr(request.user, 'apprenant') else None
+            if not apprenant:
+                return api_error(
+                    "Utilisateur non autorisé",
+                    http_status=status.HTTP_403_FORBIDDEN
+                )
+            
+            progress, created = SequenceProgress.objects.get_or_create(
+                apprenant=apprenant,
+                sequence_id=sequence_id,
+                defaults={'est_termine': False}
+            )
+            
+            progress.est_termine = serializer.validated_data['est_termine']
+            if progress.est_termine:
+                progress.completed_at = timezone.now()
+            else:
+                progress.completed_at = None
+            progress.save()
+            
+            return api_success(
+                "Progression mise à jour avec succès",
+                SequenceProgressSerializer(progress).data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la mise à jour de la progression",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-        cours = sequence.module.cours
-        if not InscriptionCours.objects.filter(apprenant=apprenant, cours=cours).exists():
-            return api_error("Non inscrit au cours.", http_status=status.HTTP_403_FORBIDDEN)
 
-        payload = ProgressToggleSerializer(data=request.data)
-        if not payload.is_valid():
-            return api_error("Erreur de validation", errors=payload.errors, http_status=status.HTTP_400_BAD_REQUEST)
-
-        done = payload.validated_data["est_termine"]
-
-        sp, _ = SequenceProgress.objects.get_or_create(apprenant=apprenant, sequence=sequence)
-        _mark_completed_fields(sp, done)
-
-        # si on force une séquence terminée, on peut (optionnel) marquer tous ses blocs terminés
-        # 👉 je le laisse désactivé pour éviter les surprises.
-
-        # ✅ Cascade module -> cours
-        recompute_module_progress(apprenant, sequence.module)
-        recompute_cours_progress(apprenant, sequence.module.cours)
-
-        return api_success("Progression séquence mise à jour", SequenceProgressSerializer(sp).data, status.HTTP_200_OK)
-
+# ============================================================================
+# PROGRESSION - MODULES
+# ============================================================================
 
 class ModuleProgressListAPIView(APIView):
+    """Liste les progressions sur les modules"""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """
-        GET /courses/progress/modules/?cours=<id>
-        """
-        apprenant = get_apprenant_from_request(request)
-
-        cours_id = request.query_params.get("cours")
-        qs = ModuleProgress.objects.filter(apprenant=apprenant)
-
-        if cours_id:
-            qs = qs.filter(module__cours_id=cours_id)
-
-        data = ModuleProgressSerializer(qs.order_by("-updated_at"), many=True).data
-        return api_success("Progression des modules", data, status.HTTP_200_OK)
+        """Récupère la liste des progressions de modules"""
+        try:
+            apprenant_id = request.query_params.get('apprenant')
+            if apprenant_id:
+                qs = ModuleProgress.objects.filter(apprenant_id=apprenant_id)
+            else:
+                if hasattr(request.user, 'apprenant'):
+                    qs = ModuleProgress.objects.filter(apprenant=request.user.apprenant)
+                else:
+                    qs = ModuleProgress.objects.all()
+            
+            qs = qs.select_related('apprenant', 'module').order_by('-updated_at')
+            serializer = ModuleProgressSerializer(qs, many=True)
+            return api_success(
+                "Liste des progressions de modules récupérée avec succès",
+                serializer.data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la récupération des progressions",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class ModuleProgressToggleAPIView(APIView):
+    """Marque un module comme terminé ou non terminé"""
     permission_classes = [permissions.IsAuthenticated]
 
-    @transaction.atomic
-    def put(self, request, module_id: int):
-        """
-        PUT /courses/progress/modules/<module_id>/
-        body: { "est_termine": true/false }
-        """
-        apprenant = get_apprenant_from_request(request)
-        module = get_object_or_404(Module, pk=module_id)
+    def put(self, request, module_id):
+        """Toggle le statut de progression d'un module"""
+        try:
+            serializer = ProgressToggleSerializer(data=request.data)
+            if not serializer.is_valid():
+                return api_error(
+                    "Erreur de validation",
+                    errors=serializer.errors,
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            apprenant = request.user.apprenant if hasattr(request.user, 'apprenant') else None
+            if not apprenant:
+                return api_error(
+                    "Utilisateur non autorisé",
+                    http_status=status.HTTP_403_FORBIDDEN
+                )
+            
+            progress, created = ModuleProgress.objects.get_or_create(
+                apprenant=apprenant,
+                module_id=module_id,
+                defaults={'est_termine': False}
+            )
+            
+            progress.est_termine = serializer.validated_data['est_termine']
+            if progress.est_termine:
+                progress.completed_at = timezone.now()
+            else:
+                progress.completed_at = None
+            progress.save()
+            
+            return api_success(
+                "Progression mise à jour avec succès",
+                ModuleProgressSerializer(progress).data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la mise à jour de la progression",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-        cours = module.cours
-        if not InscriptionCours.objects.filter(apprenant=apprenant, cours=cours).exists():
-            return api_error("Non inscrit au cours.", http_status=status.HTTP_403_FORBIDDEN)
 
-        payload = ProgressToggleSerializer(data=request.data)
-        if not payload.is_valid():
-            return api_error("Erreur de validation", errors=payload.errors, http_status=status.HTTP_400_BAD_REQUEST)
-
-        done = payload.validated_data["est_termine"]
-
-        mp, _ = ModuleProgress.objects.get_or_create(apprenant=apprenant, module=module)
-        _mark_completed_fields(mp, done)
-
-        # ✅ Cascade cours
-        recompute_cours_progress(apprenant, cours)
-
-        return api_success("Progression module mise à jour", ModuleProgressSerializer(mp).data, status.HTTP_200_OK)
-
+# ============================================================================
+# PROGRESSION - COURS
+# ============================================================================
 
 class CoursProgressListAPIView(APIView):
+    """Liste les progressions sur les cours"""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """
-        GET /courses/progress/cours/?cours=<id>
-        (retourne 0 ou 1 item)
-        """
-        apprenant = get_apprenant_from_request(request)
-        cours_id = request.query_params.get("cours")
-
-        qs = CoursProgress.objects.filter(apprenant=apprenant)
-        if cours_id:
-            qs = qs.filter(cours_id=cours_id)
-
-        data = CoursProgressSerializer(qs.order_by("-updated_at"), many=True).data
-        return api_success("Progression du cours", data, status.HTTP_200_OK)
+        """Récupère la liste des progressions de cours"""
+        try:
+            apprenant_id = request.query_params.get('apprenant')
+            if apprenant_id:
+                qs = CoursProgress.objects.filter(apprenant_id=apprenant_id)
+            else:
+                if hasattr(request.user, 'apprenant'):
+                    qs = CoursProgress.objects.filter(apprenant=request.user.apprenant)
+                else:
+                    qs = CoursProgress.objects.all()
+            
+            qs = qs.select_related('apprenant', 'cours').order_by('-updated_at')
+            serializer = CoursProgressSerializer(qs, many=True)
+            return api_success(
+                "Liste des progressions de cours récupérée avec succès",
+                serializer.data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la récupération des progressions",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class CoursProgressToggleAPIView(APIView):
+    """Marque un cours comme terminé ou non terminé"""
     permission_classes = [permissions.IsAuthenticated]
 
-    @transaction.atomic
-    def put(self, request, cours_id: int):
-        """
-        PUT /courses/progress/cours/<cours_id>/
-        body: { "est_termine": true/false }
-        """
-        apprenant = get_apprenant_from_request(request)
-        cours = get_object_or_404(Cours, pk=cours_id)
-
-        if not InscriptionCours.objects.filter(apprenant=apprenant, cours=cours).exists():
-            return api_error("Non inscrit au cours.", http_status=status.HTTP_403_FORBIDDEN)
-
-        payload = ProgressToggleSerializer(data=request.data)
-        if not payload.is_valid():
-            return api_error("Erreur de validation", errors=payload.errors, http_status=status.HTTP_400_BAD_REQUEST)
-
-        done = payload.validated_data["est_termine"]
-
-        cp, _ = CoursProgress.objects.get_or_create(apprenant=apprenant, cours=cours)
-        _mark_completed_fields(cp, done)
-
-        return api_success("Progression cours mise à jour", CoursProgressSerializer(cp).data, status.HTTP_200_OK)
-
-
-    
+    def put(self, request, cours_id):
+        """Toggle le statut de progression d'un cours"""
+        try:
+            serializer = ProgressToggleSerializer(data=request.data)
+            if not serializer.is_valid():
+                return api_error(
+                    "Erreur de validation",
+                    errors=serializer.errors,
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            apprenant = request.user.apprenant if hasattr(request.user, 'apprenant') else None
+            if not apprenant:
+                return api_error(
+                    "Utilisateur non autorisé",
+                    http_status=status.HTTP_403_FORBIDDEN
+                )
+            
+            progress, created = CoursProgress.objects.get_or_create(
+                apprenant=apprenant,
+                cours_id=cours_id,
+                defaults={'est_termine': False}
+            )
+            
+            progress.est_termine = serializer.validated_data['est_termine']
+            if progress.est_termine:
+                progress.completed_at = timezone.now()
+            else:
+                progress.completed_at = None
+            progress.save()
+            
+            return api_success(
+                "Progression mise à jour avec succès",
+                CoursProgressSerializer(progress).data,
+                status.HTTP_200_OK
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la mise à jour de la progression",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

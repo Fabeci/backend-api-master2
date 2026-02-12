@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
     # Quiz
+    EvaluationExportAPIView,
     QuizListCreateAPIView,
     QuizDetailAPIView,
     PassageQuizListCreateAPIView,
@@ -195,4 +196,5 @@ urlpatterns = [
     path('statistiques/evaluation/<int:evaluation_id>/', 
          StatistiquesEvaluationAPIView.as_view(), 
          name='stats-evaluation'),
+     path("evaluations/<int:pk>/export/", EvaluationExportAPIView.as_view(), name="evaluation-export"),
 ]

@@ -8,14 +8,15 @@ from rest_framework.response import Response
 from rest_framework import status, viewsets
 from django.utils.http import urlsafe_base64_encode
 from django.contrib.auth.tokens import default_token_generator
-
+from django.core.exceptions import ValidationError
 from academics.views import api_error, api_success
+
 
 def send_verification_email(user):
     """
     Envoie un e-mail de vérification au nouvel utilisateur.
     """
-    token = user.generate_email_verification_token()  # Implémentez une méthode pour générer un token sécurisé
+    token = user.generate_email_verification_token()
     verification_url = f"{settings.FRONTEND_BASE_URL}{reverse('verify-email')}?{urlencode({'token': token})}"
     
     subject = "Vérification de votre compte"
@@ -34,10 +35,7 @@ def custom_exception_handler(exc, context):
     """
     Gestionnaire personnalisé pour les exceptions.
     """
-    # Appelez le gestionnaire d'exceptions par défaut fourni par DRF
     response = exception_handler(exc, context)
-
-    # Personnalisez le message pour certaines exceptions spécifiques
     if isinstance(exc, NotAuthenticated):
         return Response(
             {
@@ -46,16 +44,6 @@ def custom_exception_handler(exc, context):
             },
             status=status.HTTP_401_UNAUTHORIZED
         )
-    # elif isinstance(exc, AuthenticationFailed):
-    #     return Response(
-    #         {
-    #             "status": status.HTTP_401_UNAUTHORIZED,
-    #             "message": "Vos informations d'authentification sont incorrectes."
-    #         },
-    #         status=status.HTTP_401_UNAUTHORIZED
-    #     )
-
-    # Si une réponse existe déjà, laissez-la intacte
     if response is not None:
         response.data['status'] = response.status_code
         response.data['message'] = response.data.get('detail', 'Une erreur s’est produite.')
@@ -86,6 +74,72 @@ def send_activation_email(user, subject, url):
 
 class BaseModelViewSet(viewsets.ModelViewSet):
 
+    # ---------------------------------------------------------------------
+    # Filtrage automatique par institution (si le modèle a institution_id)
+    # ---------------------------------------------------------------------
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+
+        if getattr(user, "is_superuser", False):
+            return qs
+
+        if hasattr(qs.model, "institution_id"):
+            institution_id = getattr(user, "institution_id", None)
+            if not institution_id:
+                return qs.none()
+            return qs.filter(institution_id=institution_id)
+
+        return qs
+
+    # ---------------------------------------------------------------------
+    # Helpers : injection d'institution
+    # ---------------------------------------------------------------------
+    def _needs_institution(self, serializer) -> bool:
+        model = getattr(getattr(serializer, "Meta", None), "model", None)
+        return bool(model and hasattr(model, "institution_id"))
+
+    def _get_user_institution_id(self):
+        return getattr(self.request.user, "institution_id", None)
+
+    # ---------------------------------------------------------------------
+    # DRF hooks : c'est ici qu'on force institution
+    # ---------------------------------------------------------------------
+    def perform_create(self, serializer):
+        user = self.request.user
+
+        if getattr(user, "is_superuser", False):
+            serializer.save()
+            return
+
+        if self._needs_institution(serializer):
+            institution_id = self._get_user_institution_id()
+            if not institution_id:
+                raise ValidationError({"institution": ["Utilisateur sans institution."]})
+            serializer.save(institution_id=institution_id)
+            return
+
+        serializer.save()
+
+    def perform_update(self, serializer):
+        user = self.request.user
+
+        if getattr(user, "is_superuser", False):
+            serializer.save()
+            return
+
+        if self._needs_institution(serializer):
+            institution_id = self._get_user_institution_id()
+            if not institution_id:
+                raise ValidationError({"institution": ["Utilisateur sans institution."]})
+            serializer.save(institution_id=institution_id)
+            return
+
+        serializer.save()
+
+    # ---------------------------------------------------------------------
+    # Responses custom : on garde ton format api_success/api_error
+    # ---------------------------------------------------------------------
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         serializer = self.get_serializer(queryset, many=True)
@@ -106,17 +160,28 @@ class BaseModelViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            obj = serializer.save()
-            return api_success(
-                "Création effectuée avec succès",
-                data=self.get_serializer(obj).data,
-                http_status=status.HTTP_201_CREATED,
+
+        if not serializer.is_valid():
+            return api_error(
+                "Erreur de validation",
+                errors=serializer.errors,
+                http_status=status.HTTP_400_BAD_REQUEST,
             )
-        return api_error(
-            "Erreur de validation",
-            errors=serializer.errors,
-            http_status=status.HTTP_400_BAD_REQUEST,
+
+        try:
+            self.perform_create(serializer)
+        except ValidationError as e:
+            return api_error(
+                "Erreur de validation",
+                errors=e.detail,
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        obj = serializer.instance
+        return api_success(
+            "Création effectuée avec succès",
+            data=self.get_serializer(obj).data,
+            http_status=status.HTTP_201_CREATED,
         )
 
     def update(self, request, *args, **kwargs):
@@ -124,17 +189,27 @@ class BaseModelViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
 
-        if serializer.is_valid():
-            obj = serializer.save()
-            return api_success(
-                "Mise à jour effectuée avec succès",
-                data=self.get_serializer(obj).data,
-                http_status=status.HTTP_200_OK,
+        if not serializer.is_valid():
+            return api_error(
+                "Erreur de validation",
+                errors=serializer.errors,
+                http_status=status.HTTP_400_BAD_REQUEST,
             )
-        return api_error(
-            "Erreur de validation",
-            errors=serializer.errors,
-            http_status=status.HTTP_400_BAD_REQUEST,
+
+        try:
+            self.perform_update(serializer)
+        except ValidationError as e:
+            return api_error(
+                "Erreur de validation",
+                errors=e.detail,
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        obj = serializer.instance
+        return api_success(
+            "Mise à jour effectuée avec succès",
+            data=self.get_serializer(obj).data,
+            http_status=status.HTTP_200_OK,
         )
 
     def destroy(self, request, *args, **kwargs):

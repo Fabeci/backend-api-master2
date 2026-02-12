@@ -66,6 +66,26 @@ class User(AbstractBaseUser, PermissionsMixin):
     groups = models.ManyToManyField('auth.Group', related_name='somapro_user_groups', blank=True)
     user_permissions = models.ManyToManyField('auth.Permission', related_name='somapro_user_permissions', blank=True)
 
+    # L'établissement auquel l'utilisateur appartient
+    institution = models.ForeignKey(
+        'academics.Institution',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users',
+        verbose_name="Établissement"
+    )
+    
+    # L'année scolaire actuellement active pour cet utilisateur
+    annee_scolaire_active = models.ForeignKey(
+        'academics.AnneeScolaire',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users_actifs',
+        verbose_name="Année scolaire active"
+    )
+
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['nom', 'prenom']
     objects = CustomUserManager()
@@ -77,13 +97,13 @@ class User(AbstractBaseUser, PermissionsMixin):
 # === Multi-table inheritance (gardé) ===
 class Admin(User):
     date_entree = models.DateField(null=True, blank=True, auto_now_add=True)
-    institution = models.ForeignKey('academics.Institution', on_delete=models.CASCADE, related_name='administrateurs', null=True, blank=True)
-    def __str__(self):  # corrige: ne pas référencer self.user
+    # institution = models.ForeignKey('academics.Institution', on_delete=models.CASCADE, related_name='administrateurs', null=True, blank=True)
+    def __str__(self): 
         return f"Admin: {self.nom} {self.prenom}"
 
 
 class Parent(User):
-    institution = models.ForeignKey('academics.Institution', on_delete=models.CASCADE, related_name='parents', null=True, blank=True)
+    # institution = models.ForeignKey('academics.Institution', on_delete=models.CASCADE, related_name='parents', null=True, blank=True)
     def __str__(self):
         return f"Parent: {self.nom} {self.prenom}"
 
@@ -106,7 +126,7 @@ class Formateur(User):
 
 
 class ResponsableAcademique(User):
-    institution = models.ForeignKey('academics.Institution', on_delete=models.CASCADE, related_name='responsables_academiques', null=True, blank=True)
+    # institution = models.ForeignKey('academics.Institution', on_delete=models.CASCADE, related_name='responsables_academiques', null=True, blank=True)
     departement = models.ForeignKey('academics.Departement', on_delete=models.CASCADE, related_name='responsables_departement', null=True, blank=True)
     def __str__(self):
         return f"{self.nom} {self.prenom}"
