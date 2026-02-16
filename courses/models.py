@@ -631,7 +631,6 @@ class Participation(models.Model):
         choices=[
             ("manuelle", "Manuelle"),
             ("auto", "Automatique"),
-            ("importee", "Importée"),
         ],
         default="manuelle",
     )

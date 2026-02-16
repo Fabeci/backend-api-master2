@@ -5,7 +5,8 @@ from rest_framework.response import Response
 from rest_framework import status, permissions, viewsets
 from rest_framework.authtoken.models import Token
 from django.shortcuts import get_object_or_404
-
+from rest_framework.exceptions import PermissionDenied
+from users.permissions import IsAdminOrHigher
 from users.utils import BaseModelViewSet
 
 from .serializers import (
@@ -161,19 +162,31 @@ class IsStaffOrReadOnly(permissions.BasePermission):
         )
 
 
-class IsAdminOrHigher(permissions.BasePermission):
+class IsAdminOrHigherOrSelf(permissions.BasePermission):
     """
-    Permission : Admin, Responsable ou SuperUser uniquement.
+    Permission :
+    - SuperUser : accès total
+    - Admin / Responsable : accès total (selon queryset)
+    - Utilisateur : peut accéder à SON propre objet (retrieve/update partiel si tu veux)
     """
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-        
+
         if request.user.is_superuser:
             return True
-        
+
         role_name = request.user.role.name if request.user.role else None
-        return role_name in ['Admin', 'Responsable']
+        if role_name in ['Admin', 'Responsable']:
+            return True
+
+        # ✅ Autoriser la lecture de son profil (detail route)
+        # (on autorise seulement si on est sur une route avec pk)
+        pk = view.kwargs.get('pk')
+        if pk is not None and str(pk) == str(request.user.pk):
+            return True
+
+        return False
 
 
 # =========================
@@ -324,7 +337,7 @@ class FormateurViewSet(BaseModelViewSet):
     """
     queryset = Formateur.objects.all()
     serializer_class = FormateurCrudSerializer
-    permission_classes = [IsAdminOrHigher]
+    permission_classes = [IsAdminOrHigherOrSelf]
     
     def get_queryset(self):
         """Filtre les formateurs selon le rôle de l'utilisateur"""
@@ -351,6 +364,19 @@ class FormateurViewSet(BaseModelViewSet):
         else:
             serializer.save()
 
+    def retrieve(self, request, *args, **kwargs):
+        user = request.user
+        if user.is_superuser:
+            return super().retrieve(request, *args, **kwargs)
+
+        if hasattr(user, "role") and str(user.role) in ["Admin", "Responsable"]:
+            return super().retrieve(request, *args, **kwargs)
+
+        # autoriser self profile
+        if str(user.pk) == str(kwargs.get("pk")):
+            return super().retrieve(request, *args, **kwargs)
+
+        raise PermissionDenied("Accès refusé.")
 
 class ResponsableAcademiqueViewSet(BaseModelViewSet):
     """
