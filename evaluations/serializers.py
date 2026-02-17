@@ -268,7 +268,8 @@ class EvaluationSerializer(serializers.ModelSerializer):
             'nombre_questions',
             'est_accessible',
             'peut_soumettre',
-            'est_auto_corrigeable'
+            'est_auto_corrigeable',
+            'questions_ids'
         ]
         read_only_fields = [
             'id', 
