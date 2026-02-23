@@ -596,11 +596,9 @@ class EvaluationDetailAPIView(APIView):
 
 
 class EvaluationPublierAPIView(APIView):
-    """Publier ou dépublier une évaluation"""
     permission_classes = [IsAuthenticated]
     
     def post(self, request, pk):
-        """Publie ou dépublie une évaluation"""
         try:
             evaluation = get_object_or_404(Evaluation, pk=pk)
             action = request.data.get('action', 'publier')
@@ -611,11 +609,25 @@ class EvaluationPublierAPIView(APIView):
                     http_status=status.HTTP_400_BAD_REQUEST
                 )
             
+            # ✅ NOUVELLE CONTRAINTE : vérifier les questions avant publication
+            if action == 'publier':
+                if evaluation.type_evaluation in ('structuree', 'mixte'):
+                    if not evaluation.questions.exists():
+                        return api_error(
+                            "Impossible de publier : l'évaluation doit contenir au moins une question.",
+                            http_status=status.HTTP_400_BAD_REQUEST
+                        )
+                if evaluation.type_evaluation in ('simple', 'mixte'):
+                    if not evaluation.consigne_texte and not evaluation.fichier_sujet:
+                        return api_error(
+                            "Impossible de publier : une consigne ou un fichier sujet est requis.",
+                            http_status=status.HTTP_400_BAD_REQUEST
+                        )
+            
             evaluation.est_publiee = (action == 'publier')
             evaluation.save()
             
             message = "Évaluation publiée avec succès" if action == 'publier' else "Évaluation dépubliée avec succès"
-            
             serializer = EvaluationSerializer(evaluation)
             return api_success(message, serializer.data, status.HTTP_200_OK)
         except Exception as e:
@@ -624,7 +636,6 @@ class EvaluationPublierAPIView(APIView):
                 errors={'detail': str(e)},
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
 
 class EvaluationAccessibiliteAPIView(APIView):
     """Vérifier l'accessibilité d'une évaluation pour un apprenant"""
@@ -710,14 +721,9 @@ class EvaluationAccessibiliteAPIView(APIView):
 # ============================================================================
 
 class PassageEvaluationDemarrerAPIView(APIView):
-    """Démarrer une nouvelle évaluation"""
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
-        """
-        Démarre une évaluation pour un apprenant
-        Body: {"apprenant": 1, "evaluation": 5}
-        """
         try:
             apprenant_id = request.data.get('apprenant')
             evaluation_id = request.data.get('evaluation')
@@ -730,18 +736,28 @@ class PassageEvaluationDemarrerAPIView(APIView):
             
             evaluation = get_object_or_404(Evaluation, pk=evaluation_id)
             
-            # Vérifier qu'il n'existe pas déjà un passage
+            # ✅ Si passage existant → retourner selon le statut
             passage_existant = PassageEvaluation.objects.filter(
                 apprenant_id=apprenant_id,
                 evaluation=evaluation
             ).first()
             
             if passage_existant:
-                return api_error(
-                    f"Un passage existe déjà avec le statut: {passage_existant.statut}",
-                    data={'passage_id': passage_existant.id, 'statut': passage_existant.statut},
-                    http_status=status.HTTP_400_BAD_REQUEST
-                )
+                if passage_existant.statut == 'en_cours':
+                    # ✅ Reprendre silencieusement
+                    serializer = PassageEvaluationDetailSerializer(passage_existant)
+                    return api_success(
+                        "Passage en cours récupéré",
+                        serializer.data,
+                        status.HTTP_200_OK
+                    )
+                else:
+                    # ❌ Soumis ou corrigé → refuser
+                    return api_error(
+                        f"Cette évaluation a déjà été soumise (statut: {passage_existant.statut})",
+                        data={'passage_id': passage_existant.id, 'statut': passage_existant.statut},
+                        http_status=status.HTTP_400_BAD_REQUEST
+                    )
             
             # Vérifier l'accessibilité
             if not evaluation.est_accessible():
@@ -758,7 +774,7 @@ class PassageEvaluationDemarrerAPIView(APIView):
             )
             
             # Pour évaluations structurées, créer les réponses vides
-            if evaluation.type_evaluation == 'structuree':
+            if evaluation.type_evaluation in ('structuree', 'mixte'):
                 for question in evaluation.questions.all():
                     ReponseQuestion.objects.create(
                         passage_evaluation=passage,
@@ -773,12 +789,13 @@ class PassageEvaluationDemarrerAPIView(APIView):
                 status.HTTP_201_CREATED
             )
         except Exception as e:
+            import traceback
+            traceback.print_exc()  # ← pour voir le vrai message dans le terminal Django
             return api_error(
                 "Erreur lors du démarrage de l'évaluation",
                 errors={'detail': str(e)},
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
 
 class PassageEvaluationReprendreAPIView(APIView):
     """Reprendre une évaluation en cours"""
@@ -1124,7 +1141,7 @@ class CorrectionReponseAPIView(APIView):
                 )
             
             # Vérifier que le passage est soumis
-            if reponse.passage_evaluation.statut != 'soumis':
+            if reponse.passage_evaluation.statut not in ('soumis', 'corrige'):
                 return api_error(
                     "Le passage doit être soumis pour être corrigé",
                     http_status=status.HTTP_400_BAD_REQUEST
@@ -1171,7 +1188,7 @@ class CorrectionEvaluationAPIView(APIView):
             passage = get_object_or_404(PassageEvaluation, pk=pk)
             
             # Vérifier que le passage est soumis
-            if passage.statut != 'soumis':
+            if passage.statut not in ('soumis', 'corrige'):
                 return api_error(
                     "Le passage doit être soumis pour être corrigé",
                     http_status=status.HTTP_400_BAD_REQUEST
@@ -1313,40 +1330,87 @@ class StatistiquesApprenantAPIView(APIView):
 
 
 class StatistiquesEvaluationAPIView(APIView):
-    """Statistiques d'une évaluation"""
     permission_classes = [IsAuthenticated]
     
     def get(self, request, evaluation_id):
-        """Récupère les statistiques d'une évaluation"""
         try:
-            passages = PassageEvaluation.objects.filter(
-                evaluation_id=evaluation_id,
-                statut='corrige'
-            )
+            evaluation = get_object_or_404(Evaluation, pk=evaluation_id)
             
-            if not passages.exists():
-                return api_success(
-                    "Aucun passage corrigé pour cette évaluation",
-                    {
-                        'evaluation_id': evaluation_id,
-                        'nombre_passages': 0
-                    },
-                    status.HTTP_200_OK
-                )
-            
-            notes = list(passages.values_list('note', flat=True))
-            bareme = passages.first().evaluation.bareme
+            tous_passages = PassageEvaluation.objects.filter(evaluation_id=evaluation_id)
+            passages_corriges = tous_passages.filter(statut='corrige')
             
             stats = {
-                'evaluation_id': evaluation_id,
-                'nombre_passages': len(notes),
-                'note_moyenne': round(sum(notes) / len(notes), 2),
-                'note_min': round(min(notes), 2),
-                'note_max': round(max(notes), 2),
-                'taux_reussite': round(len([n for n in notes if n >= bareme/2]) / len(notes) * 100, 2),
-                'bareme': bareme,
+                'evaluation_id':        evaluation_id,
+                'nb_passages':          tous_passages.count(),
+                'nb_passages_soumis':   tous_passages.filter(statut='soumis').count(),
+                'nb_passages_corriges': passages_corriges.count(),
+                'nb_passages_en_cours': tous_passages.filter(statut='en_cours').count(),
+                'bareme':               evaluation.bareme,
+                'moyenne_note':         None,
+                'note_min':             None,
+                'note_max':             None,
+                'taux_reussite':        None,
+                'stats_par_question':   [],
+                'nb_questions':         0,
             }
-            
+
+            if passages_corriges.exists():
+                notes = [n for n in passages_corriges.values_list('note', flat=True) if n is not None]
+                if notes:
+                    moyenne = sum(notes) / len(notes)
+                    stats.update({
+                        'moyenne_note': round(moyenne, 2),
+                        'note_min':     round(min(notes), 2),
+                        'note_max':     round(max(notes), 2),
+                        'taux_reussite': round(
+                            len([n for n in notes if n >= evaluation.bareme / 2]) / len(notes) * 100, 2
+                        ),
+                    })
+
+            # Stats par question
+            if evaluation.type_evaluation in ('structuree', 'mixte'):
+                stats_par_question = []
+                for question in evaluation.questions.all().order_by('ordre'):
+                    reponses_q = ReponseQuestion.objects.filter(
+                        passage_evaluation__evaluation_id=evaluation_id,
+                        question=question
+                    )
+                    nb_reponses = reponses_q.exclude(statut='non_repondu').count()
+
+                    if question.mode_correction == 'automatique':
+                        nb_correctes = reponses_q.filter(points_obtenus=question.points).count()
+                        taux = round((nb_correctes / nb_reponses) * 100, 2) if nb_reponses > 0 else None
+                        stats_par_question.append({
+                            'question_id':   question.id,
+                            'enonce':        question.enonce_texte,
+                            'type_question': question.type_question,
+                            'points':        question.points,
+                            'nb_reponses':   nb_reponses,
+                            'nb_correctes':  nb_correctes,
+                            'moyenne_points': None,
+                            'taux_reussite': taux,
+                        })
+                    else:
+                        points_list = list(
+                            reponses_q.filter(statut='corrige')
+                                      .values_list('points_obtenus', flat=True)
+                        )
+                        moyenne_pts = round(sum(points_list) / len(points_list), 2) if points_list else None
+                        taux = round((moyenne_pts / question.points) * 100, 2) if moyenne_pts is not None else None
+                        stats_par_question.append({
+                            'question_id':    question.id,
+                            'enonce':         question.enonce_texte,
+                            'type_question':  question.type_question,
+                            'points':         question.points,
+                            'nb_reponses':    nb_reponses,
+                            'nb_correctes':   None,
+                            'moyenne_points': moyenne_pts,
+                            'taux_reussite':  taux,
+                        })
+
+                stats['stats_par_question'] = stats_par_question
+                stats['nb_questions'] = len(stats_par_question)
+
             return api_success(
                 "Statistiques de l'évaluation récupérées avec succès",
                 stats,
@@ -1358,245 +1422,158 @@ class StatistiquesEvaluationAPIView(APIView):
                 errors={'detail': str(e)},
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
+                   
 class EvaluationExportAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         evaluation = get_object_or_404(Evaluation, pk=pk)
-
         export_format = request.query_params.get("format", "csv").lower()
         detail = request.query_params.get("detail", "false").lower() == "true"
 
-        # Récupérer passages + apprenants
+        # ✅ Apprenant hérite de AbstractUser via user_ptr → pas de __user
         passages = (
             PassageEvaluation.objects
-            .select_related("apprenant", "apprenant__user", "evaluation", "evaluation__cours")
+            .select_related("apprenant", "evaluation", "evaluation__cours")
             .filter(evaluation=evaluation)
-            .order_by("apprenant__user__last_name", "apprenant__user__first_name")
+            .order_by("apprenant__nom", "apprenant__prenom")
         )
-
-        if export_format == "csv":
-            if detail:
-                return self._export_detail_csv(evaluation, passages)
-            return self._export_resume_csv(evaluation, passages)
 
         if export_format == "xlsx":
-            if detail:
-                return self._export_detail_xlsx(evaluation, passages)
-            return self._export_resume_xlsx(evaluation, passages)
+            try:
+                from openpyxl import Workbook
+            except ImportError:
+                return api_error("openpyxl non installé.", http_status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return self._export_detail_xlsx(evaluation, passages) if detail else self._export_resume_xlsx(evaluation, passages)
 
-        return api_error(
-            "Format non supporté",
-            errors={"format": "Utilise csv ou xlsx"},
-            http_status=status.HTTP_400_BAD_REQUEST
-        )
+        return self._export_detail_csv(evaluation, passages) if detail else self._export_resume_csv(evaluation, passages)
+
+    def _get_user_info(self, apprenant):
+        return {
+            'nom':    getattr(apprenant, 'nom',  '') or '',
+            'prenom': getattr(apprenant, 'prenom', '') or '',
+            'email':  getattr(apprenant, 'email',      '') or '',
+        }
 
     def _export_resume_csv(self, evaluation, passages):
-        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response = HttpResponse(content_type="text/csv; charset=utf-8-sig")
         response["Content-Disposition"] = f'attachment; filename="evaluation_{evaluation.id}_resume.csv"'
-
-        writer = csv.writer(response)
-        writer.writerow([
-            "evaluation_id", "evaluation", "cours",
-            "apprenant_id", "nom", "prenom", "email",
-            "statut", "note", "bareme", "pourcentage",
-            "date_debut", "date_soumission", "date_correction"
-        ])
-
+        writer = csv.writer(response, delimiter=';')
+        writer.writerow(["evaluation_id", "evaluation", "cours",
+                         "apprenant_id", "nom", "prenom", "email",
+                         "statut", "note", "bareme", "pourcentage",
+                         "date_debut", "date_soumission", "date_correction"])
         for p in passages:
-            user = getattr(p.apprenant, "user", None)
-            nom = getattr(user, "last_name", "") if user else ""
-            prenom = getattr(user, "first_name", "") if user else ""
-            email = getattr(user, "email", "") if user else ""
-
+            info = self._get_user_info(p.apprenant)
+            pct = p.pourcentage()
             writer.writerow([
-                evaluation.id,
-                evaluation.titre,
+                evaluation.id, evaluation.titre,
                 evaluation.cours.titre if evaluation.cours else "",
-                p.apprenant_id,
-                nom,
-                prenom,
-                email,
+                p.apprenant_id, info['nom'], info['prenom'], info['email'],
                 p.statut,
                 p.note if p.note is not None else "",
                 evaluation.bareme,
-                p.pourcentage() if p.pourcentage() is not None else "",
-                p.date_debut,
-                p.date_soumission,
-                p.date_correction,
+                pct if pct is not None else "",
+                p.date_debut, p.date_soumission, p.date_correction,
             ])
-
         return response
 
     def _export_detail_csv(self, evaluation, passages):
-        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response = HttpResponse(content_type="text/csv; charset=utf-8-sig")
         response["Content-Disposition"] = f'attachment; filename="evaluation_{evaluation.id}_detail.csv"'
-        writer = csv.writer(response)
-
-        writer.writerow([
-            "evaluation_id", "evaluation", "cours",
-            "apprenant_id", "nom", "prenom", "email",
-            "statut_passage",
-            "question_id", "ordre", "type_question",
-            "enonce",
-            "statut_reponse", "points_obtenus", "points_question",
-            "reponse_texte", "fichier_reponse", "choix_selectionnes"
-        ])
-
-        # Charger réponses questions en batch
+        writer = csv.writer(response,  delimiter=';')
+        writer.writerow(["evaluation_id", "evaluation", "cours",
+                         "apprenant_id", "nom", "prenom", "email", "statut_passage",
+                         "question_id", "ordre", "type_question", "enonce",
+                         "statut_reponse", "points_obtenus", "points_question",
+                         "reponse_texte", "fichier_reponse", "choix_selectionnes"])
         passage_ids = list(passages.values_list("id", flat=True))
         reponses = (
             ReponseQuestion.objects
-            .select_related(
-                "passage_evaluation", "passage_evaluation__apprenant", "passage_evaluation__apprenant__user",
-                "question"
-            )
+            .select_related("passage_evaluation", "passage_evaluation__apprenant", "question")
             .prefetch_related("choix_selectionnes")
             .filter(passage_evaluation_id__in=passage_ids)
-            .order_by("passage_evaluation__apprenant__user__last_name", "question__ordre")
+            .order_by("passage_evaluation__apprenant__nom", "question__ordre")
         )
-
-        # Map passage_id -> PassageEvaluation pour accéder au statut + user
         passage_map = {p.id: p for p in passages}
-
         for rq in reponses:
             p = passage_map.get(rq.passage_evaluation_id)
-            user = getattr(p.apprenant, "user", None) if p else None
-
-            choix_txt = "; ".join(list(rq.choix_selectionnes.values_list("texte", flat=True)))
-
+            if not p:
+                continue
+            info = self._get_user_info(p.apprenant)
+            choix_txt = "; ".join(rq.choix_selectionnes.values_list("texte", flat=True))
             writer.writerow([
-                evaluation.id,
-                evaluation.titre,
+                evaluation.id, evaluation.titre,
                 evaluation.cours.titre if evaluation.cours else "",
-                p.apprenant_id if p else "",
-                getattr(user, "last_name", "") if user else "",
-                getattr(user, "first_name", "") if user else "",
-                getattr(user, "email", "") if user else "",
-                p.statut if p else "",
-                rq.question_id,
-                rq.question.ordre,
-                rq.question.type_question,
-                (rq.question.enonce_texte or "")[:200],  # limiter la taille
-                rq.statut,
-                rq.points_obtenus,
-                rq.question.points,
-                (rq.reponse_texte or "")[:200],
+                p.apprenant_id, info['nom'], info['prenom'], info['email'], p.statut,
+                rq.question_id, rq.question.ordre, rq.question.type_question,
+                (rq.question.enonce_texte or '')[:200],
+                rq.statut, rq.points_obtenus, rq.question.points,
+                (rq.reponse_texte or '')[:200],
                 rq.fichier_reponse.url if rq.fichier_reponse else "",
                 choix_txt,
             ])
-
         return response
 
-    # -------- XLSX (nécessite openpyxl) --------
     def _export_resume_xlsx(self, evaluation, passages):
         from openpyxl import Workbook
-
         wb = Workbook()
         ws = wb.active
         ws.title = "Résumé"
-
-        ws.append([
-            "evaluation_id", "evaluation", "cours",
-            "apprenant_id", "nom", "prenom", "email",
-            "statut", "note", "bareme", "pourcentage",
-            "date_debut", "date_soumission", "date_correction"
-        ])
-
+        ws.append(["evaluation_id", "evaluation", "cours", "apprenant_id", "nom", "prenom", "email",
+                   "statut", "note", "bareme", "pourcentage", "date_debut", "date_soumission", "date_correction"])
         for p in passages:
-            user = getattr(p.apprenant, "user", None)
-            ws.append([
-                evaluation.id,
-                evaluation.titre,
-                evaluation.cours.titre if evaluation.cours else "",
-                p.apprenant_id,
-                getattr(user, "last_name", "") if user else "",
-                getattr(user, "first_name", "") if user else "",
-                getattr(user, "email", "") if user else "",
-                p.statut,
-                p.note if p.note is not None else "",
-                evaluation.bareme,
-                p.pourcentage() if p.pourcentage() is not None else "",
-                p.date_debut,
-                p.date_soumission,
-                p.date_correction,
-            ])
-
+            info = self._get_user_info(p.apprenant)
+            pct = p.pourcentage()
+            ws.append([evaluation.id, evaluation.titre,
+                        evaluation.cours.titre if evaluation.cours else "",
+                        p.apprenant_id, info['nom'], info['prenom'], info['email'],
+                        p.statut, p.note if p.note is not None else "", evaluation.bareme,
+                        pct if pct is not None else "",
+                        p.date_debut, p.date_soumission, p.date_correction])
         buff = BytesIO()
         wb.save(buff)
         buff.seek(0)
-
-        response = HttpResponse(
-            buff.getvalue(),
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
+        response = HttpResponse(buff.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         response["Content-Disposition"] = f'attachment; filename="evaluation_{evaluation.id}_resume.xlsx"'
         return response
 
     def _export_detail_xlsx(self, evaluation, passages):
         from openpyxl import Workbook
-
         wb = Workbook()
         ws = wb.active
         ws.title = "Détail"
-
-        ws.append([
-            "evaluation_id", "evaluation", "cours",
-            "apprenant_id", "nom", "prenom", "email",
-            "statut_passage",
-            "question_id", "ordre", "type_question",
-            "enonce",
-            "statut_reponse", "points_obtenus", "points_question",
-            "reponse_texte", "fichier_reponse", "choix_selectionnes"
-        ])
-
+        ws.append(["evaluation_id", "evaluation", "cours", "apprenant_id", "nom", "prenom", "email",
+                   "statut_passage", "question_id", "ordre", "type_question", "enonce",
+                   "statut_reponse", "points_obtenus", "points_question",
+                   "reponse_texte", "fichier_reponse", "choix_selectionnes"])
         passage_ids = list(passages.values_list("id", flat=True))
         reponses = (
             ReponseQuestion.objects
-            .select_related(
-                "passage_evaluation", "passage_evaluation__apprenant", "passage_evaluation__apprenant__user",
-                "question"
-            )
+            .select_related("passage_evaluation", "passage_evaluation__apprenant", "question")
             .prefetch_related("choix_selectionnes")
             .filter(passage_evaluation_id__in=passage_ids)
-            .order_by("passage_evaluation__apprenant__user__last_name", "question__ordre")
+            .order_by("passage_evaluation__apprenant__last_name", "question__ordre")
         )
         passage_map = {p.id: p for p in passages}
-
         for rq in reponses:
             p = passage_map.get(rq.passage_evaluation_id)
-            user = getattr(p.apprenant, "user", None) if p else None
-            choix_txt = "; ".join(list(rq.choix_selectionnes.values_list("texte", flat=True)))
-
-            ws.append([
-                evaluation.id,
-                evaluation.titre,
-                evaluation.cours.titre if evaluation.cours else "",
-                p.apprenant_id if p else "",
-                getattr(user, "last_name", "") if user else "",
-                getattr(user, "first_name", "") if user else "",
-                getattr(user, "email", "") if user else "",
-                p.statut if p else "",
-                rq.question_id,
-                rq.question.ordre,
-                rq.question.type_question,
-                (rq.question.enonce_texte or "")[:200],
-                rq.statut,
-                rq.points_obtenus,
-                rq.question.points,
-                (rq.reponse_texte or "")[:200],
-                rq.fichier_reponse.url if rq.fichier_reponse else "",
-                choix_txt,
-            ])
-
+            if not p:
+                continue
+            info = self._get_user_info(p.apprenant)
+            choix_txt = "; ".join(rq.choix_selectionnes.values_list("texte", flat=True))
+            ws.append([evaluation.id, evaluation.titre,
+                        evaluation.cours.titre if evaluation.cours else "",
+                        p.apprenant_id, info['nom'], info['prenom'], info['email'], p.statut,
+                        rq.question_id, rq.question.ordre, rq.question.type_question,
+                        (rq.question.enonce_texte or '')[:200],
+                        rq.statut, rq.points_obtenus, rq.question.points,
+                        (rq.reponse_texte or '')[:200],
+                        rq.fichier_reponse.url if rq.fichier_reponse else "",
+                        choix_txt])
         buff = BytesIO()
         wb.save(buff)
         buff.seek(0)
-
-        response = HttpResponse(
-            buff.getvalue(),
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
+        response = HttpResponse(buff.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         response["Content-Disposition"] = f'attachment; filename="evaluation_{evaluation.id}_detail.xlsx"'
         return response

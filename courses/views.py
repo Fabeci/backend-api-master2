@@ -1,5 +1,8 @@
 # courses/views.py
 
+import os
+import uuid
+
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
@@ -7,8 +10,13 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.db import transaction
 from django.http import FileResponse, Http404
+from django.core.files.storage import default_storage
+from django.conf import settings
+from django.core.files.base import ContentFile
 
 from academics.models import Inscription
+from rest_framework.parsers import MultiPartParser, FormParser
+
 from courses.utils import can_create_in_context, filter_queryset_by_role, get_filtered_object, get_user_context
 from .models import (
     BlocContenu,
@@ -817,7 +825,101 @@ class BlocContenuDetailAPIView(APIView):
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+# ============================================================================
+# UPLOAD FICHIERS BLOCS CONTENU
+# ============================================================================
 
+class BlocContenuUploadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    ALLOWED_EXTENSIONS = {
+        'image':       ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'],
+        'video':       ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'],
+        'audio':       ['.mp3', '.wav', '.ogg', '.aac', '.m4a', '.flac'],
+        'pdf':         ['.pdf'],
+        'word':        ['.doc', '.docx'],
+        'excel':       ['.xls', '.xlsx'],
+        'powerpoint':  ['.ppt', '.pptx'],
+        'archive':     ['.zip', '.rar', '.7z', '.tar', '.gz'],
+        'texte':       ['.txt', '.csv'],
+    }
+
+    MAX_SIZE = {
+        'image':       10  * 1024 * 1024,   # 10 Mo
+        'video':       500 * 1024 * 1024,   # 500 Mo
+        'audio':       100 * 1024 * 1024,   # 100 Mo
+        'pdf':         50  * 1024 * 1024,   # 50 Mo
+        'word':        50  * 1024 * 1024,   # 50 Mo
+        'excel':       50  * 1024 * 1024,   # 50 Mo
+        'powerpoint':  100 * 1024 * 1024,   # 100 Mo
+        'archive':     200 * 1024 * 1024,   # 200 Mo
+        'texte':       10  * 1024 * 1024,   # 10 Mo
+    }
+
+    UPLOAD_SUBDIR = {
+        'image':       'images',
+        'video':       'videos',
+        'audio':       'audios',
+        'pdf':         'pdfs',
+        'word':        'documents',
+        'excel':       'documents',
+        'powerpoint':  'documents',
+        'archive':     'archives',
+        'texte':       'documents',
+    }
+
+    def post(self, request, *args, **kwargs):
+        file_obj = request.FILES.get('file')
+        kind = request.data.get('kind', '').strip().lower()
+
+        if not file_obj:
+            return Response({'error': 'Aucun fichier fourni.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if kind not in self.ALLOWED_EXTENSIONS:
+            allowed = ', '.join(self.ALLOWED_EXTENSIONS.keys())
+            return Response(
+                {'error': f"Type invalide : '{kind}'. Valeurs autorisées : {allowed}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        _, ext = os.path.splitext(file_obj.name.lower())
+        if ext not in self.ALLOWED_EXTENSIONS[kind]:
+            allowed = ', '.join(self.ALLOWED_EXTENSIONS[kind])
+            return Response(
+                {'error': f"Extension '{ext}' non autorisée pour '{kind}'. Autorisées : {allowed}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if file_obj.size > self.MAX_SIZE[kind]:
+            max_mb = self.MAX_SIZE[kind] // (1024 * 1024)
+            return Response(
+                {'error': f"Fichier trop volumineux. Maximum autorisé : {max_mb} Mo."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        unique_name = f"{uuid.uuid4().hex}{ext}"
+        subdir = self.UPLOAD_SUBDIR[kind]
+        upload_path = f"blocs_contenu/{subdir}/{unique_name}"
+
+        try:
+            saved_path = default_storage.save(upload_path, ContentFile(file_obj.read()))
+        except Exception as e:
+            return Response(
+                {'error': f"Erreur lors de la sauvegarde : {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        try:
+            file_url = default_storage.url(saved_path)
+            if file_url.startswith('/'):
+                scheme = 'https' if request.is_secure() else 'http'
+                file_url = f"{scheme}://{request.get_host()}{file_url}"
+        except Exception:
+            file_url = f"{request.scheme}://{request.get_host()}{settings.MEDIA_URL}{saved_path}"
+
+        return Response({'url': file_url}, status=status.HTTP_201_CREATED)
+    
 # ============================================================================
 # RESSOURCES / PIÈCES JOINTES
 # ============================================================================

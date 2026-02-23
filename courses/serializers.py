@@ -142,16 +142,29 @@ class ModuleSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["institution", "annee_scolaire"]
 
-
 # ============================================================================
 # BLOCS DE CONTENU
 # ============================================================================
 
 class BlocContenuSerializer(serializers.ModelSerializer):
-    """Serializer pour les blocs de contenu"""
-    
+    """
+    Serializer universel pour lecture ET écriture (PUT/PATCH/GET).
+
+    Règle importante :
+    - allow_blank=True  → uniquement sur CharField / TextField
+    - allow_null=True   → sur tous les champs nullable (URL, fichier, int...)
+    - URLField / FileField / ImageField → redéclarés explicitement pour éviter
+      l'erreur "Field.__init__() got an unexpected keyword argument 'allow_blank'"
+    """
     icone_type = serializers.ReadOnlyField()
-    
+
+    # Champs URL/fichier redéclarés explicitement (sans allow_blank)
+    image    = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
+    fichier  = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
+    video_url    = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
+    audio_url    = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
+    lien_externe = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
+
     class Meta:
         model = BlocContenu
         fields = [
@@ -163,12 +176,66 @@ class BlocContenuSerializer(serializers.ModelSerializer):
             'est_obligatoire', 'est_visible',
             'icone_type', 'date_creation', 'date_modification'
         ]
-        read_only_fields = ['id', 'date_creation', 'date_modification']
+        read_only_fields = ['id', 'icone_type', 'date_creation', 'date_modification']
+        extra_kwargs = {
+            # FK / choices
+            'sequence':              {'required': False},
+            'type_bloc':             {'required': False},
+            'ordre':                 {'required': False},
+            # CharField / TextField → allow_blank OK
+            'titre':                 {'required': False, 'allow_blank': True},
+            'contenu_texte':         {'required': False, 'allow_null': True, 'allow_blank': True},
+            'contenu_html':          {'required': False, 'allow_null': True, 'allow_blank': True},
+            'contenu_markdown':      {'required': False, 'allow_null': True, 'allow_blank': True},
+            'code_source':           {'required': False, 'allow_null': True, 'allow_blank': True},
+            'langage_code':          {'required': False, 'allow_null': True, 'allow_blank': True},
+            'objectifs':             {'required': False, 'allow_null': True, 'allow_blank': True},
+            # IntegerField → allow_null uniquement (pas allow_blank)
+            'duree_estimee_minutes': {'required': False, 'allow_null': True},
+            # BooleanField → required uniquement
+            'est_obligatoire':       {'required': False},
+            'est_visible':           {'required': False},
+        }
+
+    def to_internal_value(self, data):
+        """
+        Convertit les chaînes vides '' en None pour les champs URL/fichier
+        avant la validation DRF, évitant les erreurs URLField sur "".
+        """
+        url_like_fields = ['video_url', 'audio_url', 'lien_externe', 'image', 'fichier']
+        mutable = data.copy() if hasattr(data, 'copy') else dict(data)
+        for field_name in url_like_fields:
+            if mutable.get(field_name) == '':
+                mutable[field_name] = None
+        return super().to_internal_value(mutable)
+
+    def validate(self, attrs):
+        """
+        Création → sequence, titre, type_bloc requis.
+        Mise à jour → tout ce qui est envoyé est accepté.
+        """
+        if self.instance is None:
+            errors = {}
+            if 'sequence' not in attrs:
+                errors['sequence'] = ['Ce champ est obligatoire.']
+            if not attrs.get('titre'):
+                errors['titre'] = ['Ce champ est obligatoire.']
+            if 'type_bloc' not in attrs:
+                errors['type_bloc'] = ['Ce champ est obligatoire.']
+            if errors:
+                raise serializers.ValidationError(errors)
+        return attrs
 
 
 class BlocContenuCreateSerializer(serializers.ModelSerializer):
-    """Serializer pour créer un bloc de contenu"""
-    
+    """Serializer dédié à la création."""
+
+    image    = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
+    fichier  = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
+    video_url    = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
+    audio_url    = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
+    lien_externe = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
+
     class Meta:
         model = BlocContenu
         fields = [
@@ -179,6 +246,26 @@ class BlocContenuCreateSerializer(serializers.ModelSerializer):
             'objectifs', 'duree_estimee_minutes',
             'est_obligatoire', 'est_visible'
         ]
+        extra_kwargs = {
+            'contenu_texte':         {'required': False, 'allow_null': True, 'allow_blank': True},
+            'contenu_html':          {'required': False, 'allow_null': True, 'allow_blank': True},
+            'contenu_markdown':      {'required': False, 'allow_null': True, 'allow_blank': True},
+            'code_source':           {'required': False, 'allow_null': True, 'allow_blank': True},
+            'langage_code':          {'required': False, 'allow_null': True, 'allow_blank': True},
+            'objectifs':             {'required': False, 'allow_null': True, 'allow_blank': True},
+            'duree_estimee_minutes': {'required': False, 'allow_null': True},
+            'est_obligatoire':       {'required': False},
+            'est_visible':           {'required': False},
+            'ordre':                 {'required': False},
+        }
+
+    def to_internal_value(self, data):
+        url_like_fields = ['video_url', 'audio_url', 'lien_externe', 'image', 'fichier']
+        mutable = data.copy() if hasattr(data, 'copy') else dict(data)
+        for field_name in url_like_fields:
+            if mutable.get(field_name) == '':
+                mutable[field_name] = None
+        return super().to_internal_value(mutable)
 
 
 # ============================================================================

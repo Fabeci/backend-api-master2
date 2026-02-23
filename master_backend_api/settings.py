@@ -23,11 +23,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-$s4b+_ug=(xi0ul0(8u-^-8pxn@z=t08y@-e&5_3g#1tam2wl6'
 # SECRET_KEY = config('DJANGO_SECRET_KEY')
-DEBUG = config('DEBUG', default=False, cast=bool)
+# DEBUG = config('DEBUG', default=False, cast=bool)
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG = True
+DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost:4200', 'localhost', 'somaproapi.gconnectapp.com', 'www.somaproapi.gconnectapp.com']
 
@@ -104,6 +104,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'master_backend_api.wsgi.application'
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
@@ -227,4 +229,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:4200",  # Origine de votre application Angular
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'x-institution-id',      # ← custom header
+    'x-annee-scolaire-id',   # ← custom header
 ]

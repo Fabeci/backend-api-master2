@@ -3,6 +3,7 @@
 from django.urls import path
 from .views import (
     # Cours
+    BlocContenuUploadView,
     BlocProgressListAPIView,
     BlocProgressToggleAPIView,
     CoursListCreateAPIView,
@@ -67,6 +68,7 @@ urlpatterns = [
     # Blocs de contenu
     path('blocs-contenu/', BlocContenuListCreateAPIView.as_view(), name='bloc-contenu-list-create'),
     path('blocs-contenu/<int:pk>/', BlocContenuDetailAPIView.as_view(), name='bloc-contenu-detail'),
+    path('blocs-contenu/upload/', BlocContenuUploadView.as_view(), name='bloc-contenu-upload'),
     
     # Ressources / Pièces jointes
     path('ressources/', RessourceSequenceListCreateAPIView.as_view(), name='ressource-list-create'),

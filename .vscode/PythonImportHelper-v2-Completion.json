@@ -2099,6 +2099,14 @@
         "documentation": {}
     },
     {
+        "label": "AnneeScolaire",
+        "importPath": "academics.models",
+        "description": "academics.models",
+        "isExtraImport": true,
+        "detail": "academics.models",
+        "documentation": {}
+    },
+    {
         "label": "Groupe",
         "importPath": "academics.models",
         "description": "academics.models",
@@ -2467,11 +2475,11 @@
         "documentation": {}
     },
     {
-        "label": "send_mail",
-        "importPath": "django.core.mail",
-        "description": "django.core.mail",
+        "label": "PermissionDenied",
+        "importPath": "rest_framework.exceptions",
+        "description": "rest_framework.exceptions",
         "isExtraImport": true,
-        "detail": "django.core.mail",
+        "detail": "rest_framework.exceptions",
         "documentation": {}
     },
     {
@@ -2504,6 +2512,22 @@
         "description": "django.core.mail",
         "isExtraImport": true,
         "detail": "django.core.mail",
+        "documentation": {}
+    },
+    {
+        "label": "send_mail",
+        "importPath": "django.core.mail",
+        "description": "django.core.mail",
+        "isExtraImport": true,
+        "detail": "django.core.mail",
+        "documentation": {}
+    },
+    {
+        "label": "settings",
+        "importPath": "django.conf",
+        "description": "django.conf",
+        "isExtraImport": true,
+        "detail": "django.conf",
         "documentation": {}
     },
     {
@@ -4203,6 +4227,14 @@
         "documentation": {}
     },
     {
+        "label": "static",
+        "importPath": "django.conf.urls.static",
+        "description": "django.conf.urls.static",
+        "isExtraImport": true,
+        "detail": "django.conf.urls.static",
+        "documentation": {}
+    },
+    {
         "label": "get_schema_view",
         "importPath": "drf_yasg.views",
         "description": "drf_yasg.views",
@@ -4433,6 +4465,14 @@
         "description": "academics.views",
         "isExtraImport": true,
         "detail": "academics.views",
+        "documentation": {}
+    },
+    {
+        "label": "IsAdminOrHigher",
+        "importPath": "users.permissions",
+        "description": "users.permissions",
+        "isExtraImport": true,
+        "detail": "users.permissions",
         "documentation": {}
     },
     {
@@ -7216,7 +7256,7 @@
         "kind": 6,
         "importPath": "evaluations.serializers",
         "description": "evaluations.serializers",
-        "peekOfCode": "class PassageEvaluationDetailSerializer(PassageEvaluationSerializer):\n    \"\"\"Serializer détaillé avec toutes les réponses aux questions\"\"\"\n    reponses_questions = ReponseQuestionSerializer(many=True, read_only=True)\n    evaluation_details = serializers.SerializerMethodField()\n    class Meta(PassageEvaluationSerializer.Meta):\n        fields = PassageEvaluationSerializer.Meta.fields + [\n            'reponses_questions',\n            'evaluation_details'\n        ]\n    def get_evaluation_details(self, obj):",
+        "peekOfCode": "class PassageEvaluationDetailSerializer(PassageEvaluationSerializer):\n    \"\"\"Serializer détaillé avec toutes les réponses aux questions\"\"\"\n    reponses_questions = ReponseQuestionSerializer(many=True, read_only=True)\n    evaluation_detail = serializers.SerializerMethodField()   # ← renommé sans \"s\"\n    class Meta(PassageEvaluationSerializer.Meta):\n        fields = PassageEvaluationSerializer.Meta.fields + [\n            'reponses_questions',\n            'evaluation_detail',     # ← renommé sans \"s\"\n        ]\n    def get_evaluation_detail(self, obj):",
         "detail": "evaluations.serializers",
         "documentation": {}
     },
@@ -7396,7 +7436,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class EvaluationPublierAPIView(APIView):\n    \"\"\"Publier ou dépublier une évaluation\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request, pk):\n        \"\"\"Publie ou dépublie une évaluation\"\"\"\n        try:\n            evaluation = get_object_or_404(Evaluation, pk=pk)\n            action = request.data.get('action', 'publier')\n            if action not in ['publier', 'depublier']:\n                return api_error(",
+        "peekOfCode": "class EvaluationPublierAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def post(self, request, pk):\n        try:\n            evaluation = get_object_or_404(Evaluation, pk=pk)\n            action = request.data.get('action', 'publier')\n            if action not in ['publier', 'depublier']:\n                return api_error(\n                    \"Action invalide. Utilisez 'publier' ou 'depublier'\",\n                    http_status=status.HTTP_400_BAD_REQUEST",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7414,7 +7454,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class PassageEvaluationDemarrerAPIView(APIView):\n    \"\"\"Démarrer une nouvelle évaluation\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request):\n        \"\"\"\n        Démarre une évaluation pour un apprenant\n        Body: {\"apprenant\": 1, \"evaluation\": 5}\n        \"\"\"\n        try:\n            apprenant_id = request.data.get('apprenant')",
+        "peekOfCode": "class PassageEvaluationDemarrerAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def post(self, request):\n        try:\n            apprenant_id = request.data.get('apprenant')\n            evaluation_id = request.data.get('evaluation')\n            if not apprenant_id or not evaluation_id:\n                return api_error(\n                    \"Les champs 'apprenant' et 'evaluation' sont requis\",\n                    http_status=status.HTTP_400_BAD_REQUEST",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7522,7 +7562,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class StatistiquesEvaluationAPIView(APIView):\n    \"\"\"Statistiques d'une évaluation\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, evaluation_id):\n        \"\"\"Récupère les statistiques d'une évaluation\"\"\"\n        try:\n            passages = PassageEvaluation.objects.filter(\n                evaluation_id=evaluation_id,\n                statut='corrige'\n            )",
+        "peekOfCode": "class StatistiquesEvaluationAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request, evaluation_id):\n        try:\n            evaluation = get_object_or_404(Evaluation, pk=evaluation_id)\n            tous_passages = PassageEvaluation.objects.filter(evaluation_id=evaluation_id)\n            passages_corriges = tous_passages.filter(statut='corrige')\n            stats = {\n                'evaluation_id':        evaluation_id,\n                'nb_passages':          tous_passages.count(),",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7531,7 +7571,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class EvaluationExportAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        evaluation = get_object_or_404(Evaluation, pk=pk)\n        export_format = request.query_params.get(\"format\", \"csv\").lower()\n        detail = request.query_params.get(\"detail\", \"false\").lower() == \"true\"\n        # Récupérer passages + apprenants\n        passages = (\n            PassageEvaluation.objects\n            .select_related(\"apprenant\", \"apprenant__user\", \"evaluation\", \"evaluation__cours\")",
+        "peekOfCode": "class EvaluationExportAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        evaluation = get_object_or_404(Evaluation, pk=pk)\n        export_format = request.query_params.get(\"format\", \"csv\").lower()\n        detail = request.query_params.get(\"detail\", \"false\").lower() == \"true\"\n        # ✅ Apprenant hérite de AbstractUser via user_ptr → pas de __user\n        passages = (\n            PassageEvaluation.objects\n            .select_related(\"apprenant\", \"evaluation\", \"evaluation__cours\")",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7873,7 +7913,7 @@
         "kind": 5,
         "importPath": "master_backend_api.settings",
         "description": "master_backend_api.settings",
-        "peekOfCode": "BASE_DIR = Path(__file__).resolve().parent.parent\n# Quick-start development settings - unsuitable for production\n# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/\n# SECURITY WARNING: keep the secret key used in production secret!\nSECRET_KEY = 'django-insecure-$s4b+_ug=(xi0ul0(8u-^-8pxn@z=t08y@-e&5_3g#1tam2wl6'\n# SECRET_KEY = config('DJANGO_SECRET_KEY')\nDEBUG = config('DEBUG', default=False, cast=bool)\nANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')\n# SECURITY WARNING: don't run with debug turned on in production!\n# DEBUG = True",
+        "peekOfCode": "BASE_DIR = Path(__file__).resolve().parent.parent\n# Quick-start development settings - unsuitable for production\n# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/\n# SECURITY WARNING: keep the secret key used in production secret!\nSECRET_KEY = 'django-insecure-$s4b+_ug=(xi0ul0(8u-^-8pxn@z=t08y@-e&5_3g#1tam2wl6'\n# SECRET_KEY = config('DJANGO_SECRET_KEY')\n# DEBUG = config('DEBUG', default=False, cast=bool)\nANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')\n# SECURITY WARNING: don't run with debug turned on in production!\nDEBUG = True",
         "detail": "master_backend_api.settings",
         "documentation": {}
     },
@@ -7882,16 +7922,7 @@
         "kind": 5,
         "importPath": "master_backend_api.settings",
         "description": "master_backend_api.settings",
-        "peekOfCode": "SECRET_KEY = 'django-insecure-$s4b+_ug=(xi0ul0(8u-^-8pxn@z=t08y@-e&5_3g#1tam2wl6'\n# SECRET_KEY = config('DJANGO_SECRET_KEY')\nDEBUG = config('DEBUG', default=False, cast=bool)\nANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')\n# SECURITY WARNING: don't run with debug turned on in production!\n# DEBUG = True\nALLOWED_HOSTS = ['127.0.0.1', 'localhost:4200', 'localhost', 'somaproapi.gconnectapp.com', 'www.somaproapi.gconnectapp.com']\n# Application definition\nINSTALLED_APPS = [\n    \"corsheaders\",",
-        "detail": "master_backend_api.settings",
-        "documentation": {}
-    },
-    {
-        "label": "DEBUG",
-        "kind": 5,
-        "importPath": "master_backend_api.settings",
-        "description": "master_backend_api.settings",
-        "peekOfCode": "DEBUG = config('DEBUG', default=False, cast=bool)\nANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')\n# SECURITY WARNING: don't run with debug turned on in production!\n# DEBUG = True\nALLOWED_HOSTS = ['127.0.0.1', 'localhost:4200', 'localhost', 'somaproapi.gconnectapp.com', 'www.somaproapi.gconnectapp.com']\n# Application definition\nINSTALLED_APPS = [\n    \"corsheaders\",\n    'django.contrib.admin',\n    'django.contrib.auth',",
+        "peekOfCode": "SECRET_KEY = 'django-insecure-$s4b+_ug=(xi0ul0(8u-^-8pxn@z=t08y@-e&5_3g#1tam2wl6'\n# SECRET_KEY = config('DJANGO_SECRET_KEY')\n# DEBUG = config('DEBUG', default=False, cast=bool)\nANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')\n# SECURITY WARNING: don't run with debug turned on in production!\nDEBUG = True\nALLOWED_HOSTS = ['127.0.0.1', 'localhost:4200', 'localhost', 'somaproapi.gconnectapp.com', 'www.somaproapi.gconnectapp.com']\n# Application definition\nINSTALLED_APPS = [\n    \"corsheaders\",",
         "detail": "master_backend_api.settings",
         "documentation": {}
     },
@@ -7900,7 +7931,16 @@
         "kind": 5,
         "importPath": "master_backend_api.settings",
         "description": "master_backend_api.settings",
-        "peekOfCode": "ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')\n# SECURITY WARNING: don't run with debug turned on in production!\n# DEBUG = True\nALLOWED_HOSTS = ['127.0.0.1', 'localhost:4200', 'localhost', 'somaproapi.gconnectapp.com', 'www.somaproapi.gconnectapp.com']\n# Application definition\nINSTALLED_APPS = [\n    \"corsheaders\",\n    'django.contrib.admin',\n    'django.contrib.auth',\n    'django.contrib.contenttypes',",
+        "peekOfCode": "ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')\n# SECURITY WARNING: don't run with debug turned on in production!\nDEBUG = True\nALLOWED_HOSTS = ['127.0.0.1', 'localhost:4200', 'localhost', 'somaproapi.gconnectapp.com', 'www.somaproapi.gconnectapp.com']\n# Application definition\nINSTALLED_APPS = [\n    \"corsheaders\",\n    'django.contrib.admin',\n    'django.contrib.auth',\n    'django.contrib.contenttypes',",
+        "detail": "master_backend_api.settings",
+        "documentation": {}
+    },
+    {
+        "label": "DEBUG",
+        "kind": 5,
+        "importPath": "master_backend_api.settings",
+        "description": "master_backend_api.settings",
+        "peekOfCode": "DEBUG = True\nALLOWED_HOSTS = ['127.0.0.1', 'localhost:4200', 'localhost', 'somaproapi.gconnectapp.com', 'www.somaproapi.gconnectapp.com']\n# Application definition\nINSTALLED_APPS = [\n    \"corsheaders\",\n    'django.contrib.admin',\n    'django.contrib.auth',\n    'django.contrib.contenttypes',\n    'django.contrib.sessions',\n    'django.contrib.messages',",
         "detail": "master_backend_api.settings",
         "documentation": {}
     },
@@ -7972,7 +8012,25 @@
         "kind": 5,
         "importPath": "master_backend_api.settings",
         "description": "master_backend_api.settings",
-        "peekOfCode": "WSGI_APPLICATION = 'master_backend_api.wsgi.application'\n# Database\n# https://docs.djangoproject.com/en/4.2/ref/settings/#databases\nDATABASES = {\n    'default': {\n        'ENGINE': 'django.db.backends.sqlite3',\n        'NAME': BASE_DIR / 'db.sqlite3',\n    }\n}\n# Password validation",
+        "peekOfCode": "WSGI_APPLICATION = 'master_backend_api.wsgi.application'\nMEDIA_URL = '/media/'\nMEDIA_ROOT = BASE_DIR / 'media'\n# Database\n# https://docs.djangoproject.com/en/4.2/ref/settings/#databases\nDATABASES = {\n    'default': {\n        'ENGINE': 'django.db.backends.sqlite3',\n        'NAME': BASE_DIR / 'db.sqlite3',\n    }",
+        "detail": "master_backend_api.settings",
+        "documentation": {}
+    },
+    {
+        "label": "MEDIA_URL",
+        "kind": 5,
+        "importPath": "master_backend_api.settings",
+        "description": "master_backend_api.settings",
+        "peekOfCode": "MEDIA_URL = '/media/'\nMEDIA_ROOT = BASE_DIR / 'media'\n# Database\n# https://docs.djangoproject.com/en/4.2/ref/settings/#databases\nDATABASES = {\n    'default': {\n        'ENGINE': 'django.db.backends.sqlite3',\n        'NAME': BASE_DIR / 'db.sqlite3',\n    }\n}",
+        "detail": "master_backend_api.settings",
+        "documentation": {}
+    },
+    {
+        "label": "MEDIA_ROOT",
+        "kind": 5,
+        "importPath": "master_backend_api.settings",
+        "description": "master_backend_api.settings",
+        "peekOfCode": "MEDIA_ROOT = BASE_DIR / 'media'\n# Database\n# https://docs.djangoproject.com/en/4.2/ref/settings/#databases\nDATABASES = {\n    'default': {\n        'ENGINE': 'django.db.backends.sqlite3',\n        'NAME': BASE_DIR / 'db.sqlite3',\n    }\n}\n# Password validation",
         "detail": "master_backend_api.settings",
         "documentation": {}
     },
@@ -8314,7 +8372,7 @@
         "kind": 5,
         "importPath": "master_backend_api.settings",
         "description": "master_backend_api.settings",
-        "peekOfCode": "STATIC_URL = \"/static/\"\nSTATIC_ROOT = BASE_DIR / \"staticfiles\"\n# Default primary key field type\n# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field\nDEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'\nCORS_ALLOWED_ORIGINS = [\n    \"http://localhost:4200\",  # Origine de votre application Angular\n]",
+        "peekOfCode": "STATIC_URL = \"/static/\"\nSTATIC_ROOT = BASE_DIR / \"staticfiles\"\n# Default primary key field type\n# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field\nDEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'\nCORS_ALLOWED_ORIGINS = [\n    \"http://localhost:4200\",  # Origine de votre application Angular\n]\nCORS_ALLOW_HEADERS = [\n    'accept',",
         "detail": "master_backend_api.settings",
         "documentation": {}
     },
@@ -8323,7 +8381,7 @@
         "kind": 5,
         "importPath": "master_backend_api.settings",
         "description": "master_backend_api.settings",
-        "peekOfCode": "STATIC_ROOT = BASE_DIR / \"staticfiles\"\n# Default primary key field type\n# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field\nDEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'\nCORS_ALLOWED_ORIGINS = [\n    \"http://localhost:4200\",  # Origine de votre application Angular\n]",
+        "peekOfCode": "STATIC_ROOT = BASE_DIR / \"staticfiles\"\n# Default primary key field type\n# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field\nDEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'\nCORS_ALLOWED_ORIGINS = [\n    \"http://localhost:4200\",  # Origine de votre application Angular\n]\nCORS_ALLOW_HEADERS = [\n    'accept',\n    'accept-encoding',",
         "detail": "master_backend_api.settings",
         "documentation": {}
     },
@@ -8332,7 +8390,7 @@
         "kind": 5,
         "importPath": "master_backend_api.settings",
         "description": "master_backend_api.settings",
-        "peekOfCode": "DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'\nCORS_ALLOWED_ORIGINS = [\n    \"http://localhost:4200\",  # Origine de votre application Angular\n]",
+        "peekOfCode": "DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'\nCORS_ALLOWED_ORIGINS = [\n    \"http://localhost:4200\",  # Origine de votre application Angular\n]\nCORS_ALLOW_HEADERS = [\n    'accept',\n    'accept-encoding',\n    'authorization',\n    'content-type',\n    'dnt',",
         "detail": "master_backend_api.settings",
         "documentation": {}
     },
@@ -8341,7 +8399,16 @@
         "kind": 5,
         "importPath": "master_backend_api.settings",
         "description": "master_backend_api.settings",
-        "peekOfCode": "CORS_ALLOWED_ORIGINS = [\n    \"http://localhost:4200\",  # Origine de votre application Angular\n]",
+        "peekOfCode": "CORS_ALLOWED_ORIGINS = [\n    \"http://localhost:4200\",  # Origine de votre application Angular\n]\nCORS_ALLOW_HEADERS = [\n    'accept',\n    'accept-encoding',\n    'authorization',\n    'content-type',\n    'dnt',\n    'origin',",
+        "detail": "master_backend_api.settings",
+        "documentation": {}
+    },
+    {
+        "label": "CORS_ALLOW_HEADERS",
+        "kind": 5,
+        "importPath": "master_backend_api.settings",
+        "description": "master_backend_api.settings",
+        "peekOfCode": "CORS_ALLOW_HEADERS = [\n    'accept',\n    'accept-encoding',\n    'authorization',\n    'content-type',\n    'dnt',\n    'origin',\n    'user-agent',\n    'x-csrftoken',\n    'x-requested-with',",
         "detail": "master_backend_api.settings",
         "documentation": {}
     },
@@ -9610,7 +9677,7 @@
         "kind": 6,
         "importPath": "users.serializers",
         "description": "users.serializers",
-        "peekOfCode": "class BaseUserCrudSerializer(serializers.ModelSerializer):\n    password = serializers.CharField(write_only=True, required=False, allow_blank=True, min_length=8)\n    # ✅ LECTURE : Objet complet\n    pays_residence = PaysSerializer(read_only=True)\n    # ✅ ÉCRITURE : ID uniquement\n    pays_residence_id = serializers.PrimaryKeyRelatedField(\n        source=\"pays_residence\",\n        queryset=Pays.objects.all(),\n        write_only=True,\n        required=False,",
+        "peekOfCode": "class BaseUserCrudSerializer(serializers.ModelSerializer):\n    password = serializers.CharField(write_only=True, required=False, allow_blank=True, min_length=8)\n    pays_residence = PaysSerializer(read_only=True)\n    pays_residence_id = serializers.PrimaryKeyRelatedField(\n        source=\"pays_residence\",\n        queryset=Pays.objects.all(),\n        write_only=True, required=False, allow_null=True,\n    )\n    # ✅ NOUVEAU\n    annee_scolaire_active = serializers.SerializerMethodField(read_only=True)",
         "detail": "users.serializers",
         "documentation": {}
     },
@@ -9781,7 +9848,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class LogoutAPIView(APIView):\n    \"\"\"\n    Invalide le token d'authentification courant.\n    \"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def post(self, request):\n        Token.objects.filter(user=request.user).delete()\n        return api_success(\n            \"Déconnexion réussie. Le token a été invalidé.\",\n            data=None,",
+        "peekOfCode": "class LogoutAPIView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def post(self, request):\n        Token.objects.filter(user=request.user).delete()\n        return api_success(\n            \"Déconnexion réussie. Le token a été invalidé.\",\n            data=None,\n            http_status=status.HTTP_200_OK,\n        )\n# =========================",
         "detail": "users.views",
         "documentation": {}
     },
@@ -9790,16 +9857,16 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class IsStaffOrReadOnly(permissions.BasePermission):\n    \"\"\"\n    - Lecture (GET, HEAD, OPTIONS) : utilisateur authentifié\n    - Écriture (POST, PUT, PATCH, DELETE) : staff uniquement\n    \"\"\"\n    def has_permission(self, request, view):\n        if request.method in (\"GET\", \"HEAD\", \"OPTIONS\"):\n            return bool(request.user and request.user.is_authenticated)\n        return bool(\n            request.user",
+        "peekOfCode": "class IsStaffOrReadOnly(permissions.BasePermission):\n    def has_permission(self, request, view):\n        if request.method in (\"GET\", \"HEAD\", \"OPTIONS\"):\n            return bool(request.user and request.user.is_authenticated)\n        return bool(request.user and request.user.is_authenticated and request.user.is_staff)\nclass IsAdminOrHigherOrSelf(permissions.BasePermission):\n    def has_permission(self, request, view):\n        if not request.user or not request.user.is_authenticated:\n            return False\n        if request.user.is_superuser:",
         "detail": "users.views",
         "documentation": {}
     },
     {
-        "label": "IsAdminOrHigher",
+        "label": "IsAdminOrHigherOrSelf",
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class IsAdminOrHigher(permissions.BasePermission):\n    \"\"\"\n    Permission : Admin, Responsable ou SuperUser uniquement.\n    \"\"\"\n    def has_permission(self, request, view):\n        if not request.user or not request.user.is_authenticated:\n            return False\n        if request.user.is_superuser:\n            return True\n        role_name = request.user.role.name if request.user.role else None",
+        "peekOfCode": "class IsAdminOrHigherOrSelf(permissions.BasePermission):\n    def has_permission(self, request, view):\n        if not request.user or not request.user.is_authenticated:\n            return False\n        if request.user.is_superuser:\n            return True\n        role_name = request.user.role.name if getattr(request.user, \"role\", None) else None\n        if role_name in [\"Admin\", \"Responsable\"]:\n            return True\n        pk = view.kwargs.get(\"pk\")",
         "detail": "users.views",
         "documentation": {}
     },
@@ -9808,7 +9875,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class AdminViewSet(BaseModelViewSet):\n    \"\"\"\n    ViewSet pour les Admins.\n    Filtrage selon le rôle :\n    - SuperUser : voit tous les admins\n    - Admin : voit seulement les admins de son institution\n    - Autres : accès refusé\n    \"\"\"\n    queryset = Admin.objects.all()\n    serializer_class = AdminCrudSerializer",
+        "peekOfCode": "class AdminViewSet(BaseModelViewSet):\n    queryset = Admin.objects.all()\n    serializer_class = AdminCrudSerializer\n    permission_classes = [IsAdminOrHigher]\n    def get_queryset(self):\n        user = self.request.user\n        if user.is_superuser:\n            return Admin.objects.all()\n        inst = _user_institution(user)\n        if inst:",
         "detail": "users.views",
         "documentation": {}
     },
@@ -9817,7 +9884,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class ParentViewSet(BaseModelViewSet):\n    \"\"\"\n    ViewSet pour les Parents.\n    Filtrage selon le rôle :\n    - SuperUser : voit tous les parents\n    - Admin/Responsable : voit les parents de son institution\n    - Autres : accès refusé\n    \"\"\"\n    queryset = Parent.objects.all()\n    serializer_class = ParentCrudSerializer",
+        "peekOfCode": "class ParentViewSet(BaseModelViewSet):\n    queryset = Parent.objects.all()\n    serializer_class = ParentCrudSerializer\n    permission_classes = [IsAdminOrHigher]\n    def get_queryset(self):\n        user = self.request.user\n        if user.is_superuser:\n            return Parent.objects.all()\n        inst = _user_institution(user)\n        if inst:",
         "detail": "users.views",
         "documentation": {}
     },
@@ -9826,7 +9893,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class ApprenantViewSet(BaseModelViewSet):\n    \"\"\"\n    ViewSet pour les Apprenants.\n    Filtrage selon le rôle :\n    - SuperUser : voit tous les apprenants\n    - Admin/Responsable : voit les apprenants de son institution\n    - Formateur : voit les apprenants de SES cours\n    - Autres : accès refusé\n    \"\"\"\n    queryset = Apprenant.objects.all()",
+        "peekOfCode": "class ApprenantViewSet(BaseModelViewSet):\n    queryset = Apprenant.objects.all()\n    serializer_class = ApprenantCrudSerializer\n    permission_classes = [IsStaffOrReadOnly]\n    def get_queryset(self):\n        user = self.request.user\n        if user.is_superuser:\n            return Apprenant.objects.all()\n        role_name = _role_name(user)\n        inst = _user_institution(user)",
         "detail": "users.views",
         "documentation": {}
     },
@@ -9835,7 +9902,16 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class FormateurViewSet(BaseModelViewSet):\n    \"\"\"\n    ViewSet pour les Formateurs.\n    Filtrage selon le rôle :\n    - SuperUser : voit tous les formateurs\n    - Admin/Responsable : voit les formateurs de son institution\n    - Autres : accès refusé\n    \"\"\"\n    queryset = Formateur.objects.all()\n    serializer_class = FormateurCrudSerializer",
+        "peekOfCode": "class FormateurViewSet(BaseModelViewSet):\n    queryset = Formateur.objects.all()\n    serializer_class = FormateurCrudSerializer\n    permission_classes = [IsAdminOrHigherOrSelf]\n    def get_queryset(self):\n        user = self.request.user\n        if user.is_superuser:\n            return Formateur.objects.all()\n        inst = _user_institution(user)\n        if inst:",
+        "detail": "users.views",
+        "documentation": {}
+    },
+    {
+        "label": "ResponsableAcademiqueViewSet",
+        "kind": 6,
+        "importPath": "users.views",
+        "description": "users.views",
+        "peekOfCode": "class ResponsableAcademiqueViewSet(BaseModelViewSet):\n    queryset = ResponsableAcademique.objects.all()\n    serializer_class = ResponsableAcademiqueCrudSerializer\n    permission_classes = [IsAdminOrHigher]\n    def get_queryset(self):\n        user = self.request.user\n        if user.is_superuser:\n            return ResponsableAcademique.objects.all()\n        inst = _user_institution(user)\n        if inst:",
         "detail": "users.views",
         "documentation": {}
     },
@@ -9853,7 +9929,7 @@
         "kind": 2,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "def api_success(message: str, data=None, http_status=status.HTTP_200_OK):\n    return Response(\n        {\n            \"success\": True,\n            \"status\": http_status,\n            \"message\": message,\n            \"data\": data,\n        },\n        status=http_status,\n    )",
+        "peekOfCode": "def api_success(message: str, data=None, http_status=status.HTTP_200_OK):\n    return Response(\n        {\"success\": True, \"status\": http_status, \"message\": message, \"data\": data},\n        status=http_status,\n    )\ndef api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST):\n    payload = {\"success\": False, \"status\": http_status, \"message\": message}\n    if errors is not None:\n        payload[\"errors\"] = errors\n    return Response(payload, status=http_status)",
         "detail": "users.views",
         "documentation": {}
     },
@@ -9862,7 +9938,7 @@
         "kind": 2,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST):\n    payload = {\n        \"success\": False,\n        \"status\": http_status,\n        \"message\": message,\n    }\n    if errors is not None:\n        payload[\"errors\"] = errors\n    return Response(payload, status=http_status)\n# =========================",
+        "peekOfCode": "def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST):\n    payload = {\"success\": False, \"status\": http_status, \"message\": message}\n    if errors is not None:\n        payload[\"errors\"] = errors\n    return Response(payload, status=http_status)\n# =========================\n# Auth & Onboarding\n# =========================\nclass RegisterAPIView(APIView):\n    permission_classes = [permissions.AllowAny]",
         "detail": "users.views",
         "documentation": {}
     },

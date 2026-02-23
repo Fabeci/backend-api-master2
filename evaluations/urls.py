@@ -197,4 +197,4 @@ urlpatterns = [
          StatistiquesEvaluationAPIView.as_view(), 
          name='stats-evaluation'),
      path("evaluations/<int:pk>/export/", EvaluationExportAPIView.as_view(), name="evaluation-export"),
-]
+] 

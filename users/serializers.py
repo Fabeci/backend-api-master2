@@ -11,6 +11,7 @@ from rest_framework.authtoken.models import Token
 
 from django.core.mail import send_mail
 from django.conf import settings
+from academics.models import AnneeScolaire
 
 from academics.models import Groupe, Institution, Specialite, Departement, Classe
 # ❌ NE PAS importer les serializers d'academics ici (import circulaire)
@@ -322,47 +323,43 @@ class FormateurSerializer(serializers.ModelSerializer):
 class BaseUserCrudSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False, allow_blank=True, min_length=8)
 
-    # ✅ LECTURE : Objet complet
     pays_residence = PaysSerializer(read_only=True)
-
-    # ✅ ÉCRITURE : ID uniquement
     pays_residence_id = serializers.PrimaryKeyRelatedField(
         source="pays_residence",
         queryset=Pays.objects.all(),
-        write_only=True,
-        required=False,
-        allow_null=True,
+        write_only=True, required=False, allow_null=True,
+    )
+
+    # ✅ NOUVEAU
+    annee_scolaire_active = serializers.SerializerMethodField(read_only=True)
+    annee_scolaire_active_id = serializers.PrimaryKeyRelatedField(
+        source="annee_scolaire_active",
+        queryset=AnneeScolaire.objects.all(),
+        write_only=True, required=False, allow_null=True,
     )
 
     class Meta:
         model = User
         fields = [
-            "id",
-            "email",
-            "nom",
-            "prenom",
-            "telephone",
-            "pays_residence",       # objet complet en lecture
-            "pays_residence_id",    # ID en écriture
-            "is_active",
-            "password",
+            "id", "email", "nom", "prenom", "telephone",
+            "pays_residence", "pays_residence_id",
+            "annee_scolaire_active",      # lecture
+            "annee_scolaire_active_id",   # écriture
+            "is_active", "password",
         ]
-        read_only_fields = ["id", "pays_residence"]
+        read_only_fields = ["id", "pays_residence", "annee_scolaire_active"]
 
-    def validate_email(self, value):
-        qs = User.objects.filter(email=value)
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise serializers.ValidationError("Un utilisateur avec cet email existe déjà.")
-        return value
-
+    def get_annee_scolaire_active(self, obj):
+        if not obj.annee_scolaire_active:
+            return None
+        a = obj.annee_scolaire_active
+        return {"id": a.id, "libelle": getattr(a, 'libelle', str(a))}
+    
     def _apply_password(self, instance, validated_data):
         password = validated_data.pop("password", None)
         if password:
             instance.set_password(password)
         return instance
-
 
 class AdminCrudSerializer(BaseUserCrudSerializer):
     # ✅ LECTURE : Objet institution complet via SerializerMethodField
