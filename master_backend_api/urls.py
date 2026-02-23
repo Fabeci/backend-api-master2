@@ -41,11 +41,12 @@ urlpatterns = [
     path('api/', include('users.urls')),
     path('api/', include('academics.urls')),
     path('api/', include('locations.urls')),
+    path('api/', include('courses.urls_ai')),
     path('api/', include('courses.urls')),
     path('api/', include('collaborations.urls')),
     path('api/', include('evaluations.urls')),
     path('api/', include('progress.urls')),
     # path('api/', include('notifications.urls')),
     path('api/', include('resources.urls')),
-    path('api/analytics/', include('analytics.urls')),
+    path('api/', include('analytics.urls')),
 ]

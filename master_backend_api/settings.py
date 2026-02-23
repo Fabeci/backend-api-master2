@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'dj_rest_auth.registration',
+    'django_extensions',
     'academics',
     'collaborations',
     'courses',
@@ -204,6 +205,10 @@ CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 USE_AI_MOCK = True
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
+
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL   = 'gpt-4o'
 
 LANGUAGE_CODE = 'en-us'
 

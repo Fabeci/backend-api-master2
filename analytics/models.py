@@ -1,218 +1,164 @@
+# courses/models_analytics.py
+# ============================================================================
+# ANALYTICS — Capture complète des interactions apprenant
+# Modèles : BlocAnalytics (sessions brutes) + résumés agrégés
+# ============================================================================
 from django.db import models
-from django.core.validators import MinValueValidator, MaxValueValidator
-from courses.models import BlocContenu
-from evaluations.models import Question
-from users.models import Apprenant
+from django.utils import timezone
+
 
 class BlocAnalytics(models.Model):
-    """Suivi détaillé de l'interaction avec un bloc"""
-    apprenant = models.ForeignKey(
-        Apprenant, 
-        on_delete=models.CASCADE, 
-        related_name='blocs_analytics'
-    )
-    bloc = models.ForeignKey(
-        BlocContenu, 
-        on_delete=models.CASCADE, 
-        related_name='analytics'
-    )
-    
-    # Temps passé
-    temps_total_secondes = models.PositiveIntegerField(default=0)
-    nombre_visites = models.PositiveIntegerField(default=0)
-    
-    # Engagement
-    pourcentage_scroll = models.FloatField(
-        default=0.0,
-        validators=[MinValueValidator(0), MaxValueValidator(100)]
-    )
-    interactions = models.JSONField(default=dict, blank=True)
-    
-    # Compréhension
-    score_comprehension = models.FloatField(null=True, blank=True)
-    difficulte_percue = models.IntegerField(
-        null=True, 
-        blank=True,
-        choices=[
-            (1, 'Très facile'), 
-            (2, 'Facile'), 
-            (3, 'Moyen'), 
-            (4, 'Difficile'), 
-            (5, 'Très difficile')
+    """
+    Une entrée = une session d'ouverture d'un bloc par un apprenant.
+    Créée au moment où l'apprenant ouvre le bloc, complétée à la fermeture.
+    """
+    apprenant   = models.ForeignKey('users.Apprenant',    on_delete=models.CASCADE, related_name='bloc_analytics')
+    bloc        = models.ForeignKey('courses.BlocContenu', on_delete=models.CASCADE, related_name='analytics_sessions')
+    sequence    = models.ForeignKey('courses.Sequence',    on_delete=models.SET_NULL, null=True, blank=True)
+    module      = models.ForeignKey('courses.Module',      on_delete=models.SET_NULL, null=True, blank=True)
+    cours       = models.ForeignKey('courses.Cours',       on_delete=models.SET_NULL, null=True, blank=True)
+
+    ouvert_le           = models.DateTimeField(default=timezone.now)
+    ferme_le            = models.DateTimeField(null=True, blank=True)
+    duree_secondes      = models.PositiveIntegerField(default=0)
+    scroll_max_pct      = models.PositiveSmallIntegerField(default=0)   # 0-100
+    complete_en_session = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name        = 'Session de bloc'
+        verbose_name_plural = 'Sessions de blocs'
+        ordering            = ['-ouvert_le']
+        indexes             = [
+            models.Index(fields=['apprenant', 'bloc']),
+            models.Index(fields=['apprenant', 'cours']),
         ]
-    )
-    
-    # Timestamps
-    premiere_visite = models.DateTimeField(auto_now_add=True)
-    derniere_visite = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        unique_together = ('apprenant', 'bloc')
-        verbose_name = "Analytique de bloc"
-        verbose_name_plural = "Analytiques de blocs"
-        indexes = [
-            models.Index(fields=['apprenant', 'temps_total_secondes']),
-            models.Index(fields=['bloc', 'score_comprehension']),
-        ]
-    
+
     def __str__(self):
-        return f"{self.apprenant.nom} - {self.bloc.titre} ({self.temps_total_secondes}s)"
+        return f'{self.apprenant} → {self.bloc.titre} ({self.duree_secondes}s)'
+
+    def clore(self, duree_sec: int = 0, scroll_pct: int = 0, complete: bool = False):
+        self.ferme_le            = timezone.now()
+        self.duree_secondes      = duree_sec or max(0, int((self.ferme_le - self.ouvert_le).total_seconds()))
+        self.scroll_max_pct      = scroll_pct
+        self.complete_en_session = complete
+        self.save(update_fields=['ferme_le', 'duree_secondes', 'scroll_max_pct', 'complete_en_session'])
 
 
-class QuestionAnalytics(models.Model):
-    """Analyse des erreurs sur une question"""
-    apprenant = models.ForeignKey(
-        Apprenant, 
-        on_delete=models.CASCADE, 
-        related_name='questions_analytics'
-    )
-    question = models.ForeignKey(
-        Question, 
-        on_delete=models.CASCADE, 
-        related_name='analytics'
-    )
-    
-    nombre_tentatives = models.PositiveIntegerField(default=0)
-    nombre_echecs = models.PositiveIntegerField(default=0)
-    temps_moyen_reponse_sec = models.FloatField(default=0.0)
-    
-    # Pour QCM : pattern d'erreurs
-    erreurs_frequentes = models.JSONField(
-        default=list, 
-        blank=True,
-        help_text="IDs des mauvaises réponses choisies"
-    )
-    
-    # Concepts non maîtrisés
-    concepts_fragiles = models.JSONField(
-        default=list, 
-        blank=True,
-        help_text="Ex: ['boucles', 'variables']"
-    )
-    
-    derniere_tentative = models.DateTimeField(auto_now=True)
-    
+# ── Résumé (apprenant × bloc) ─────────────────────────────────────────────
+
+class BlocAnalyticsSummary(models.Model):
+    """
+    Résumé agrégé par (apprenant, bloc). Mis à jour après chaque session.
+    Source de vérité pour les indicateurs affichés dans les composants.
+    """
+    apprenant           = models.ForeignKey('users.Apprenant',    on_delete=models.CASCADE, related_name='bloc_summaries')
+    bloc                = models.ForeignKey('courses.BlocContenu', on_delete=models.CASCADE, related_name='analytics_summary')
+    sequence            = models.ForeignKey('courses.Sequence',    on_delete=models.SET_NULL, null=True, blank=True)
+    module              = models.ForeignKey('courses.Module',      on_delete=models.SET_NULL, null=True, blank=True)
+    cours               = models.ForeignKey('courses.Cours',       on_delete=models.SET_NULL, null=True, blank=True)
+
+    nb_ouvertures       = models.PositiveIntegerField(default=0)
+    nb_completions      = models.PositiveIntegerField(default=0)
+
+    duree_totale_sec    = models.PositiveIntegerField(default=0)   # Σ toutes sessions
+    duree_moy_sec       = models.PositiveIntegerField(default=0)   # Moyenne par session
+
+    # Ratio = temps passé / temps estimé du bloc (en %)
+    # < 50 % → rapide, 50-130 % → normal, > 130 % → long
+    ratio_temps_pct     = models.SmallIntegerField(default=0)
+
+    scroll_max_pct      = models.PositiveSmallIntegerField(default=0)
+
+    premiere_ouverture  = models.DateTimeField(null=True, blank=True)
+    derniere_ouverture  = models.DateTimeField(null=True, blank=True)
+    date_completion     = models.DateTimeField(null=True, blank=True)
+
+    updated_at          = models.DateTimeField(auto_now=True)
+
     class Meta:
-        unique_together = ('apprenant', 'question')
-        verbose_name = "Analytique de question"
-        verbose_name_plural = "Analytiques de questions"
-    
-    def __str__(self):
-        return f"{self.apprenant.nom} - Q{self.question.id} (échecs: {self.nombre_echecs})"
+        verbose_name        = 'Résumé bloc'
+        verbose_name_plural = 'Résumés blocs'
+        unique_together     = ('apprenant', 'bloc')
+
+    def recalculer(self):
+        sessions = BlocAnalytics.objects.filter(apprenant=self.apprenant, bloc=self.bloc, ferme_le__isnull=False)
+        n          = sessions.count()
+        total_sec  = sum(s.duree_secondes for s in sessions)
+        nb_comp    = sessions.filter(complete_en_session=True).count()
+        scroll_max = max((s.scroll_max_pct for s in sessions), default=0)
+
+        self.nb_ouvertures     = n
+        self.nb_completions    = nb_comp
+        self.duree_totale_sec  = total_sec
+        self.duree_moy_sec     = round(total_sec / n) if n else 0
+        self.scroll_max_pct    = scroll_max
+
+        est_sec = (getattr(self.bloc, 'duree_estimee_minutes', 0) or 0) * 60
+        self.ratio_temps_pct   = round((total_sec / est_sec) * 100) if est_sec else 0
+
+        premier = sessions.order_by('ouvert_le').first()
+        dernier = sessions.order_by('-ouvert_le').first()
+        if premier: self.premiere_ouverture = premier.ouvert_le
+        if dernier: self.derniere_ouverture = dernier.ouvert_le
+
+        if nb_comp and not self.date_completion:
+            comp = sessions.filter(complete_en_session=True).order_by('ferme_le').first()
+            if comp: self.date_completion = comp.ferme_le
+
+        self.save()
 
 
-class ContenuGenere(models.Model):
-    """Contenu pédagogique généré par IA"""
-    TYPE_GENERATION = [
-        ('remediation', 'Remédiation (après échec)'),
-        ('approfondissement', 'Approfondissement'),
-        ('simplification', 'Simplification'),
-        ('alternative', 'Approche alternative'),
-    ]
-    
-    apprenant = models.ForeignKey(
-        Apprenant, 
-        on_delete=models.CASCADE, 
-        related_name='contenus_generes'
-    )
-    bloc_source = models.ForeignKey(
-        BlocContenu, 
-        on_delete=models.CASCADE, 
-        related_name='contenus_generes'
-    )
-    
-    type_generation = models.CharField(max_length=20, choices=TYPE_GENERATION)
-    
-    # Contenu généré
-    titre = models.CharField(max_length=255)
-    contenu_html = models.TextField()
-    contenu_markdown = models.TextField(blank=True, default="")
-    
-    # Métadonnées
-    concepts_cibles = models.JSONField(
-        default=list, 
-        blank=True,
-        help_text="Ex: ['variables', 'types']"
-    )
-    niveau_difficulte = models.IntegerField(
-        default=2,
-        validators=[MinValueValidator(1), MaxValueValidator(5)]
-    )
-    
-    # Efficacité
-    a_ete_consulte = models.BooleanField(default=False)
-    a_aide = models.BooleanField(
-        null=True, 
-        blank=True,
-        help_text="Feedback apprenant"
-    )
-    nombre_consultations = models.PositiveIntegerField(default=0)
-    
-    date_generation = models.DateTimeField(auto_now_add=True)
-    date_derniere_consultation = models.DateTimeField(null=True, blank=True)
-    
+# ── Résumé (apprenant × séquence) ────────────────────────────────────────
+
+class SequenceAnalyticsSummary(models.Model):
+    apprenant               = models.ForeignKey('users.Apprenant', on_delete=models.CASCADE, related_name='sequence_summaries')
+    sequence                = models.ForeignKey('courses.Sequence', on_delete=models.CASCADE, related_name='analytics_summary')
+    module                  = models.ForeignKey('courses.Module',   on_delete=models.SET_NULL, null=True, blank=True)
+    cours                   = models.ForeignKey('courses.Cours',    on_delete=models.SET_NULL, null=True, blank=True)
+
+    nb_blocs_consultes      = models.PositiveSmallIntegerField(default=0)
+    nb_blocs_total          = models.PositiveSmallIntegerField(default=0)
+    nb_blocs_completes      = models.PositiveSmallIntegerField(default=0)
+
+    duree_totale_sec        = models.PositiveIntegerField(default=0)
+    duree_estimee_sec       = models.PositiveIntegerField(default=0)
+    ratio_temps_pct         = models.SmallIntegerField(default=0)
+
+    nb_quiz_passes          = models.PositiveSmallIntegerField(default=0)
+    score_moyen_quiz        = models.SmallIntegerField(default=0)   # 0-100
+
+    premiere_activite       = models.DateTimeField(null=True, blank=True)
+    derniere_activite       = models.DateTimeField(null=True, blank=True)
+    completee_le            = models.DateTimeField(null=True, blank=True)
+    updated_at              = models.DateTimeField(auto_now=True)
+
     class Meta:
-        ordering = ['-date_generation']
-        verbose_name = "Contenu généré"
-        verbose_name_plural = "Contenus générés"
-    
-    def __str__(self):
-        return f"{self.titre} (pour {self.apprenant.nom})"
+        unique_together = ('apprenant', 'sequence')
 
 
-class RecommandationPedagogique(models.Model):
-    """Recommandations personnalisées pour l'apprenant"""
-    TYPE_RECO = [
-        ('bloc_revoir', 'Revoir un bloc'),
-        ('quiz_supplementaire', 'Quiz supplémentaire'),
-        ('pause', 'Pause recommandée'),
-        ('changement_approche', 'Changer d\'approche'),
-        ('contenu_alternatif', 'Contenu alternatif disponible'),
-    ]
-    
-    apprenant = models.ForeignKey(
-        Apprenant, 
-        on_delete=models.CASCADE, 
-        related_name='recommandations'
-    )
-    
-    type_recommandation = models.CharField(max_length=30, choices=TYPE_RECO)
-    message = models.TextField()
-    
-    # Cible
-    bloc_cible = models.ForeignKey(
-        BlocContenu, 
-        null=True, 
-        blank=True, 
-        on_delete=models.CASCADE
-    )
-    contenu_genere = models.ForeignKey(
-        ContenuGenere, 
-        null=True, 
-        blank=True, 
-        on_delete=models.SET_NULL
-    )
-    
-    # Priorité & statut
-    priorite = models.IntegerField(
-        default=3,
-        validators=[MinValueValidator(1), MaxValueValidator(5)],
-        help_text="1=haute priorité, 5=basse priorité"
-    )
-    est_vue = models.BooleanField(default=False)
-    est_suivie = models.BooleanField(default=False)
-    
-    date_creation = models.DateTimeField(auto_now_add=True)
-    date_vue = models.DateTimeField(null=True, blank=True)
-    date_expiration = models.DateTimeField(null=True, blank=True)
-    
+# ── Résumé (apprenant × module) ──────────────────────────────────────────
+
+class ModuleAnalyticsSummary(models.Model):
+    apprenant                   = models.ForeignKey('users.Apprenant', on_delete=models.CASCADE, related_name='module_summaries')
+    module                      = models.ForeignKey('courses.Module',   on_delete=models.CASCADE, related_name='analytics_summary')
+    cours                       = models.ForeignKey('courses.Cours',    on_delete=models.SET_NULL, null=True, blank=True)
+
+    nb_sequences_consultees     = models.PositiveSmallIntegerField(default=0)
+    nb_sequences_total          = models.PositiveSmallIntegerField(default=0)
+    nb_sequences_completes      = models.PositiveSmallIntegerField(default=0)
+
+    nb_blocs_total              = models.PositiveSmallIntegerField(default=0)
+    nb_blocs_completes          = models.PositiveSmallIntegerField(default=0)
+
+    duree_totale_sec            = models.PositiveIntegerField(default=0)
+    duree_estimee_sec           = models.PositiveIntegerField(default=0)
+    ratio_temps_pct             = models.SmallIntegerField(default=0)
+
+    score_moyen_quiz            = models.SmallIntegerField(default=0)
+    premiere_activite           = models.DateTimeField(null=True, blank=True)
+    derniere_activite           = models.DateTimeField(null=True, blank=True)
+    complete_le                 = models.DateTimeField(null=True, blank=True)
+    updated_at                  = models.DateTimeField(auto_now=True)
+
     class Meta:
-        ordering = ['priorite', '-date_creation']
-        verbose_name = "Recommandation pédagogique"
-        verbose_name_plural = "Recommandations pédagogiques"
-        indexes = [
-            models.Index(fields=['apprenant', 'est_vue', 'date_expiration']),
-        ]
-    
-    def __str__(self):
-        return f"{self.apprenant.nom} - {self.get_type_recommandation_display()}"
+        unique_together = ('apprenant', 'module')
