@@ -23,11 +23,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-$s4b+_ug=(xi0ul0(8u-^-8pxn@z=t08y@-e&5_3g#1tam2wl6'
 # SECRET_KEY = config('DJANGO_SECRET_KEY')
-DEBUG = config('DEBUG', default=False, cast=bool)
+# DEBUG = config('DEBUG', default=False, cast=bool)
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG = True
+DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost:4200', 'localhost', 'somaproapi.gconnectapp.com', 'www.somaproapi.gconnectapp.com']
 
@@ -105,6 +105,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'master_backend_api.wsgi.application'
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
@@ -207,8 +209,8 @@ USE_AI_MOCK = True
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL   = 'gpt-4o'
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
 
 LANGUAGE_CODE = 'en-us'
 
@@ -222,7 +224,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -231,4 +234,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:4200",  # Origine de votre application Angular
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'x-institution-id',      # ← custom header
+    'x-annee-scolaire-id',   # ← custom header
 ]
