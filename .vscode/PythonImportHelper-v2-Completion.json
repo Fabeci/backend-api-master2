@@ -288,14 +288,6 @@
         "documentation": {}
     },
     {
-        "label": "models",
-        "importPath": "django.db",
-        "description": "django.db",
-        "isExtraImport": true,
-        "detail": "django.db",
-        "documentation": {}
-    },
-    {
         "label": "migrations",
         "importPath": "django.db",
         "description": "django.db",
@@ -505,6 +497,46 @@
     },
     {
         "label": "migrations",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "migrations",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "migrations",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "models",
         "importPath": "django.db",
         "description": "django.db",
         "isExtraImport": true,
@@ -1611,7 +1643,7 @@
         "documentation": {}
     },
     {
-        "label": "viewsets",
+        "label": "status",
         "importPath": "rest_framework",
         "description": "rest_framework",
         "isExtraImport": true,
@@ -1619,7 +1651,7 @@
         "documentation": {}
     },
     {
-        "label": "status",
+        "label": "permissions",
         "importPath": "rest_framework",
         "description": "rest_framework",
         "isExtraImport": true,
@@ -1652,6 +1684,22 @@
     },
     {
         "label": "serializers",
+        "importPath": "rest_framework",
+        "description": "rest_framework",
+        "isExtraImport": true,
+        "detail": "rest_framework",
+        "documentation": {}
+    },
+    {
+        "label": "status",
+        "importPath": "rest_framework",
+        "description": "rest_framework",
+        "isExtraImport": true,
+        "detail": "rest_framework",
+        "documentation": {}
+    },
+    {
+        "label": "permissions",
         "importPath": "rest_framework",
         "description": "rest_framework",
         "isExtraImport": true,
@@ -2244,14 +2292,6 @@
     },
     {
         "label": "VerificationCode",
-        "importPath": "users.models",
-        "description": "users.models",
-        "isExtraImport": true,
-        "detail": "users.models",
-        "documentation": {}
-    },
-    {
-        "label": "Apprenant",
         "importPath": "users.models",
         "description": "users.models",
         "isExtraImport": true,
@@ -2627,6 +2667,14 @@
         "documentation": {}
     },
     {
+        "label": "settings",
+        "importPath": "django.conf",
+        "description": "django.conf",
+        "isExtraImport": true,
+        "detail": "django.conf",
+        "documentation": {}
+    },
+    {
         "label": "ApprenantSerializer",
         "importPath": "users.serializers",
         "description": "users.serializers",
@@ -2763,7 +2811,7 @@
         "documentation": {}
     },
     {
-        "label": "include",
+        "label": "path",
         "importPath": "django.urls",
         "description": "django.urls",
         "isExtraImport": true,
@@ -2963,11 +3011,19 @@
         "documentation": {}
     },
     {
-        "label": "DefaultRouter",
-        "importPath": "rest_framework.routers",
-        "description": "rest_framework.routers",
+        "label": "get_object_or_404",
+        "importPath": "django.shortcuts",
+        "description": "django.shortcuts",
         "isExtraImport": true,
-        "detail": "rest_framework.routers",
+        "detail": "django.shortcuts",
+        "documentation": {}
+    },
+    {
+        "label": "get_object_or_404",
+        "importPath": "django.shortcuts",
+        "description": "django.shortcuts",
+        "isExtraImport": true,
+        "detail": "django.shortcuts",
         "documentation": {}
     },
     {
@@ -3100,6 +3156,22 @@
         "documentation": {}
     },
     {
+        "label": "APIView",
+        "importPath": "rest_framework.views",
+        "description": "rest_framework.views",
+        "isExtraImport": true,
+        "detail": "rest_framework.views",
+        "documentation": {}
+    },
+    {
+        "label": "APIView",
+        "importPath": "rest_framework.views",
+        "description": "rest_framework.views",
+        "isExtraImport": true,
+        "detail": "rest_framework.views",
+        "documentation": {}
+    },
+    {
         "label": "exception_handler",
         "importPath": "rest_framework.views",
         "description": "rest_framework.views",
@@ -3113,6 +3185,14 @@
         "description": "rest_framework.views",
         "isExtraImport": true,
         "detail": "rest_framework.views",
+        "documentation": {}
+    },
+    {
+        "label": "Response",
+        "importPath": "rest_framework.response",
+        "description": "rest_framework.response",
+        "isExtraImport": true,
+        "detail": "rest_framework.response",
         "documentation": {}
     },
     {
@@ -3300,258 +3380,112 @@
         "documentation": {}
     },
     {
-        "label": "django.core.validators",
+        "label": "django.utils.timezone",
         "kind": 6,
         "isExtraImport": true,
-        "importPath": "django.core.validators",
-        "description": "django.core.validators",
-        "detail": "django.core.validators",
+        "importPath": "django.utils.timezone",
+        "description": "django.utils.timezone",
+        "detail": "django.utils.timezone",
         "documentation": {}
     },
     {
-        "label": "MinValueValidator",
-        "importPath": "django.core.validators",
-        "description": "django.core.validators",
+        "label": "now",
+        "importPath": "django.utils.timezone",
+        "description": "django.utils.timezone",
         "isExtraImport": true,
-        "detail": "django.core.validators",
-        "documentation": {}
-    },
-    {
-        "label": "MaxValueValidator",
-        "importPath": "django.core.validators",
-        "description": "django.core.validators",
-        "isExtraImport": true,
-        "detail": "django.core.validators",
-        "documentation": {}
-    },
-    {
-        "label": "MinValueValidator",
-        "importPath": "django.core.validators",
-        "description": "django.core.validators",
-        "isExtraImport": true,
-        "detail": "django.core.validators",
-        "documentation": {}
-    },
-    {
-        "label": "MaxValueValidator",
-        "importPath": "django.core.validators",
-        "description": "django.core.validators",
-        "isExtraImport": true,
-        "detail": "django.core.validators",
-        "documentation": {}
-    },
-    {
-        "label": "FileExtensionValidator",
-        "importPath": "django.core.validators",
-        "description": "django.core.validators",
-        "isExtraImport": true,
-        "detail": "django.core.validators",
-        "documentation": {}
-    },
-    {
-        "label": "anthropic",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "anthropic",
-        "description": "anthropic",
-        "detail": "anthropic",
-        "documentation": {}
-    },
-    {
-        "label": "random",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "random",
-        "description": "random",
-        "detail": "random",
-        "documentation": {}
-    },
-    {
-        "label": "ContenuGenere",
-        "importPath": "analytics.models",
-        "description": "analytics.models",
-        "isExtraImport": true,
-        "detail": "analytics.models",
-        "documentation": {}
-    },
-    {
-        "label": "QuestionAnalytics",
-        "importPath": "analytics.models",
-        "description": "analytics.models",
-        "isExtraImport": true,
-        "detail": "analytics.models",
-        "documentation": {}
-    },
-    {
-        "label": "BlocAnalytics",
-        "importPath": "analytics.models",
-        "description": "analytics.models",
-        "isExtraImport": true,
-        "detail": "analytics.models",
-        "documentation": {}
-    },
-    {
-        "label": "QuestionAnalytics",
-        "importPath": "analytics.models",
-        "description": "analytics.models",
-        "isExtraImport": true,
-        "detail": "analytics.models",
-        "documentation": {}
-    },
-    {
-        "label": "RecommandationPedagogique",
-        "importPath": "analytics.models",
-        "description": "analytics.models",
-        "isExtraImport": true,
-        "detail": "analytics.models",
-        "documentation": {}
-    },
-    {
-        "label": "ContenuGenere",
-        "importPath": "analytics.models",
-        "description": "analytics.models",
-        "isExtraImport": true,
-        "detail": "analytics.models",
-        "documentation": {}
-    },
-    {
-        "label": "BlocAnalytics",
-        "importPath": "analytics.models",
-        "description": "analytics.models",
-        "isExtraImport": true,
-        "detail": "analytics.models",
-        "documentation": {}
-    },
-    {
-        "label": "RecommandationPedagogique",
-        "importPath": "analytics.models",
-        "description": "analytics.models",
-        "isExtraImport": true,
-        "detail": "analytics.models",
-        "documentation": {}
-    },
-    {
-        "label": "ContenuGenere",
-        "importPath": "analytics.models",
-        "description": "analytics.models",
-        "isExtraImport": true,
-        "detail": "analytics.models",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "django.utils",
-        "description": "django.utils",
-        "isExtraImport": true,
-        "detail": "django.utils",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "django.utils",
-        "description": "django.utils",
-        "isExtraImport": true,
-        "detail": "django.utils",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "django.utils",
-        "description": "django.utils",
-        "isExtraImport": true,
-        "detail": "django.utils",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "django.utils",
-        "description": "django.utils",
-        "isExtraImport": true,
-        "detail": "django.utils",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "django.utils",
-        "description": "django.utils",
-        "isExtraImport": true,
-        "detail": "django.utils",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "django.utils",
-        "description": "django.utils",
-        "isExtraImport": true,
-        "detail": "django.utils",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "django.utils",
-        "description": "django.utils",
-        "isExtraImport": true,
-        "detail": "django.utils",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "django.utils",
-        "description": "django.utils",
-        "isExtraImport": true,
-        "detail": "django.utils",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "django.utils",
-        "description": "django.utils",
-        "isExtraImport": true,
-        "detail": "django.utils",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "django.utils",
-        "description": "django.utils",
-        "isExtraImport": true,
-        "detail": "django.utils",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "django.utils",
-        "description": "django.utils",
-        "isExtraImport": true,
-        "detail": "django.utils",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "django.utils",
-        "description": "django.utils",
-        "isExtraImport": true,
-        "detail": "django.utils",
-        "documentation": {}
-    },
-    {
-        "label": "timezone",
-        "importPath": "django.utils",
-        "description": "django.utils",
-        "isExtraImport": true,
-        "detail": "django.utils",
+        "detail": "django.utils.timezone",
         "documentation": {}
     },
     {
         "label": "timedelta",
-        "importPath": "datetime",
-        "description": "datetime",
+        "importPath": "django.utils.timezone",
+        "description": "django.utils.timezone",
         "isExtraImport": true,
-        "detail": "datetime",
+        "detail": "django.utils.timezone",
+        "documentation": {}
+    },
+    {
+        "label": "format_html",
+        "importPath": "django.utils.html",
+        "description": "django.utils.html",
+        "isExtraImport": true,
+        "detail": "django.utils.html",
+        "documentation": {}
+    },
+    {
+        "label": "format_html",
+        "importPath": "django.utils.html",
+        "description": "django.utils.html",
+        "isExtraImport": true,
+        "detail": "django.utils.html",
+        "documentation": {}
+    },
+    {
+        "label": "format_html",
+        "importPath": "django.utils.html",
+        "description": "django.utils.html",
+        "isExtraImport": true,
+        "detail": "django.utils.html",
         "documentation": {}
     },
     {
         "label": "Sum",
+        "importPath": "django.db.models",
+        "description": "django.db.models",
+        "isExtraImport": true,
+        "detail": "django.db.models",
+        "documentation": {}
+    },
+    {
+        "label": "Avg",
+        "importPath": "django.db.models",
+        "description": "django.db.models",
+        "isExtraImport": true,
+        "detail": "django.db.models",
+        "documentation": {}
+    },
+    {
+        "label": "Count",
+        "importPath": "django.db.models",
+        "description": "django.db.models",
+        "isExtraImport": true,
+        "detail": "django.db.models",
+        "documentation": {}
+    },
+    {
+        "label": "Sum",
+        "importPath": "django.db.models",
+        "description": "django.db.models",
+        "isExtraImport": true,
+        "detail": "django.db.models",
+        "documentation": {}
+    },
+    {
+        "label": "Count",
+        "importPath": "django.db.models",
+        "description": "django.db.models",
+        "isExtraImport": true,
+        "detail": "django.db.models",
+        "documentation": {}
+    },
+    {
+        "label": "Max",
+        "importPath": "django.db.models",
+        "description": "django.db.models",
+        "isExtraImport": true,
+        "detail": "django.db.models",
+        "documentation": {}
+    },
+    {
+        "label": "Min",
+        "importPath": "django.db.models",
+        "description": "django.db.models",
+        "isExtraImport": true,
+        "detail": "django.db.models",
+        "documentation": {}
+    },
+    {
+        "label": "Q",
         "importPath": "django.db.models",
         "description": "django.db.models",
         "isExtraImport": true,
@@ -3639,7 +3573,152 @@
         "documentation": {}
     },
     {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "django.utils",
+        "description": "django.utils",
+        "isExtraImport": true,
+        "detail": "django.utils",
+        "documentation": {}
+    },
+    {
+        "label": "logging",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "logging",
+        "description": "logging",
+        "detail": "logging",
+        "documentation": {}
+    },
+    {
         "label": "BlocContenu",
+        "importPath": "courses.models",
+        "description": "courses.models",
+        "isExtraImport": true,
+        "detail": "courses.models",
+        "documentation": {}
+    },
+    {
+        "label": "Sequence",
         "importPath": "courses.models",
         "description": "courses.models",
         "isExtraImport": true,
@@ -3903,11 +3982,241 @@
         "documentation": {}
     },
     {
-        "label": "Question",
-        "importPath": "evaluations.models",
-        "description": "evaluations.models",
+        "label": "IsAuthenticated",
+        "importPath": "rest_framework.permissions",
+        "description": "rest_framework.permissions",
         "isExtraImport": true,
-        "detail": "evaluations.models",
+        "detail": "rest_framework.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "IsAuthenticated",
+        "importPath": "rest_framework.permissions",
+        "description": "rest_framework.permissions",
+        "isExtraImport": true,
+        "detail": "rest_framework.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "IsAuthenticated",
+        "importPath": "rest_framework.permissions",
+        "description": "rest_framework.permissions",
+        "isExtraImport": true,
+        "detail": "rest_framework.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "get_object_or_404",
+        "importPath": "rest_framework.generics",
+        "description": "rest_framework.generics",
+        "isExtraImport": true,
+        "detail": "rest_framework.generics",
+        "documentation": {}
+    },
+    {
+        "label": "MiddlewareMixin",
+        "importPath": "django.utils.deprecation",
+        "description": "django.utils.deprecation",
+        "isExtraImport": true,
+        "detail": "django.utils.deprecation",
+        "documentation": {}
+    },
+    {
+        "label": "cache",
+        "importPath": "django.core.cache",
+        "description": "django.core.cache",
+        "isExtraImport": true,
+        "detail": "django.core.cache",
+        "documentation": {}
+    },
+    {
+        "label": "django.core.validators",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "django.core.validators",
+        "description": "django.core.validators",
+        "detail": "django.core.validators",
+        "documentation": {}
+    },
+    {
+        "label": "MinValueValidator",
+        "importPath": "django.core.validators",
+        "description": "django.core.validators",
+        "isExtraImport": true,
+        "detail": "django.core.validators",
+        "documentation": {}
+    },
+    {
+        "label": "MaxValueValidator",
+        "importPath": "django.core.validators",
+        "description": "django.core.validators",
+        "isExtraImport": true,
+        "detail": "django.core.validators",
+        "documentation": {}
+    },
+    {
+        "label": "FileExtensionValidator",
+        "importPath": "django.core.validators",
+        "description": "django.core.validators",
+        "isExtraImport": true,
+        "detail": "django.core.validators",
+        "documentation": {}
+    },
+    {
+        "label": "json",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "json",
+        "description": "json",
+        "detail": "json",
+        "documentation": {}
+    },
+    {
+        "label": "os",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "os",
+        "description": "os",
+        "detail": "os",
+        "documentation": {}
+    },
+    {
+        "label": "FileResponse",
+        "importPath": "django.http",
+        "description": "django.http",
+        "isExtraImport": true,
+        "detail": "django.http",
+        "documentation": {}
+    },
+    {
+        "label": "Http404",
+        "importPath": "django.http",
+        "description": "django.http",
+        "isExtraImport": true,
+        "detail": "django.http",
+        "documentation": {}
+    },
+    {
+        "label": "HttpResponse",
+        "importPath": "django.http",
+        "description": "django.http",
+        "isExtraImport": true,
+        "detail": "django.http",
+        "documentation": {}
+    },
+    {
+        "label": "default_storage",
+        "importPath": "django.core.files.storage",
+        "description": "django.core.files.storage",
+        "isExtraImport": true,
+        "detail": "django.core.files.storage",
+        "documentation": {}
+    },
+    {
+        "label": "ContentFile",
+        "importPath": "django.core.files.base",
+        "description": "django.core.files.base",
+        "isExtraImport": true,
+        "detail": "django.core.files.base",
+        "documentation": {}
+    },
+    {
+        "label": "MultiPartParser",
+        "importPath": "rest_framework.parsers",
+        "description": "rest_framework.parsers",
+        "isExtraImport": true,
+        "detail": "rest_framework.parsers",
+        "documentation": {}
+    },
+    {
+        "label": "FormParser",
+        "importPath": "rest_framework.parsers",
+        "description": "rest_framework.parsers",
+        "isExtraImport": true,
+        "detail": "rest_framework.parsers",
+        "documentation": {}
+    },
+    {
+        "label": "can_create_in_context",
+        "importPath": "courses.utils",
+        "description": "courses.utils",
+        "isExtraImport": true,
+        "detail": "courses.utils",
+        "documentation": {}
+    },
+    {
+        "label": "filter_queryset_by_role",
+        "importPath": "courses.utils",
+        "description": "courses.utils",
+        "isExtraImport": true,
+        "detail": "courses.utils",
+        "documentation": {}
+    },
+    {
+        "label": "get_filtered_object",
+        "importPath": "courses.utils",
+        "description": "courses.utils",
+        "isExtraImport": true,
+        "detail": "courses.utils",
+        "documentation": {}
+    },
+    {
+        "label": "get_user_context",
+        "importPath": "courses.utils",
+        "description": "courses.utils",
+        "isExtraImport": true,
+        "detail": "courses.utils",
+        "documentation": {}
+    },
+    {
+        "label": "threading",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "threading",
+        "description": "threading",
+        "detail": "threading",
+        "documentation": {}
+    },
+    {
+        "label": "_get_apprenant",
+        "importPath": "analytics.views",
+        "description": "analytics.views",
+        "isExtraImport": true,
+        "detail": "analytics.views",
+        "documentation": {}
+    },
+    {
+        "label": "django",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "django",
+        "description": "django",
+        "detail": "django",
+        "documentation": {}
+    },
+    {
+        "label": "forms",
+        "importPath": "django",
+        "description": "django",
+        "isExtraImport": true,
+        "detail": "django",
+        "documentation": {}
+    },
+    {
+        "label": "csv",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "csv",
+        "description": "csv",
+        "detail": "csv",
+        "documentation": {}
+    },
+    {
+        "label": "BytesIO",
+        "importPath": "io",
+        "description": "io",
+        "isExtraImport": true,
+        "detail": "io",
         "documentation": {}
     },
     {
@@ -3980,193 +4289,6 @@
         "description": "evaluations.models",
         "isExtraImport": true,
         "detail": "evaluations.models",
-        "documentation": {}
-    },
-    {
-        "label": "action",
-        "importPath": "rest_framework.decorators",
-        "description": "rest_framework.decorators",
-        "isExtraImport": true,
-        "detail": "rest_framework.decorators",
-        "documentation": {}
-    },
-    {
-        "label": "action",
-        "importPath": "rest_framework.decorators",
-        "description": "rest_framework.decorators",
-        "isExtraImport": true,
-        "detail": "rest_framework.decorators",
-        "documentation": {}
-    },
-    {
-        "label": "IsAuthenticated",
-        "importPath": "rest_framework.permissions",
-        "description": "rest_framework.permissions",
-        "isExtraImport": true,
-        "detail": "rest_framework.permissions",
-        "documentation": {}
-    },
-    {
-        "label": "IsAuthenticated",
-        "importPath": "rest_framework.permissions",
-        "description": "rest_framework.permissions",
-        "isExtraImport": true,
-        "detail": "rest_framework.permissions",
-        "documentation": {}
-    },
-    {
-        "label": "IsAuthenticated",
-        "importPath": "rest_framework.permissions",
-        "description": "rest_framework.permissions",
-        "isExtraImport": true,
-        "detail": "rest_framework.permissions",
-        "documentation": {}
-    },
-    {
-        "label": "IsAuthenticated",
-        "importPath": "rest_framework.permissions",
-        "description": "rest_framework.permissions",
-        "isExtraImport": true,
-        "detail": "rest_framework.permissions",
-        "documentation": {}
-    },
-    {
-        "label": "get_object_or_404",
-        "importPath": "rest_framework.generics",
-        "description": "rest_framework.generics",
-        "isExtraImport": true,
-        "detail": "rest_framework.generics",
-        "documentation": {}
-    },
-    {
-        "label": "MiddlewareMixin",
-        "importPath": "django.utils.deprecation",
-        "description": "django.utils.deprecation",
-        "isExtraImport": true,
-        "detail": "django.utils.deprecation",
-        "documentation": {}
-    },
-    {
-        "label": "cache",
-        "importPath": "django.core.cache",
-        "description": "django.core.cache",
-        "isExtraImport": true,
-        "detail": "django.core.cache",
-        "documentation": {}
-    },
-    {
-        "label": "FileResponse",
-        "importPath": "django.http",
-        "description": "django.http",
-        "isExtraImport": true,
-        "detail": "django.http",
-        "documentation": {}
-    },
-    {
-        "label": "Http404",
-        "importPath": "django.http",
-        "description": "django.http",
-        "isExtraImport": true,
-        "detail": "django.http",
-        "documentation": {}
-    },
-    {
-        "label": "HttpResponse",
-        "importPath": "django.http",
-        "description": "django.http",
-        "isExtraImport": true,
-        "detail": "django.http",
-        "documentation": {}
-    },
-    {
-        "label": "can_create_in_context",
-        "importPath": "courses.utils",
-        "description": "courses.utils",
-        "isExtraImport": true,
-        "detail": "courses.utils",
-        "documentation": {}
-    },
-    {
-        "label": "filter_queryset_by_role",
-        "importPath": "courses.utils",
-        "description": "courses.utils",
-        "isExtraImport": true,
-        "detail": "courses.utils",
-        "documentation": {}
-    },
-    {
-        "label": "get_filtered_object",
-        "importPath": "courses.utils",
-        "description": "courses.utils",
-        "isExtraImport": true,
-        "detail": "courses.utils",
-        "documentation": {}
-    },
-    {
-        "label": "get_user_context",
-        "importPath": "courses.utils",
-        "description": "courses.utils",
-        "isExtraImport": true,
-        "detail": "courses.utils",
-        "documentation": {}
-    },
-    {
-        "label": "django",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "django",
-        "description": "django",
-        "detail": "django",
-        "documentation": {}
-    },
-    {
-        "label": "forms",
-        "importPath": "django",
-        "description": "django",
-        "isExtraImport": true,
-        "detail": "django",
-        "documentation": {}
-    },
-    {
-        "label": "format_html",
-        "importPath": "django.utils.html",
-        "description": "django.utils.html",
-        "isExtraImport": true,
-        "detail": "django.utils.html",
-        "documentation": {}
-    },
-    {
-        "label": "format_html",
-        "importPath": "django.utils.html",
-        "description": "django.utils.html",
-        "isExtraImport": true,
-        "detail": "django.utils.html",
-        "documentation": {}
-    },
-    {
-        "label": "csv",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "csv",
-        "description": "csv",
-        "detail": "csv",
-        "documentation": {}
-    },
-    {
-        "label": "BytesIO",
-        "importPath": "io",
-        "description": "io",
-        "isExtraImport": true,
-        "detail": "io",
-        "documentation": {}
-    },
-    {
-        "label": "os",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "os",
-        "description": "os",
-        "detail": "os",
         "documentation": {}
     },
     {
@@ -4259,28 +4381,11 @@
         "documentation": {}
     },
     {
-        "label": "django.utils.timezone",
-        "kind": 6,
+        "label": "action",
+        "importPath": "rest_framework.decorators",
+        "description": "rest_framework.decorators",
         "isExtraImport": true,
-        "importPath": "django.utils.timezone",
-        "description": "django.utils.timezone",
-        "detail": "django.utils.timezone",
-        "documentation": {}
-    },
-    {
-        "label": "now",
-        "importPath": "django.utils.timezone",
-        "description": "django.utils.timezone",
-        "isExtraImport": true,
-        "detail": "django.utils.timezone",
-        "documentation": {}
-    },
-    {
-        "label": "timedelta",
-        "importPath": "django.utils.timezone",
-        "description": "django.utils.timezone",
-        "isExtraImport": true,
-        "detail": "django.utils.timezone",
+        "detail": "rest_framework.decorators",
         "documentation": {}
     },
     {
@@ -4329,6 +4434,15 @@
         "description": "django.contrib.auth.models",
         "isExtraImport": true,
         "detail": "django.contrib.auth.models",
+        "documentation": {}
+    },
+    {
+        "label": "random",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "random",
+        "description": "random",
+        "detail": "random",
         "documentation": {}
     },
     {
@@ -4482,6 +4596,62 @@
         "importPath": "sys",
         "description": "sys",
         "detail": "sys",
+        "documentation": {}
+    },
+    {
+        "label": "BlocAnalytics",
+        "importPath": "analytics.models",
+        "description": "analytics.models",
+        "isExtraImport": true,
+        "detail": "analytics.models",
+        "documentation": {}
+    },
+    {
+        "label": "QuestionAnalytics",
+        "importPath": "analytics.models",
+        "description": "analytics.models",
+        "isExtraImport": true,
+        "detail": "analytics.models",
+        "documentation": {}
+    },
+    {
+        "label": "RecommandationPedagogique",
+        "importPath": "analytics.models",
+        "description": "analytics.models",
+        "isExtraImport": true,
+        "detail": "analytics.models",
+        "documentation": {}
+    },
+    {
+        "label": "ContenuGenere",
+        "importPath": "analytics.models",
+        "description": "analytics.models",
+        "isExtraImport": true,
+        "detail": "analytics.models",
+        "documentation": {}
+    },
+    {
+        "label": "BlocAnalytics",
+        "importPath": "analytics.models",
+        "description": "analytics.models",
+        "isExtraImport": true,
+        "detail": "analytics.models",
+        "documentation": {}
+    },
+    {
+        "label": "RecommandationPedagogique",
+        "importPath": "analytics.models",
+        "description": "analytics.models",
+        "isExtraImport": true,
+        "detail": "analytics.models",
+        "documentation": {}
+    },
+    {
+        "label": "ContenuGenere",
+        "importPath": "analytics.models",
+        "description": "analytics.models",
+        "isExtraImport": true,
+        "detail": "analytics.models",
         "documentation": {}
     },
     {
@@ -4961,7 +5131,7 @@
         "kind": 6,
         "importPath": "academics.serializers",
         "description": "academics.serializers",
-        "peekOfCode": "class GroupeSerializer(serializers.ModelSerializer):\n    enseignants = serializers.PrimaryKeyRelatedField(\n        queryset=Formateur.objects.all(),\n        many=True,\n        required=False\n    )\n    class Meta:\n        model = Groupe\n        fields = [\"id\", \"nom\", \"description\", \"enseignants\"]\nclass ClasseSerializer(serializers.ModelSerializer):",
+        "peekOfCode": "class GroupeSerializer(serializers.ModelSerializer):\n    enseignants = serializers.PrimaryKeyRelatedField(\n        queryset=Formateur.objects.all(),\n        many=True,\n        required=False\n    )\n    class Meta:\n        model = Groupe\n        fields = [\"id\", \"nom\", \"description\", \"institution\", \"classe\", \"enseignants\", \"annee_scolaire\"]\nclass ClasseSerializer(serializers.ModelSerializer):",
         "detail": "academics.serializers",
         "documentation": {}
     },
@@ -5240,35 +5410,8 @@
         "kind": 6,
         "importPath": "analytics.migrations.0001_initial",
         "description": "analytics.migrations.0001_initial",
-        "peekOfCode": "class Migration(migrations.Migration):\n    initial = True\n    dependencies = [\n        ('courses', '0008_coursprogress_moduleprogress_sequenceprogress_and_more'),\n        ('evaluations', '0005_alter_question_mode_correction'),\n        ('users', '0023_remove_apprenant_classe'),\n    ]\n    operations = [\n        migrations.CreateModel(\n            name='ContenuGenere',",
+        "peekOfCode": "class Migration(migrations.Migration):\n    initial = True\n    dependencies = [\n        ('courses', '0013_alter_participation_source'),\n        ('users', '0026_alter_admin_options_alter_apprenant_options_and_more'),\n    ]\n    operations = [\n        migrations.CreateModel(\n            name='BlocAnalytics',\n            fields=[",
         "detail": "analytics.migrations.0001_initial",
-        "documentation": {}
-    },
-    {
-        "label": "AIContentGenerator",
-        "kind": 6,
-        "importPath": "analytics.services.ai_content_generator",
-        "description": "analytics.services.ai_content_generator",
-        "peekOfCode": "class AIContentGenerator:\n    def __init__(self):\n        # ✅ Version simplifiée sans paramètres problématiques\n        self.client = anthropic.Anthropic(\n            api_key=settings.ANTHROPIC_API_KEY\n        )\n    def generer_remediation(self, apprenant, question_ratee, bloc_source):\n        \"\"\"\n        Génère un contenu de remédiation après échec à une question\n        \"\"\"",
-        "detail": "analytics.services.ai_content_generator",
-        "documentation": {}
-    },
-    {
-        "label": "AIContentGeneratorMock",
-        "kind": 6,
-        "importPath": "analytics.services.ai_content_generator_mock",
-        "description": "analytics.services.ai_content_generator_mock",
-        "peekOfCode": "class AIContentGeneratorMock:\n    \"\"\"\n    Version simulée de l'AI Content Generator\n    Génère du contenu factice pour les tests\n    \"\"\"\n    def __init__(self):\n        self.templates_remediation = [\n            \"\"\"\n            <h3>Comprendre ce concept autrement</h3>\n            <p>Imaginons que vous préparez un gâteau. Les <strong>variables</strong> sont comme ",
-        "detail": "analytics.services.ai_content_generator_mock",
-        "documentation": {}
-    },
-    {
-        "label": "RecommendationEngine",
-        "kind": 6,
-        "importPath": "analytics.services.recommendation_engine",
-        "description": "analytics.services.recommendation_engine",
-        "peekOfCode": "class RecommendationEngine:\n    SEUIL_TEMPS_EXCESSIF = 900  # 15 minutes\n    SEUIL_ECHECS_QUESTION = 2\n    SEUIL_SCORE_FAIBLE = 0.5\n    def __init__(self, apprenant):\n        self.apprenant = apprenant\n    def analyser_et_recommander(self):\n        \"\"\"\n        Analyse globale et génère des recommandations\n        \"\"\"",
-        "detail": "analytics.services.recommendation_engine",
         "documentation": {}
     },
     {
@@ -5276,34 +5419,34 @@
         "kind": 6,
         "importPath": "analytics.admin",
         "description": "analytics.admin",
-        "peekOfCode": "class BlocAnalyticsAdmin(admin.ModelAdmin):\n    list_display = ('apprenant', 'bloc', 'temps_total_secondes', 'nombre_visites', 'score_comprehension')\n    list_filter = ('difficulte_percue', 'derniere_visite')\n    search_fields = ('apprenant__nom', 'bloc__titre')\n    readonly_fields = ('premiere_visite', 'derniere_visite')\n@admin.register(QuestionAnalytics)\nclass QuestionAnalyticsAdmin(admin.ModelAdmin):\n    list_display = ('apprenant', 'question', 'nombre_tentatives', 'nombre_echecs')\n    list_filter = ('derniere_tentative',)\n    search_fields = ('apprenant__nom', 'question__enonce_texte')",
+        "peekOfCode": "class BlocAnalyticsAdmin(admin.ModelAdmin):\n    list_display  = (\n        'apprenant', 'bloc', 'cours_col', 'module_col',\n        'ouvert_le', 'ferme_le', 'duree_fmt',\n        'scroll_max_pct', 'complete_en_session',\n    )\n    list_filter   = (\n        'complete_en_session',\n        ('ferme_le', admin.DateFieldListFilter),\n        ('ouvert_le', admin.DateFieldListFilter),",
         "detail": "analytics.admin",
         "documentation": {}
     },
     {
-        "label": "QuestionAnalyticsAdmin",
+        "label": "BlocAnalyticsSummaryAdmin",
         "kind": 6,
         "importPath": "analytics.admin",
         "description": "analytics.admin",
-        "peekOfCode": "class QuestionAnalyticsAdmin(admin.ModelAdmin):\n    list_display = ('apprenant', 'question', 'nombre_tentatives', 'nombre_echecs')\n    list_filter = ('derniere_tentative',)\n    search_fields = ('apprenant__nom', 'question__enonce_texte')\n@admin.register(ContenuGenere)\nclass ContenuGenereAdmin(admin.ModelAdmin):\n    list_display = ('titre', 'apprenant', 'type_generation', 'a_ete_consulte', 'date_generation')\n    list_filter = ('type_generation', 'a_ete_consulte', 'a_aide')\n    search_fields = ('titre', 'apprenant__nom')\n    readonly_fields = ('date_generation',)",
+        "peekOfCode": "class BlocAnalyticsSummaryAdmin(admin.ModelAdmin):\n    list_display  = (\n        'apprenant', 'bloc',\n        'nb_ouvertures', 'nb_completions',\n        'duree_totale_fmt', 'duree_moy_fmt',\n        'scroll_max_pct', 'pace_col',\n        'premiere_ouverture', 'derniere_ouverture', 'date_completion',\n    )\n    list_filter   = (\n        ('derniere_ouverture', admin.DateFieldListFilter),",
         "detail": "analytics.admin",
         "documentation": {}
     },
     {
-        "label": "ContenuGenereAdmin",
+        "label": "SequenceAnalyticsSummaryAdmin",
         "kind": 6,
         "importPath": "analytics.admin",
         "description": "analytics.admin",
-        "peekOfCode": "class ContenuGenereAdmin(admin.ModelAdmin):\n    list_display = ('titre', 'apprenant', 'type_generation', 'a_ete_consulte', 'date_generation')\n    list_filter = ('type_generation', 'a_ete_consulte', 'a_aide')\n    search_fields = ('titre', 'apprenant__nom')\n    readonly_fields = ('date_generation',)\n@admin.register(RecommandationPedagogique)\nclass RecommandationAdmin(admin.ModelAdmin):\n    list_display = ('apprenant', 'type_recommandation', 'priorite', 'est_vue', 'est_suivie', 'date_creation')\n    list_filter = ('type_recommandation', 'priorite', 'est_vue', 'est_suivie')\n    search_fields = ('apprenant__nom', 'message')",
+        "peekOfCode": "class SequenceAnalyticsSummaryAdmin(admin.ModelAdmin):\n    list_display  = (\n        'apprenant', 'sequence', 'module_col',\n        'blocs_consultes_col', 'blocs_completes_col',\n        'duree_totale_fmt', 'pace_col',\n        'nb_quiz_passes', 'score_moyen_quiz',\n        'premiere_activite', 'derniere_activite', 'completee_le',\n    )\n    list_filter   = (\n        ('completee_le',       admin.DateFieldListFilter),",
         "detail": "analytics.admin",
         "documentation": {}
     },
     {
-        "label": "RecommandationAdmin",
+        "label": "ModuleAnalyticsSummaryAdmin",
         "kind": 6,
         "importPath": "analytics.admin",
         "description": "analytics.admin",
-        "peekOfCode": "class RecommandationAdmin(admin.ModelAdmin):\n    list_display = ('apprenant', 'type_recommandation', 'priorite', 'est_vue', 'est_suivie', 'date_creation')\n    list_filter = ('type_recommandation', 'priorite', 'est_vue', 'est_suivie')\n    search_fields = ('apprenant__nom', 'message')\n    readonly_fields = ('date_creation',)",
+        "peekOfCode": "class ModuleAnalyticsSummaryAdmin(admin.ModelAdmin):\n    list_display  = (\n        'apprenant', 'module', 'cours_col',\n        'sequences_col', 'blocs_col',\n        'duree_totale_fmt', 'pace_col',\n        'score_moyen_quiz',\n        'premiere_activite', 'derniere_activite', 'complete_le',\n    )\n    list_filter   = (\n        ('complete_le',        admin.DateFieldListFilter),",
         "detail": "analytics.admin",
         "documentation": {}
     },
@@ -5321,34 +5464,34 @@
         "kind": 6,
         "importPath": "analytics.models",
         "description": "analytics.models",
-        "peekOfCode": "class BlocAnalytics(models.Model):\n    \"\"\"Suivi détaillé de l'interaction avec un bloc\"\"\"\n    apprenant = models.ForeignKey(\n        Apprenant, \n        on_delete=models.CASCADE, \n        related_name='blocs_analytics'\n    )\n    bloc = models.ForeignKey(\n        BlocContenu, \n        on_delete=models.CASCADE, ",
+        "peekOfCode": "class BlocAnalytics(models.Model):\n    \"\"\"\n    Une entrée = une session d'ouverture d'un bloc par un apprenant.\n    Créée au moment où l'apprenant ouvre le bloc, complétée à la fermeture.\n    \"\"\"\n    apprenant   = models.ForeignKey('users.Apprenant',    on_delete=models.CASCADE, related_name='bloc_analytics')\n    bloc        = models.ForeignKey('courses.BlocContenu', on_delete=models.CASCADE, related_name='analytics_sessions')\n    sequence    = models.ForeignKey('courses.Sequence',    on_delete=models.SET_NULL, null=True, blank=True)\n    module      = models.ForeignKey('courses.Module',      on_delete=models.SET_NULL, null=True, blank=True)\n    cours       = models.ForeignKey('courses.Cours',       on_delete=models.SET_NULL, null=True, blank=True)",
         "detail": "analytics.models",
         "documentation": {}
     },
     {
-        "label": "QuestionAnalytics",
+        "label": "BlocAnalyticsSummary",
         "kind": 6,
         "importPath": "analytics.models",
         "description": "analytics.models",
-        "peekOfCode": "class QuestionAnalytics(models.Model):\n    \"\"\"Analyse des erreurs sur une question\"\"\"\n    apprenant = models.ForeignKey(\n        Apprenant, \n        on_delete=models.CASCADE, \n        related_name='questions_analytics'\n    )\n    question = models.ForeignKey(\n        Question, \n        on_delete=models.CASCADE, ",
+        "peekOfCode": "class BlocAnalyticsSummary(models.Model):\n    \"\"\"\n    Résumé agrégé par (apprenant, bloc). Mis à jour après chaque session.\n    Source de vérité pour les indicateurs affichés dans les composants.\n    \"\"\"\n    apprenant           = models.ForeignKey('users.Apprenant',    on_delete=models.CASCADE, related_name='bloc_summaries')\n    bloc                = models.ForeignKey('courses.BlocContenu', on_delete=models.CASCADE, related_name='analytics_summary')\n    sequence            = models.ForeignKey('courses.Sequence',    on_delete=models.SET_NULL, null=True, blank=True)\n    module              = models.ForeignKey('courses.Module',      on_delete=models.SET_NULL, null=True, blank=True)\n    cours               = models.ForeignKey('courses.Cours',       on_delete=models.SET_NULL, null=True, blank=True)",
         "detail": "analytics.models",
         "documentation": {}
     },
     {
-        "label": "ContenuGenere",
+        "label": "SequenceAnalyticsSummary",
         "kind": 6,
         "importPath": "analytics.models",
         "description": "analytics.models",
-        "peekOfCode": "class ContenuGenere(models.Model):\n    \"\"\"Contenu pédagogique généré par IA\"\"\"\n    TYPE_GENERATION = [\n        ('remediation', 'Remédiation (après échec)'),\n        ('approfondissement', 'Approfondissement'),\n        ('simplification', 'Simplification'),\n        ('alternative', 'Approche alternative'),\n    ]\n    apprenant = models.ForeignKey(\n        Apprenant, ",
+        "peekOfCode": "class SequenceAnalyticsSummary(models.Model):\n    apprenant               = models.ForeignKey('users.Apprenant', on_delete=models.CASCADE, related_name='sequence_summaries')\n    sequence                = models.ForeignKey('courses.Sequence', on_delete=models.CASCADE, related_name='analytics_summary')\n    module                  = models.ForeignKey('courses.Module',   on_delete=models.SET_NULL, null=True, blank=True)\n    cours                   = models.ForeignKey('courses.Cours',    on_delete=models.SET_NULL, null=True, blank=True)\n    nb_blocs_consultes      = models.PositiveSmallIntegerField(default=0)\n    nb_blocs_total          = models.PositiveSmallIntegerField(default=0)\n    nb_blocs_completes      = models.PositiveSmallIntegerField(default=0)\n    duree_totale_sec        = models.PositiveIntegerField(default=0)\n    duree_estimee_sec       = models.PositiveIntegerField(default=0)",
         "detail": "analytics.models",
         "documentation": {}
     },
     {
-        "label": "RecommandationPedagogique",
+        "label": "ModuleAnalyticsSummary",
         "kind": 6,
         "importPath": "analytics.models",
         "description": "analytics.models",
-        "peekOfCode": "class RecommandationPedagogique(models.Model):\n    \"\"\"Recommandations personnalisées pour l'apprenant\"\"\"\n    TYPE_RECO = [\n        ('bloc_revoir', 'Revoir un bloc'),\n        ('quiz_supplementaire', 'Quiz supplémentaire'),\n        ('pause', 'Pause recommandée'),\n        ('changement_approche', 'Changer d\\'approche'),\n        ('contenu_alternatif', 'Contenu alternatif disponible'),\n    ]\n    apprenant = models.ForeignKey(",
+        "peekOfCode": "class ModuleAnalyticsSummary(models.Model):\n    apprenant                   = models.ForeignKey('users.Apprenant', on_delete=models.CASCADE, related_name='module_summaries')\n    module                      = models.ForeignKey('courses.Module',   on_delete=models.CASCADE, related_name='analytics_summary')\n    cours                       = models.ForeignKey('courses.Cours',    on_delete=models.SET_NULL, null=True, blank=True)\n    nb_sequences_consultees     = models.PositiveSmallIntegerField(default=0)\n    nb_sequences_total          = models.PositiveSmallIntegerField(default=0)\n    nb_sequences_completes      = models.PositiveSmallIntegerField(default=0)\n    nb_blocs_total              = models.PositiveSmallIntegerField(default=0)\n    nb_blocs_completes          = models.PositiveSmallIntegerField(default=0)\n    duree_totale_sec            = models.PositiveIntegerField(default=0)",
         "detail": "analytics.models",
         "documentation": {}
     },
@@ -5357,35 +5500,8 @@
         "kind": 6,
         "importPath": "analytics.serializers",
         "description": "analytics.serializers",
-        "peekOfCode": "class BlocAnalyticsSerializer(serializers.ModelSerializer):\n    bloc_titre = serializers.CharField(source='bloc.titre', read_only=True)\n    class Meta:\n        model = BlocAnalytics\n        fields = '__all__'\n        read_only_fields = ('premiere_visite', 'derniere_visite')\nclass ContenuGenereSerializer(serializers.ModelSerializer):\n    class Meta:\n        model = ContenuGenere\n        fields = '__all__'",
+        "peekOfCode": "class BlocAnalyticsSerializer(serializers.ModelSerializer):\n    bloc_titre = serializers.CharField(source='bloc.titre', read_only=True)\n    class Meta:\n        model = BlocAnalytics\n        fields = '__all__'\n        read_only_fields = ('premiere_visite', 'derniere_visite')\n# class ContenuGenereSerializer(serializers.ModelSerializer):\n#     class Meta:\n#         model = ContenuGenere\n#         fields = '__all__'",
         "detail": "analytics.serializers",
-        "documentation": {}
-    },
-    {
-        "label": "ContenuGenereSerializer",
-        "kind": 6,
-        "importPath": "analytics.serializers",
-        "description": "analytics.serializers",
-        "peekOfCode": "class ContenuGenereSerializer(serializers.ModelSerializer):\n    class Meta:\n        model = ContenuGenere\n        fields = '__all__'\n        read_only_fields = ('date_generation', 'nombre_consultations')\nclass RecommandationSerializer(serializers.ModelSerializer):\n    bloc_titre = serializers.CharField(source='bloc_cible.titre', read_only=True)\n    class Meta:\n        model = RecommandationPedagogique\n        fields = '__all__'",
-        "detail": "analytics.serializers",
-        "documentation": {}
-    },
-    {
-        "label": "RecommandationSerializer",
-        "kind": 6,
-        "importPath": "analytics.serializers",
-        "description": "analytics.serializers",
-        "peekOfCode": "class RecommandationSerializer(serializers.ModelSerializer):\n    bloc_titre = serializers.CharField(source='bloc_cible.titre', read_only=True)\n    class Meta:\n        model = RecommandationPedagogique\n        fields = '__all__'\n        read_only_fields = ('date_creation', 'date_vue')",
-        "detail": "analytics.serializers",
-        "documentation": {}
-    },
-    {
-        "label": "router",
-        "kind": 5,
-        "importPath": "analytics.urls",
-        "description": "analytics.urls",
-        "peekOfCode": "router = DefaultRouter()\nrouter.register(r'bloc-analytics', BlocAnalyticsViewSet, basename='bloc-analytics')\nrouter.register(r'recommandations', RecommandationViewSet, basename='recommandations')\nrouter.register(r'contenus-generes', ContenuGenereViewSet, basename='contenus-generes')\nurlpatterns = [\n    path('', include(router.urls)),\n]",
-        "detail": "analytics.urls",
         "documentation": {}
     },
     {
@@ -5393,34 +5509,106 @@
         "kind": 5,
         "importPath": "analytics.urls",
         "description": "analytics.urls",
-        "peekOfCode": "urlpatterns = [\n    path('', include(router.urls)),\n]",
+        "peekOfCode": "urlpatterns = [\n    # ── Diagnostic (désactiver en production) ──────────────────────────────\n    path(\n        'analytics/debug/',\n        AnalyticsDebugView.as_view(),\n        name='analytics-debug',\n    ),\n    # ── Tracking blocs ─────────────────────────────────────────────────────\n    # ⚠️  session/close AVANT bloc/open (ordre Django)\n    path(",
         "detail": "analytics.urls",
         "documentation": {}
     },
     {
-        "label": "BlocAnalyticsViewSet",
+        "label": "AnalyticsDebugView",
         "kind": 6,
         "importPath": "analytics.views",
         "description": "analytics.views",
-        "peekOfCode": "class BlocAnalyticsViewSet(viewsets.ModelViewSet):\n    serializer_class = BlocAnalyticsSerializer\n    permission_classes = [IsAuthenticated]\n    def get_queryset(self):\n        return BlocAnalytics.objects.filter(apprenant=self.request.user.apprenant)\n    @action(detail=False, methods=['post'])\n    def track_interaction(self, request):\n        \"\"\"\n        Endpoint pour tracker l'interaction avec un bloc\n        Body: {",
+        "peekOfCode": "class AnalyticsDebugView(APIView):\n    \"\"\"\n    GET /api/analytics/debug/\n    Ouvrir dans le navigateur (user connecté) pour voir pourquoi les tables\n    sont vides. La clé 'apprenant_resolu' doit être non-null.\n    Si elle est null, regarder 'chemins_testes' pour trouver le bon attribut\n    et adapter _get_apprenant() en conséquence.\n    \"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):",
         "detail": "analytics.views",
         "documentation": {}
     },
     {
-        "label": "RecommandationViewSet",
+        "label": "BlocAnalyticsOpenView",
         "kind": 6,
         "importPath": "analytics.views",
         "description": "analytics.views",
-        "peekOfCode": "class RecommandationViewSet(viewsets.ReadOnlyModelViewSet):\n    serializer_class = RecommandationSerializer\n    permission_classes = [IsAuthenticated]\n    def get_queryset(self):\n        return RecommandationPedagogique.objects.filter(\n            apprenant=self.request.user.apprenant,\n            est_vue=False\n        ).filter(\n            models.Q(date_expiration__isnull=True) | \n            models.Q(date_expiration__gt=timezone.now())",
+        "peekOfCode": "class BlocAnalyticsOpenView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def post(self, request, bloc_id):\n        apprenant = _get_apprenant(request, request.data.get('apprenant_id'))\n        if not apprenant:\n            logger.warning(\n                '[analytics/open] 403 apprenant introuvable — user=%s pk=%s — '\n                'voir GET /api/analytics/debug/',\n                getattr(request.user, 'username', '?'),\n                getattr(request.user, 'pk', '?'),",
         "detail": "analytics.views",
         "documentation": {}
     },
     {
-        "label": "ContenuGenereViewSet",
+        "label": "BlocAnalyticsCloseView",
         "kind": 6,
         "importPath": "analytics.views",
         "description": "analytics.views",
-        "peekOfCode": "class ContenuGenereViewSet(viewsets.ReadOnlyModelViewSet):\n    serializer_class = ContenuGenereSerializer\n    permission_classes = [IsAuthenticated]\n    def get_queryset(self):\n        return ContenuGenere.objects.filter(apprenant=self.request.user.apprenant)\n    def retrieve(self, request, *args, **kwargs):\n        instance = self.get_object()\n        instance.a_ete_consulte = True\n        instance.nombre_consultations += 1\n        instance.date_derniere_consultation = timezone.now()",
+        "peekOfCode": "class BlocAnalyticsCloseView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def patch(self, request, session_id):\n        apprenant = _get_apprenant(request, request.data.get('apprenant_id'))\n        if not apprenant:\n            logger.warning('[analytics/close] 403 apprenant introuvable — user=%s', request.user)\n            return Response(\n                {'error': 'Apprenant introuvable — voir GET /api/analytics/debug/'},\n                status=status.HTTP_403_FORBIDDEN,\n            )",
+        "detail": "analytics.views",
+        "documentation": {}
+    },
+    {
+        "label": "BulkAnalyticsSummaryView",
+        "kind": 6,
+        "importPath": "analytics.views",
+        "description": "analytics.views",
+        "peekOfCode": "class BulkAnalyticsSummaryView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def post(self, request):\n        apprenant = _get_apprenant(request, request.data.get('apprenant_id'))\n        if not apprenant:\n            return Response({'blocs': [], 'sequences': [], 'modules': []})\n        def safe_ids(key):\n            return [int(x) for x in (request.data.get(key) or []) if str(x).strip().isdigit()]\n        bloc_ids     = safe_ids('bloc_ids')\n        sequence_ids = safe_ids('sequence_ids')",
+        "detail": "analytics.views",
+        "documentation": {}
+    },
+    {
+        "label": "RecommandationsListView",
+        "kind": 6,
+        "importPath": "analytics.views",
+        "description": "analytics.views",
+        "peekOfCode": "class RecommandationsListView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, apprenant_id):\n        return Response({'recommendations': []})\nclass RecommandationVueView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def patch(self, request, pk):\n        return Response({'status': 'ok'})\nclass RecommandationSuivieView(APIView):\n    permission_classes = [permissions.IsAuthenticated]",
+        "detail": "analytics.views",
+        "documentation": {}
+    },
+    {
+        "label": "RecommandationVueView",
+        "kind": 6,
+        "importPath": "analytics.views",
+        "description": "analytics.views",
+        "peekOfCode": "class RecommandationVueView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def patch(self, request, pk):\n        return Response({'status': 'ok'})\nclass RecommandationSuivieView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def patch(self, request, pk):\n        return Response({'status': 'ok'})\nclass ContenuGenereDetailView(APIView):\n    permission_classes = [permissions.IsAuthenticated]",
+        "detail": "analytics.views",
+        "documentation": {}
+    },
+    {
+        "label": "RecommandationSuivieView",
+        "kind": 6,
+        "importPath": "analytics.views",
+        "description": "analytics.views",
+        "peekOfCode": "class RecommandationSuivieView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def patch(self, request, pk):\n        return Response({'status': 'ok'})\nclass ContenuGenereDetailView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, pk):\n        return Response({'error': 'non implémenté'}, status=404)\nclass ContenuGenereConsulteView(APIView):\n    permission_classes = [permissions.IsAuthenticated]",
+        "detail": "analytics.views",
+        "documentation": {}
+    },
+    {
+        "label": "ContenuGenereDetailView",
+        "kind": 6,
+        "importPath": "analytics.views",
+        "description": "analytics.views",
+        "peekOfCode": "class ContenuGenereDetailView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, pk):\n        return Response({'error': 'non implémenté'}, status=404)\nclass ContenuGenereConsulteView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def patch(self, request, pk):\n        return Response({'status': 'ok'})\nclass ContenuGenereFeedbackView(APIView):\n    permission_classes = [permissions.IsAuthenticated]",
+        "detail": "analytics.views",
+        "documentation": {}
+    },
+    {
+        "label": "ContenuGenereConsulteView",
+        "kind": 6,
+        "importPath": "analytics.views",
+        "description": "analytics.views",
+        "peekOfCode": "class ContenuGenereConsulteView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def patch(self, request, pk):\n        return Response({'status': 'ok'})\nclass ContenuGenereFeedbackView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def patch(self, request, pk):\n        return Response({'status': 'ok'})",
+        "detail": "analytics.views",
+        "documentation": {}
+    },
+    {
+        "label": "ContenuGenereFeedbackView",
+        "kind": 6,
+        "importPath": "analytics.views",
+        "description": "analytics.views",
+        "peekOfCode": "class ContenuGenereFeedbackView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def patch(self, request, pk):\n        return Response({'status': 'ok'})",
+        "detail": "analytics.views",
+        "documentation": {}
+    },
+    {
+        "label": "logger",
+        "kind": 5,
+        "importPath": "analytics.views",
+        "description": "analytics.views",
+        "peekOfCode": "logger = logging.getLogger(__name__)\n# ══════════════════════════════════════════════════════════════════════════════\n# HELPER — résolution de l'apprenant (BUG 2)\n# ══════════════════════════════════════════════════════════════════════════════\ndef _get_apprenant(request, apprenant_id=None):\n    \"\"\"\n    Résout l'objet Apprenant en testant plusieurs chemins dans l'ordre.\n    Appeler GET /api/analytics/debug/ pour voir quel chemin fonctionne\n    dans votre projet.\n    \"\"\"",
         "detail": "analytics.views",
         "documentation": {}
     },
@@ -5938,6 +6126,24 @@
         "documentation": {}
     },
     {
+        "label": "Migration",
+        "kind": 6,
+        "importPath": "courses.migrations.0013_alter_participation_source",
+        "description": "courses.migrations.0013_alter_participation_source",
+        "peekOfCode": "class Migration(migrations.Migration):\n    dependencies = [\n        ('courses', '0012_alter_ressourcesequence_options_and_more'),\n    ]\n    operations = [\n        migrations.AlterField(\n            model_name='participation',\n            name='source',\n            field=models.CharField(choices=[('manuelle', 'Manuelle'), ('auto', 'Automatique')], default='manuelle', max_length=20),\n        ),",
+        "detail": "courses.migrations.0013_alter_participation_source",
+        "documentation": {}
+    },
+    {
+        "label": "Migration",
+        "kind": 6,
+        "importPath": "courses.migrations.0014_aianalysisrequest_blocgenere_quizgenere_and_more",
+        "description": "courses.migrations.0014_aianalysisrequest_blocgenere_quizgenere_and_more",
+        "peekOfCode": "class Migration(migrations.Migration):\n    dependencies = [\n        ('courses', '0013_alter_participation_source'),\n        ('evaluations', '0007_merge_20260212_1727'),\n        ('users', '0026_alter_admin_options_alter_apprenant_options_and_more'),\n    ]\n    operations = [\n        migrations.CreateModel(\n            name='AIAnalysisRequest',\n            fields=[",
+        "detail": "courses.migrations.0014_aianalysisrequest_blocgenere_quizgenere_and_more",
+        "documentation": {}
+    },
+    {
         "label": "recompute_sequence",
         "kind": 2,
         "importPath": "courses.services.progression",
@@ -6145,6 +6351,69 @@
         "documentation": {}
     },
     {
+        "label": "generer_bloc_simplifie",
+        "kind": 2,
+        "importPath": "courses.ai_service",
+        "description": "courses.ai_service",
+        "peekOfCode": "def generer_bloc_simplifie(context: dict) -> dict:\n    \"\"\"\n    Génère un bloc de cours simplifié pour un apprenant qui a trop de temps\n    passé sur le bloc original.\n    context = {\n        'bloc_titre': str,\n        'bloc_contenu': str,          # texte brut ou HTML du bloc original\n        'duree_estimee_min': int,\n        'duree_passee_min': int,\n        'ratio_pct': int,             # ex: 180 = 180% du temps estimé",
+        "detail": "courses.ai_service",
+        "documentation": {}
+    },
+    {
+        "label": "generer_quiz_remediation",
+        "kind": 2,
+        "importPath": "courses.ai_service",
+        "description": "courses.ai_service",
+        "peekOfCode": "def generer_quiz_remediation(context: dict) -> dict:\n    \"\"\"\n    Génère un quiz de remédiation ciblé sur les concepts ratés.\n    context = {\n        'quiz_titre': str,\n        'quiz_description': str,\n        'score_obtenu': int,          # 0-100\n        'questions_ratees': list[{    # questions du quiz original ratées\n            'question': str,\n            'bonne_reponse': str,",
+        "detail": "courses.ai_service",
+        "documentation": {}
+    },
+    {
+        "label": "traiter_demande_ai",
+        "kind": 2,
+        "importPath": "courses.ai_service",
+        "description": "courses.ai_service",
+        "peekOfCode": "def traiter_demande_ai(ai_request) -> bool:\n    \"\"\"\n    Traite une AIAnalysisRequest et génère le contenu approprié.\n    Met à jour ai_request.status en base.\n    Retourne True si succès.\n    \"\"\"\n    from .models_ai import BlocGenere, QuizGenere\n    ai_request.status = 'pending'\n    ai_request.save(update_fields=['status'])\n    if ai_request.trigger == 'temps_long':",
+        "detail": "courses.ai_service",
+        "documentation": {}
+    },
+    {
+        "label": "logger",
+        "kind": 5,
+        "importPath": "courses.ai_service",
+        "description": "courses.ai_service",
+        "peekOfCode": "logger = logging.getLogger(__name__)\ntry:\n    from openai import OpenAI as _OpenAIClass\n    _openai_available = True\nexcept ImportError:\n    _OpenAIClass = None\n    _openai_available = False\n    logger.warning('[ai_service] openai non installé — pip install openai')\n# Lazy — instancié à la première requête pour ne pas crasher au démarrage\n# si OPENAI_API_KEY est absent ou vide au moment de l'import.",
+        "detail": "courses.ai_service",
+        "documentation": {}
+    },
+    {
+        "label": "_client",
+        "kind": 5,
+        "importPath": "courses.ai_service",
+        "description": "courses.ai_service",
+        "peekOfCode": "_client = None\ndef _get_client():\n    \"\"\"Retourne (ou crée) le client OpenAI. Retourne None si non configuré.\"\"\"\n    global _client\n    if _client is not None:\n        return _client\n    if not _openai_available:\n        return None\n    api_key = getattr(settings, 'OPENAI_API_KEY', '') or ''\n    if not api_key:",
+        "detail": "courses.ai_service",
+        "documentation": {}
+    },
+    {
+        "label": "SYSTEM_BLOC",
+        "kind": 5,
+        "importPath": "courses.ai_service",
+        "description": "courses.ai_service",
+        "peekOfCode": "SYSTEM_BLOC = \"\"\"\nTu es un assistant pédagogique expert. Tu aides des apprenants qui peinent à comprendre\nun contenu de formation.\nTon rôle : générer une explication ALTERNATIVE et SIMPLIFIÉE d'un bloc de cours,\nadaptée à un apprenant qui a passé beaucoup de temps dessus sans comprendre.\nRègles STRICTES :\n- Répondre UNIQUEMENT en JSON valide (pas de texte avant/après)\n- Le contenu HTML doit être propre, lisible, sans balises inutiles\n- Utiliser des analogies concrètes et du quotidien\n- Structurer avec des titres h3, listes ul/ol, et exemples",
+        "detail": "courses.ai_service",
+        "documentation": {}
+    },
+    {
+        "label": "SYSTEM_QUIZ",
+        "kind": 5,
+        "importPath": "courses.ai_service",
+        "description": "courses.ai_service",
+        "peekOfCode": "SYSTEM_QUIZ = \"\"\"\nTu es un expert en évaluation pédagogique. Tu crées des quiz de REMÉDIATION\npour aider les apprenants à consolider des notions qu'ils n'ont pas maîtrisées.\nRègles STRICTES :\n- Répondre UNIQUEMENT en JSON valide\n- Les questions doivent cibler SPÉCIFIQUEMENT les concepts ratés\n- Proposer des explications détaillées pour chaque bonne réponse\n- Varier les types (QCM, vrai/faux, réponse courte)\n- Difficulté progressive (commencer facile, finir plus exigeant)\n- La langue est le FRANÇAIS",
+        "detail": "courses.ai_service",
+        "documentation": {}
+    },
+    {
         "label": "CoursesConfig",
         "kind": 6,
         "importPath": "courses.apps",
@@ -6280,6 +6549,33 @@
         "documentation": {}
     },
     {
+        "label": "AIAnalysisRequest",
+        "kind": 6,
+        "importPath": "courses.models_ai",
+        "description": "courses.models_ai",
+        "peekOfCode": "class AIAnalysisRequest(models.Model):\n    \"\"\"\n    Historique de toutes les requêtes envoyées à ChatGPT.\n    Sert à éviter les doublons, auditer les coûts et déboguer.\n    \"\"\"\n    TRIGGER_CHOICES = [\n        ('temps_long',   'Temps passé trop long sur un bloc'),\n        ('quiz_rate',    'Quiz raté ou score faible'),\n        ('scroll_faible','Scroll insuffisant (bloc peu lu)'),\n        ('multi_reouverture', 'Bloc réouvert plusieurs fois'),",
+        "detail": "courses.models_ai",
+        "documentation": {}
+    },
+    {
+        "label": "BlocGenere",
+        "kind": 6,
+        "importPath": "courses.models_ai",
+        "description": "courses.models_ai",
+        "peekOfCode": "class BlocGenere(models.Model):\n    \"\"\"\n    Bloc de contenu simplifié généré par ChatGPT pour aider un apprenant\n    qui a mis trop de temps sur un bloc (trigger = temps_long).\n    Ce bloc est affiché dans le panneau AITutor du course-player.\n    Il n'est PAS inséré dans le cours — il reste une aide contextuelle.\n    \"\"\"\n    TYPE_CHOICES = [\n        ('explication_simple', 'Explication simplifiée'),\n        ('analogie',           'Analogie / métaphore'),",
+        "detail": "courses.models_ai",
+        "documentation": {}
+    },
+    {
+        "label": "QuizGenere",
+        "kind": 6,
+        "importPath": "courses.models_ai",
+        "description": "courses.models_ai",
+        "peekOfCode": "class QuizGenere(models.Model):\n    \"\"\"\n    Quiz de remédiation généré par ChatGPT à partir des questions ratées\n    d'un passage de quiz (trigger = quiz_rate).\n    Structure JSON stockée dans `questions` :\n    [\n      {\n        \"question\": \"Quelle est la différence entre X et Y ?\",\n        \"type\": \"qcm\",          # qcm | vrai_faux | texte_libre\n        \"options\": [\"A\", \"B\", \"C\", \"D\"],",
+        "detail": "courses.models_ai",
+        "documentation": {}
+    },
+    {
         "label": "CoursSerializer",
         "kind": 6,
         "importPath": "courses.serializers",
@@ -6302,7 +6598,7 @@
         "kind": 6,
         "importPath": "courses.serializers",
         "description": "courses.serializers",
-        "peekOfCode": "class BlocContenuSerializer(serializers.ModelSerializer):\n    \"\"\"Serializer pour les blocs de contenu\"\"\"\n    icone_type = serializers.ReadOnlyField()\n    class Meta:\n        model = BlocContenu\n        fields = [\n            'id', 'sequence', 'titre', 'type_bloc', 'ordre',\n            'contenu_texte', 'contenu_html', 'contenu_markdown',\n            'video_url', 'audio_url', 'image', 'fichier',\n            'lien_externe', 'code_source', 'langage_code',",
+        "peekOfCode": "class BlocContenuSerializer(serializers.ModelSerializer):\n    \"\"\"\n    Serializer universel pour lecture ET écriture (PUT/PATCH/GET).\n    Règle importante :\n    - allow_blank=True  → uniquement sur CharField / TextField\n    - allow_null=True   → sur tous les champs nullable (URL, fichier, int...)\n    - URLField / FileField / ImageField → redéclarés explicitement pour éviter\n      l'erreur \"Field.__init__() got an unexpected keyword argument 'allow_blank'\"\n    \"\"\"\n    icone_type = serializers.ReadOnlyField()",
         "detail": "courses.serializers",
         "documentation": {}
     },
@@ -6311,7 +6607,7 @@
         "kind": 6,
         "importPath": "courses.serializers",
         "description": "courses.serializers",
-        "peekOfCode": "class BlocContenuCreateSerializer(serializers.ModelSerializer):\n    \"\"\"Serializer pour créer un bloc de contenu\"\"\"\n    class Meta:\n        model = BlocContenu\n        fields = [\n            'sequence', 'titre', 'type_bloc', 'ordre',\n            'contenu_texte', 'contenu_html', 'contenu_markdown',\n            'video_url', 'audio_url', 'image', 'fichier',\n            'lien_externe', 'code_source', 'langage_code',\n            'objectifs', 'duree_estimee_minutes',",
+        "peekOfCode": "class BlocContenuCreateSerializer(serializers.ModelSerializer):\n    \"\"\"Serializer dédié à la création.\"\"\"\n    image    = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)\n    fichier  = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)\n    video_url    = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)\n    audio_url    = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)\n    lien_externe = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)\n    class Meta:\n        model = BlocContenu\n        fields = [",
         "detail": "courses.serializers",
         "documentation": {}
     },
@@ -6457,6 +6753,15 @@
         "description": "courses.urls",
         "peekOfCode": "urlpatterns = [\n    # Cours\n    path('cours/', CoursListCreateAPIView.as_view(), name='cours-list-create'),\n    path('cours/<int:pk>/', CoursDetailAPIView.as_view(), name='cours-detail'),\n    path('cours/<int:cours_id>/modules/', CoursModulesAPIView.as_view(), name='cours-modules'),\n    # Modules\n    path('modules/', ModuleListCreateAPIView.as_view(), name='module-list-create'),\n    path('modules/<int:pk>/', ModuleDetailAPIView.as_view(), name='module-detail'),\n    path('modules/<int:module_id>/sequences/', ModuleSequencesAPIView.as_view(), name='module-sequences'),\n    # Séquences",
         "detail": "courses.urls",
+        "documentation": {}
+    },
+    {
+        "label": "urlpatterns",
+        "kind": 5,
+        "importPath": "courses.urls_ai",
+        "description": "courses.urls_ai",
+        "peekOfCode": "urlpatterns = [\n    # Déclencher une analyse et lancer la génération GPT\n    path(\n        'ai/analyze/',\n        AIAnalyzeView.as_view(),\n        name='ai-analyze',\n    ),\n    # Récupérer les suggestions générées pour un apprenant\n    path(\n        'ai/suggestions/<int:apprenant_id>/',",
+        "detail": "courses.urls_ai",
         "documentation": {}
     },
     {
@@ -6609,6 +6914,15 @@
         "importPath": "courses.views",
         "description": "courses.views",
         "peekOfCode": "class BlocContenuDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'un bloc\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        \"\"\"Récupère un bloc par son ID avec filtrage contexte\"\"\"\n        context = get_user_context(request)\n        qs = BlocContenu.objects.select_related('sequence')\n        if context.get('institution_id'):\n            qs = qs.filter(sequence__institution_id=context['institution_id'])\n        if context.get('annee_scolaire_id'):",
+        "detail": "courses.views",
+        "documentation": {}
+    },
+    {
+        "label": "BlocContenuUploadView",
+        "kind": 6,
+        "importPath": "courses.views",
+        "description": "courses.views",
+        "peekOfCode": "class BlocContenuUploadView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    parser_classes = [MultiPartParser, FormParser]\n    ALLOWED_EXTENSIONS = {\n        'image':       ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'],\n        'video':       ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'],\n        'audio':       ['.mp3', '.wav', '.ogg', '.aac', '.m4a', '.flac'],\n        'pdf':         ['.pdf'],\n        'word':        ['.doc', '.docx'],\n        'excel':       ['.xls', '.xlsx'],",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -6808,6 +7122,69 @@
         "description": "courses.views",
         "peekOfCode": "def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST, data=None):\n    \"\"\"Réponse standardisée pour les erreurs\"\"\"\n    payload = {\n        \"success\": False,\n        \"status\": http_status,\n        \"message\": message,\n        \"data\": data,\n    }\n    if errors is not None:\n        payload[\"errors\"] = errors",
         "detail": "courses.views",
+        "documentation": {}
+    },
+    {
+        "label": "AIAnalyzeView",
+        "kind": 6,
+        "importPath": "courses.views_ai",
+        "description": "courses.views_ai",
+        "peekOfCode": "class AIAnalyzeView(APIView):\n    \"\"\"\n    POST /api/ai/analyze/\n    Body :\n    {\n      \"trigger\": \"temps_long\" | \"quiz_rate\",\n      \"apprenant_id\": 42,            // optionnel, déduit du token sinon\n      // Pour trigger = temps_long :\n      \"bloc_id\": 15,\n      \"duree_passee_sec\": 720,",
+        "detail": "courses.views_ai",
+        "documentation": {}
+    },
+    {
+        "label": "AISuggestionsView",
+        "kind": 6,
+        "importPath": "courses.views_ai",
+        "description": "courses.views_ai",
+        "peekOfCode": "class AISuggestionsView(APIView):\n    \"\"\"\n    GET /api/ai/suggestions/<int:apprenant_id>/\n    Optionnel : ?bloc_id=15 ou ?quiz_id=8 pour filtrer\n    Retourne :\n    {\n      \"blocs_generes\": [...],\n      \"quiz_generes\": [...],\n      \"pending_count\": 2     // requêtes en cours de génération\n    }",
+        "detail": "courses.views_ai",
+        "documentation": {}
+    },
+    {
+        "label": "BlocGenereConsulteView",
+        "kind": 6,
+        "importPath": "courses.views_ai",
+        "description": "courses.views_ai",
+        "peekOfCode": "class BlocGenereConsulteView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def patch(self, request, pk):\n        apprenant = _get_apprenant(request)\n        bloc = get_object_or_404(BlocGenere, pk=pk, apprenant=apprenant)\n        bloc.marquer_consulte()\n        return Response({'status': 'ok'})\nclass BlocGenereFeedbackView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def patch(self, request, pk):",
+        "detail": "courses.views_ai",
+        "documentation": {}
+    },
+    {
+        "label": "BlocGenereFeedbackView",
+        "kind": 6,
+        "importPath": "courses.views_ai",
+        "description": "courses.views_ai",
+        "peekOfCode": "class BlocGenereFeedbackView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def patch(self, request, pk):\n        apprenant = _get_apprenant(request)\n        bloc = get_object_or_404(BlocGenere, pk=pk, apprenant=apprenant)\n        a_aide = request.data.get('a_aide')\n        if a_aide is None:\n            return Response({'error': 'a_aide requis (true/false)'}, status=400)\n        bloc.soumettre_feedback(bool(a_aide))\n        return Response({'status': 'ok'})",
+        "detail": "courses.views_ai",
+        "documentation": {}
+    },
+    {
+        "label": "QuizGenereConsulteView",
+        "kind": 6,
+        "importPath": "courses.views_ai",
+        "description": "courses.views_ai",
+        "peekOfCode": "class QuizGenereConsulteView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def patch(self, request, pk):\n        apprenant = _get_apprenant(request)\n        quiz = get_object_or_404(QuizGenere, pk=pk, apprenant=apprenant)\n        quiz.marquer_consulte()\n        return Response({'status': 'ok'})\nclass QuizGenereScoreView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def post(self, request, pk):",
+        "detail": "courses.views_ai",
+        "documentation": {}
+    },
+    {
+        "label": "QuizGenereScoreView",
+        "kind": 6,
+        "importPath": "courses.views_ai",
+        "description": "courses.views_ai",
+        "peekOfCode": "class QuizGenereScoreView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def post(self, request, pk):\n        apprenant = _get_apprenant(request)\n        quiz = get_object_or_404(QuizGenere, pk=pk, apprenant=apprenant)\n        score = request.data.get('score')\n        if score is None:\n            return Response({'error': 'score requis (0-100)'}, status=400)\n        quiz.soumettre_score(int(score))\n        return Response({",
+        "detail": "courses.views_ai",
+        "documentation": {}
+    },
+    {
+        "label": "logger",
+        "kind": 5,
+        "importPath": "courses.views_ai",
+        "description": "courses.views_ai",
+        "peekOfCode": "logger = logging.getLogger(__name__)\n# ══════════════════════════════════════════════════════════════════════════════\n# HELPERS\n# ══════════════════════════════════════════════════════════════════════════════\ndef _get_bloc_contenu_texte(bloc) -> str:\n    \"\"\"Extrait le texte brut d'un BlocContenu pour le passer à GPT.\"\"\"\n    if not bloc:\n        return ''\n    parts = []\n    for field in ('contenu_html', 'contenu_texte', 'contenu_markdown', 'code_source'):",
+        "detail": "courses.views_ai",
         "documentation": {}
     },
     {
@@ -8318,7 +8695,7 @@
         "kind": 5,
         "importPath": "master_backend_api.settings",
         "description": "master_backend_api.settings",
-        "peekOfCode": "CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True\n# ========================================\n# ANTHROPIC API (Claude AI)\n# ========================================\n# À mettre dans un fichier .env pour plus de sécurité\n# ANTHROPIC_API_KEY = 'votre_cle_api_anthropic'\nUSE_AI_MOCK = True\n# Internationalization\n# https://docs.djangoproject.com/en/4.2/topics/i18n/\nLANGUAGE_CODE = 'en-us'",
+        "peekOfCode": "CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True\n# ========================================\n# ANTHROPIC API (Claude AI)\n# ========================================\n# À mettre dans un fichier .env pour plus de sécurité\n# ANTHROPIC_API_KEY = 'votre_cle_api_anthropic'\nUSE_AI_MOCK = True\n# Internationalization\n# https://docs.djangoproject.com/en/4.2/topics/i18n/\nOPENAI_API_KEY = os.environ.get(\"OPENAI_API_KEY\", \"\")",
         "detail": "master_backend_api.settings",
         "documentation": {}
     },
@@ -8327,7 +8704,25 @@
         "kind": 5,
         "importPath": "master_backend_api.settings",
         "description": "master_backend_api.settings",
-        "peekOfCode": "USE_AI_MOCK = True\n# Internationalization\n# https://docs.djangoproject.com/en/4.2/topics/i18n/\nLANGUAGE_CODE = 'en-us'\nTIME_ZONE = 'UTC'\nUSE_I18N = True\nUSE_TZ = True\n# Static files (CSS, JavaScript, Images)\n# https://docs.djangoproject.com/en/4.2/howto/static-files/\nSTATIC_URL = \"/static/\"",
+        "peekOfCode": "USE_AI_MOCK = True\n# Internationalization\n# https://docs.djangoproject.com/en/4.2/topics/i18n/\nOPENAI_API_KEY = os.environ.get(\"OPENAI_API_KEY\", \"\")\nOPENAI_MODEL = os.environ.get(\"OPENAI_MODEL\", \"gpt-4o\")\nLANGUAGE_CODE = 'en-us'\nTIME_ZONE = 'UTC'\nUSE_I18N = True\nUSE_TZ = True\n# Static files (CSS, JavaScript, Images)",
+        "detail": "master_backend_api.settings",
+        "documentation": {}
+    },
+    {
+        "label": "OPENAI_API_KEY",
+        "kind": 5,
+        "importPath": "master_backend_api.settings",
+        "description": "master_backend_api.settings",
+        "peekOfCode": "OPENAI_API_KEY = os.environ.get(\"OPENAI_API_KEY\", \"\")\nOPENAI_MODEL = os.environ.get(\"OPENAI_MODEL\", \"gpt-4o\")\nLANGUAGE_CODE = 'en-us'\nTIME_ZONE = 'UTC'\nUSE_I18N = True\nUSE_TZ = True\n# Static files (CSS, JavaScript, Images)\n# https://docs.djangoproject.com/en/4.2/howto/static-files/\nSTATIC_URL = \"/static/\"\nSTATIC_ROOT = BASE_DIR / \"staticfiles\"",
+        "detail": "master_backend_api.settings",
+        "documentation": {}
+    },
+    {
+        "label": "OPENAI_MODEL",
+        "kind": 5,
+        "importPath": "master_backend_api.settings",
+        "description": "master_backend_api.settings",
+        "peekOfCode": "OPENAI_MODEL = os.environ.get(\"OPENAI_MODEL\", \"gpt-4o\")\nLANGUAGE_CODE = 'en-us'\nTIME_ZONE = 'UTC'\nUSE_I18N = True\nUSE_TZ = True\n# Static files (CSS, JavaScript, Images)\n# https://docs.djangoproject.com/en/4.2/howto/static-files/\nSTATIC_URL = \"/static/\"\nSTATIC_ROOT = BASE_DIR / \"staticfiles\"\n# Default primary key field type",
         "detail": "master_backend_api.settings",
         "documentation": {}
     },
@@ -8453,7 +8848,7 @@
         "kind": 5,
         "importPath": "master_backend_api.urls",
         "description": "master_backend_api.urls",
-        "peekOfCode": "urlpatterns = [\n    re_path(r'^swagger(?P<format>\\.json|\\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),\n    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),\n    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),\n    path('admin/', admin.site.urls),\n    path('api/', include('users.urls')),\n    path('api/', include('academics.urls')),\n    path('api/', include('locations.urls')),\n    path('api/', include('courses.urls')),\n    path('api/', include('collaborations.urls')),",
+        "peekOfCode": "urlpatterns = [\n    re_path(r'^swagger(?P<format>\\.json|\\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),\n    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),\n    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),\n    path('admin/', admin.site.urls),\n    path('api/', include('users.urls')),\n    path('api/', include('academics.urls')),\n    path('api/', include('locations.urls')),\n    path('api/', include('courses.urls_ai')),\n    path('api/', include('courses.urls')),",
         "detail": "master_backend_api.urls",
         "documentation": {}
     },
@@ -9857,7 +10252,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class IsStaffOrReadOnly(permissions.BasePermission):\n    def has_permission(self, request, view):\n        if request.method in (\"GET\", \"HEAD\", \"OPTIONS\"):\n            return bool(request.user and request.user.is_authenticated)\n        return bool(request.user and request.user.is_authenticated and request.user.is_staff)\nclass IsAdminOrHigherOrSelf(permissions.BasePermission):\n    def has_permission(self, request, view):\n        if not request.user or not request.user.is_authenticated:\n            return False\n        if request.user.is_superuser:",
+        "peekOfCode": "class IsStaffOrReadOnly(permissions.BasePermission):\n    def has_permission(self, request, view):\n        if request.method in (\"GET\", \"HEAD\", \"OPTIONS\"):\n            return bool(request.user and request.user.is_authenticated)\n        return bool(request.user and request.user.is_authenticated and request.user.is_staff)\nclass IsAdminOrHigherOrSelf(permissions.BasePermission):\n    \"\"\"\n    Permission :\n    - SuperUser : accès total\n    - Admin / Responsable : accès total (selon queryset)",
         "detail": "users.views",
         "documentation": {}
     },
@@ -9866,7 +10261,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class IsAdminOrHigherOrSelf(permissions.BasePermission):\n    def has_permission(self, request, view):\n        if not request.user or not request.user.is_authenticated:\n            return False\n        if request.user.is_superuser:\n            return True\n        role_name = request.user.role.name if getattr(request.user, \"role\", None) else None\n        if role_name in [\"Admin\", \"Responsable\"]:\n            return True\n        pk = view.kwargs.get(\"pk\")",
+        "peekOfCode": "class IsAdminOrHigherOrSelf(permissions.BasePermission):\n    \"\"\"\n    Permission :\n    - SuperUser : accès total\n    - Admin / Responsable : accès total (selon queryset)\n    - Utilisateur : peut accéder à SON propre objet (retrieve/update partiel si tu veux)\n    \"\"\"\n    def has_permission(self, request, view):\n        if not request.user or not request.user.is_authenticated:\n            return False",
         "detail": "users.views",
         "documentation": {}
     },
