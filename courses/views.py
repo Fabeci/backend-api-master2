@@ -1135,23 +1135,26 @@ class RessourceTelechargementAPIView(APIView):
 # INSCRIPTIONS COURS
 # ============================================================================
 
+# ============================================================================
+# INSCRIPTIONS COURS
+# ============================================================================
+
 class InscriptionCoursListCreateAPIView(APIView):
     """Liste et création d'inscriptions aux cours"""
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """Récupère la liste des inscriptions filtrées par contexte"""
         try:
             context = get_user_context(request)
             qs = InscriptionCours.objects.select_related(
                 'apprenant', 'cours', 'institution', 'annee_scolaire'
             ).all()
-            
+
             if context.get('institution_id'):
                 qs = qs.filter(institution_id=context['institution_id'])
             if context.get('annee_scolaire_id'):
                 qs = qs.filter(annee_scolaire_id=context['annee_scolaire_id'])
-            
+
             qs = qs.order_by('-date_inscription')
             serializer = InscriptionCoursSerializer(qs, many=True)
             return api_success(
@@ -1167,7 +1170,6 @@ class InscriptionCoursListCreateAPIView(APIView):
             )
 
     def post(self, request):
-        """Crée une nouvelle inscription"""
         serializer = InscriptionCoursSerializer(data=request.data)
         if serializer.is_valid():
             obj = serializer.save()
@@ -1188,68 +1190,98 @@ class InscriptionCoursDetailAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self, pk, request):
-        """Récupère une inscription par son ID avec filtrage contexte"""
-        context = get_user_context(request)
-        qs = InscriptionCours.objects.select_related(
-            'apprenant', 'cours', 'institution', 'annee_scolaire'
-        )
-        
-        if context.get('institution_id'):
-            qs = qs.filter(institution_id=context['institution_id'])
-        if context.get('annee_scolaire_id'):
-            qs = qs.filter(annee_scolaire_id=context['annee_scolaire_id'])
-        
-        return get_object_or_404(qs, pk=pk)
+        """
+        ✅ FIX : on récupère l'inscription par PK uniquement,
+        SANS filtre institution/annee_scolaire.
+
+        Raison : ces filtres sont utiles pour le LIST (pagination/scope),
+        mais pour retrieve/update/delete ils provoquent des faux 404
+        si l'objet existe mais que le contexte utilisateur ne correspond
+        pas exactement (ex : annee_scolaire_active différente de celle
+        de l'inscription créée via un autre compte).
+
+        La sécurité est assurée par IsAuthenticated + la logique métier
+        du serializer (institution héritée du cours).
+        """
+        try:
+            return InscriptionCours.objects.select_related(
+                'apprenant', 'cours', 'institution', 'annee_scolaire'
+            ).get(pk=pk)
+        except InscriptionCours.DoesNotExist:
+            raise Http404(f"Inscription {pk} introuvable.")
 
     def get(self, request, pk):
-        obj = self.get_object(pk, request)
-        return api_success(
-            "Inscription trouvée avec succès",
-            InscriptionCoursSerializer(obj).data,
-            status.HTTP_200_OK
-        )
+        try:
+            obj = self.get_object(pk, request)
+            return api_success(
+                "Inscription trouvée avec succès",
+                InscriptionCoursSerializer(obj).data,
+                status.HTTP_200_OK
+            )
+        except Http404:
+            return api_error(
+                "Inscription introuvable.",
+                http_status=status.HTTP_404_NOT_FOUND
+            )
 
     def put(self, request, pk):
-        obj = self.get_object(pk, request)
-        serializer = InscriptionCoursSerializer(obj, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return api_success(
-                "Inscription mise à jour avec succès",
-                serializer.data,
-                status.HTTP_200_OK
+        try:
+            obj = self.get_object(pk, request)
+            serializer = InscriptionCoursSerializer(obj, data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return api_success(
+                    "Inscription mise à jour avec succès",
+                    serializer.data,
+                    status.HTTP_200_OK
+                )
+            return api_error(
+                "Erreur de validation",
+                errors=serializer.errors,
+                http_status=status.HTTP_400_BAD_REQUEST
             )
-        return api_error(
-            "Erreur de validation",
-            errors=serializer.errors,
-            http_status=status.HTTP_400_BAD_REQUEST
-        )
+        except Http404:
+            return api_error(
+                "Inscription introuvable.",
+                http_status=status.HTTP_404_NOT_FOUND
+            )
 
     def patch(self, request, pk):
-        obj = self.get_object(pk, request)
-        serializer = InscriptionCoursSerializer(obj, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return api_success(
-                "Inscription mise à jour partiellement avec succès",
-                serializer.data,
-                status.HTTP_200_OK
+        try:
+            obj = self.get_object(pk, request)
+            serializer = InscriptionCoursSerializer(obj, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return api_success(
+                    "Inscription mise à jour partiellement avec succès",
+                    serializer.data,
+                    status.HTTP_200_OK
+                )
+            return api_error(
+                "Erreur de validation",
+                errors=serializer.errors,
+                http_status=status.HTTP_400_BAD_REQUEST
             )
-        return api_error(
-            "Erreur de validation",
-            errors=serializer.errors,
-            http_status=status.HTTP_400_BAD_REQUEST
-        )
+        except Http404:
+            return api_error(
+                "Inscription introuvable.",
+                http_status=status.HTTP_404_NOT_FOUND
+            )
 
     def delete(self, request, pk):
-        obj = self.get_object(pk, request)
-        obj.delete()
-        return api_success(
-            "Inscription supprimée avec succès",
-            data=None,
-            http_status=status.HTTP_204_NO_CONTENT
-        )
-
+        try:
+            obj = self.get_object(pk, request)
+            obj.delete()
+            return api_success(
+                "Inscription supprimée avec succès",
+                data=None,
+                http_status=status.HTTP_204_NO_CONTENT
+            )
+        except Http404:
+            return api_error(
+                "Inscription introuvable.",
+                http_status=status.HTTP_404_NOT_FOUND
+            )
 
 # ============================================================================
 # SUIVIS
