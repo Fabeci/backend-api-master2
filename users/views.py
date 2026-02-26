@@ -140,29 +140,33 @@ class IsStaffOrReadOnly(permissions.BasePermission):
 class IsAdminOrHigherOrSelf(permissions.BasePermission):
     """
     Permission :
-    - SuperUser : accès total
-    - Admin / Responsable : accès total (selon queryset)
-    - Utilisateur : peut accéder à SON propre objet (retrieve/update partiel si tu veux)
+    - SuperUser             : accès total (lecture + écriture)
+    - Admin / Responsable   : accès total (selon queryset)
+    - Tout utilisateur auth : lecture seule (GET, HEAD, OPTIONS)
+    - Utilisateur lui-même  : peut modifier son propre profil
     """
+
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
 
         if request.user.is_superuser:
             return True
-        
+
         role_name = request.user.role.name if request.user.role else None
         if role_name in ['Admin', 'Responsable']:
             return True
 
-        # ✅ Autoriser la lecture de son profil (detail route)
-        # (on autorise seulement si on est sur une route avec pk)
+        # ✅ Lecture autorisée pour TOUS les utilisateurs authentifiés
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        # ✅ Écriture autorisée uniquement sur son propre profil
         pk = view.kwargs.get('pk')
         if pk is not None and str(pk) == str(request.user.pk):
             return True
 
         return False
-
     
 # =========================
 # Helpers internes (évite les 500 AttributeError)
@@ -299,9 +303,21 @@ class FormateurViewSet(BaseModelViewSet):
             return Formateur.objects.all()
 
         inst = _user_institution(user)
+        role_name = _role_name(user)
+
+        # ✅ Admin / Responsable / Formateur : limité à leur institution
+        if role_name in ['Admin', 'Responsable', 'Formateur']:
+            if inst:
+                return Formateur.objects.filter(institution=inst)
+            return Formateur.objects.none()
+
+        # ✅ Apprenant (et autres rôles authentifiés) :
+        # Lecture seule autorisée → on expose les formateurs de leur institution
+        # pour permettre l'affichage de la fiche enseignant dans les cours.
         if inst:
             return Formateur.objects.filter(institution=inst)
 
+        # Aucune institution → aucun résultat
         return Formateur.objects.none()
 
     def perform_create(self, serializer):
@@ -316,33 +332,6 @@ class FormateurViewSet(BaseModelViewSet):
             serializer.save(**kwargs)
         else:
             serializer.save()
-
-    def retrieve(self, request, *args, **kwargs):
-        user = request.user
-        if user.is_superuser:
-            return super().retrieve(request, *args, **kwargs)
-
-        if hasattr(user, "role") and str(user.role) in ["Admin", "Responsable"]:
-            return super().retrieve(request, *args, **kwargs)
-
-        # autoriser self profile
-        if str(user.pk) == str(kwargs.get("pk")):
-            return super().retrieve(request, *args, **kwargs)
-
-        raise PermissionDenied("Accès refusé.")
-
-        if user.is_superuser:
-            return super().retrieve(request, *args, **kwargs)
-
-        role_name = _role_name(user)
-        if role_name in ["Admin", "Responsable"]:
-            return super().retrieve(request, *args, **kwargs)
-
-        if str(user.pk) == str(kwargs.get("pk")):
-            return super().retrieve(request, *args, **kwargs)
-
-        raise PermissionDenied("Accès refusé.")
-
 
 class ResponsableAcademiqueViewSet(BaseModelViewSet):
     queryset = ResponsableAcademique.objects.all()
