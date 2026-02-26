@@ -495,21 +495,23 @@ class GroupeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Groupe
-        fields = ["id", "nom", "description", "enseignants"]
+        fields = ["id", "nom", "description", "institution", "classe", "enseignants", "annee_scolaire"]
 
 
 class ClasseSerializer(serializers.ModelSerializer):
     # ===== WRITE (IDs) =====
     filieres = serializers.PrimaryKeyRelatedField(queryset=Filiere.objects.all(), many=True)
     matieres = serializers.PrimaryKeyRelatedField(queryset=Matiere.objects.all(), many=True)
+    groupes  = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
 
-    groupes = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
     # ===== READ (détails) =====
-    filieres_data = FiliereSerializer(source="filieres", many=True, read_only=True)
-    matieres_data = MatiereSerializer(source="matieres", many=True, read_only=True)
+    filieres_data  = FiliereSerializer(source="filieres", many=True, read_only=True)
+    matieres_data  = MatiereSerializer(source="matieres", many=True, read_only=True)
+    groupes_data   = GroupeSerializer(source="groupes",   many=True, read_only=True)
 
-    # ✅ ICI il manquait many=True -> sinon RelatedManager.nom
-    groupes_data = GroupeSerializer(source="groupes", many=True, read_only=True)
+    # ✅ Labels lecture seule pour annee_scolaire et institution
+    annee_scolaire_display = serializers.StringRelatedField(source="annee_scolaire", read_only=True)
+    institution_display    = serializers.StringRelatedField(source="institution",    read_only=True)
 
     class Meta:
         model = Classe
@@ -518,6 +520,14 @@ class ClasseSerializer(serializers.ModelSerializer):
             "nom",
             "description",
             "date_creation",
+
+            # ✅ FK en écriture (acceptent un ID entier)
+            "annee_scolaire",
+            "institution",
+
+            # ✅ Labels en lecture
+            "annee_scolaire_display",
+            "institution_display",
 
             # write
             "filieres",
@@ -529,13 +539,23 @@ class ClasseSerializer(serializers.ModelSerializer):
             "matieres_data",
             "groupes_data",
         ]
-        read_only_fields = ["id", "date_creation", "groupes"]   
-        
+        read_only_fields = ["id", "date_creation", "groupes"]
+               
 class InscriptionSerializer(serializers.ModelSerializer):
-    apprenant = serializers.StringRelatedField()  # Affiche les informations de l'apprenant (par exemple, son nom)
-    institution = serializers.StringRelatedField()  # Affiche le nom de l'institution
-    annee_scolaire = serializers.StringRelatedField()  # Affiche l'année scolaire associée
+    # Champs en lecture seule (affichage)
+    apprenant_display      = serializers.StringRelatedField(source='apprenant',      read_only=True)
+    institution_display    = serializers.StringRelatedField(source='institution',    read_only=True)
+    annee_scolaire_display = serializers.StringRelatedField(source='annee_scolaire', read_only=True)
+    classe_display         = serializers.StringRelatedField(source='classe',         read_only=True)
 
     class Meta:
-        model = Inscription
-        fields = ['id', 'apprenant', 'institution', 'annee_scolaire', 'statut', 'statut_paiement']
+        model  = Inscription
+        fields = [
+            'id',
+            # IDs en écriture
+            'apprenant', 'institution', 'annee_scolaire', 'classe',
+            # Labels en lecture
+            'apprenant_display', 'institution_display',
+            'annee_scolaire_display', 'classe_display',
+            'statut', 'statut_paiement',
+        ]

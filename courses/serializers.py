@@ -379,33 +379,55 @@ class SequenceDetailSerializer(serializers.ModelSerializer):
 # ============================================================================
 
 class InscriptionCoursSerializer(serializers.ModelSerializer):
+    # lecture nested
     apprenant = ApprenantSerializer(read_only=True)
     cours = CoursSerializer(read_only=True)
+
     institution_nom = serializers.CharField(source="institution.nom", read_only=True)
     annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
-    
-    # Pour la création
+
+    # ✅ écriture : apprenant_id / cours_id
     apprenant_id = serializers.PrimaryKeyRelatedField(
         queryset=Apprenant.objects.all(),
         source='apprenant',
-        write_only=True
+        write_only=True,
+        required=True,
     )
     cours_id = serializers.PrimaryKeyRelatedField(
         queryset=Cours.objects.all(),
         source='cours',
-        write_only=True
+        write_only=True,
+        required=True,
     )
+
+    # ✅ forcer read_only (et donc non requis)
+    institution = serializers.PrimaryKeyRelatedField(read_only=True)
+    annee_scolaire = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = InscriptionCours
         fields = [
-            'id', 'apprenant', 'apprenant_id', 'cours', 'cours_id',
+            'id',
+            'apprenant', 'apprenant_id',
+            'cours', 'cours_id',
             'date_inscription', 'statut',
             'institution', 'institution_nom',
             'annee_scolaire', 'annee_scolaire_nom'
         ]
-        read_only_fields = ['institution', 'annee_scolaire']
+        extra_kwargs = {
+            'statut': {'required': False},  # default = inscrit
+        }
 
+    def create(self, validated_data):
+        """
+        ✅ Héritage automatique AVANT save()
+        (utile si tu veux que l’objet soit cohérent même avant le save custom).
+        """
+        cours = validated_data.get('cours')
+        if cours:
+            validated_data['institution'] = cours.institution
+            validated_data['annee_scolaire'] = cours.annee_scolaire
+        return super().create(validated_data)
 
 class SuiviSerializer(serializers.ModelSerializer):
     apprenant = ApprenantSerializer(read_only=True)
