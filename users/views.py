@@ -10,6 +10,7 @@ from users.permissions import IsAdminOrHigher
 from users.utils import BaseModelViewSet
 
 from .serializers import (
+    ModifierMotDePasseSerializer,
     RegisterSerializer,
     VerifyEmailSerializer,
     ResendCodeSerializer,
@@ -399,3 +400,24 @@ class ResponsableAcademiqueViewSet(BaseModelViewSet):
             serializer.save(**kwargs)
         else:
             serializer.save()
+
+class ChangePasswordAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = ModifierMotDePasseSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        if not serializer.is_valid():
+            return api_error(
+                message="Erreur de validation",
+                errors=serializer.errors,
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer.save()
+        return api_success(
+            "Mot de passe modifié avec succès. Veuillez vous reconnecter.",
+            data=None,
+            http_status=status.HTTP_200_OK,
+        )

@@ -2,6 +2,7 @@ from django.urls import path, include
 from django.contrib.auth import views as auth_views
 from rest_framework.routers import DefaultRouter
 from .views import (
+    ChangePasswordAPIView,
     LogoutAPIView,
     RegisterAPIView,
     ResendCodeAPIView,
@@ -31,6 +32,7 @@ urlpatterns = [
     path('verify-email/', VerifyEmailAPIView.as_view(), name='verify_email'),
     path('resend-code/', ResendCodeAPIView.as_view(), name='resend_code'),
     path('logout/', LogoutAPIView.as_view(), name='logout'),
+    path('change-password/', ChangePasswordAPIView.as_view(), name='change-password'),
 
     path('', include(router.urls)),
 

@@ -729,3 +729,34 @@ class ResponsableAcademiqueCrudSerializer(BaseUserCrudSerializer):
         instance.role = _get_or_create_role("ResponsableAcademique")
         instance.save()
         return instance
+
+
+class ModifierMotDePasseSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True, min_length=8)
+
+    def validate_current_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Le mot de passe actuel est incorrect.")
+        return value
+
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError({
+                "confirm_password": "Les deux nouveaux mots de passe ne correspondent pas."
+            })
+        if data['current_password'] == data['new_password']:
+            raise serializers.ValidationError({
+                "new_password": "Le nouveau mot de passe doit être différent de l'actuel."
+            })
+        return data
+
+    def save(self):
+        user = self.context['request'].user
+        user.set_password(self.validated_data['new_password'])
+        user.save(update_fields=['password'])
+        # Invalider l'ancien token pour forcer une nouvelle connexion
+        Token.objects.filter(user=user).delete()
+        return user
