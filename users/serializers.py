@@ -321,46 +321,86 @@ class FormateurSerializer(serializers.ModelSerializer):
 # =============================================================================
 
 class BaseUserCrudSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=False, allow_blank=True, min_length=8)
+    password = serializers.CharField(
+        write_only=True, required=False, allow_blank=True, min_length=8
+    )
 
-    pays_residence = PaysSerializer(read_only=True)
+    pays_residence    = PaysSerializer(read_only=True)
     pays_residence_id = serializers.PrimaryKeyRelatedField(
         source="pays_residence",
         queryset=Pays.objects.all(),
         write_only=True, required=False, allow_null=True,
     )
 
-    # ✅ NOUVEAU
-    annee_scolaire_active = serializers.SerializerMethodField(read_only=True)
+    annee_scolaire_active    = serializers.SerializerMethodField(read_only=True)
     annee_scolaire_active_id = serializers.PrimaryKeyRelatedField(
         source="annee_scolaire_active",
         queryset=AnneeScolaire.objects.all(),
         write_only=True, required=False, allow_null=True,
     )
 
+    # ✅ Déclaré explicitement → évite le KeyError DRF sur la FK
+    role = serializers.SerializerMethodField(read_only=True)
+
+    # ✅ Déclaré explicitement → date_modification n'est pas auto-détecté sans ça
+    date_joined       = serializers.DateTimeField(read_only=True)
+    date_modification = serializers.DateTimeField(read_only=True)
+
+    # ✅ URL absolue photo
+    photo = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
-        model = User
+        model  = User
         fields = [
-            "id", "email", "nom", "prenom", "telephone",
+            "id",
+            "email", "nom", "prenom", "telephone",
+            "photo",
+            "role",
             "pays_residence", "pays_residence_id",
-            "annee_scolaire_active",      # lecture
-            "annee_scolaire_active_id",   # écriture
-            "is_active", "password",
+            "annee_scolaire_active", "annee_scolaire_active_id",
+            "is_active", "is_staff", "is_superuser",
+            "date_joined", "date_modification",
+            "password",
         ]
-        read_only_fields = ["id", "pays_residence", "annee_scolaire_active"]
+        read_only_fields = [
+            "id",
+            "photo",
+            "role",
+            "pays_residence",
+            "annee_scolaire_active",
+            "date_joined",
+            "date_modification",
+            "is_staff",
+            "is_superuser",
+        ]
+
+    def get_role(self, obj):
+        """Retourne le nom du rôle en string — jamais l'objet FK brut."""
+        return getattr(obj.role, 'name', None) if obj.role else None
 
     def get_annee_scolaire_active(self, obj):
         if not obj.annee_scolaire_active:
             return None
         a = obj.annee_scolaire_active
-        return {"id": a.id, "libelle": getattr(a, 'libelle', str(a))}
-    
+        return {
+            "id":      a.id,
+            "libelle": getattr(a, 'libelle', str(a)),
+        }
+
+    def get_photo(self, obj):
+        if not obj.photo:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.photo.url)
+        return obj.photo.url
+
     def _apply_password(self, instance, validated_data):
         password = validated_data.pop("password", None)
         if password:
             instance.set_password(password)
         return instance
-
+       
 class AdminCrudSerializer(BaseUserCrudSerializer):
     # ✅ LECTURE : Objet institution complet via SerializerMethodField
     institution = serializers.SerializerMethodField(read_only=True)

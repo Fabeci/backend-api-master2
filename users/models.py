@@ -53,6 +53,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     nom = models.CharField(max_length=30)
     prenom = models.CharField(max_length=30)
     telephone = models.CharField(max_length=15, blank=True, null=True)
+    photo = models.ImageField(
+        upload_to='photos/profils/',
+        null=True,
+        blank=True,
+        verbose_name="Photo de profil"
+    )
     pays_residence = models.ForeignKey(Pays, on_delete=models.CASCADE, related_name='users', null=True)
     is_active = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=now)
