@@ -16,6 +16,7 @@ urlpatterns = [
 
     path('institutions/', views.InstitutionAPIView.as_view(), name='institution-list-create'),
     path('institutions/<int:pk>/', views.InstitutionAPIView.as_view(), name='institution-detail'),
+    path('institutions/<int:pk>/upload-logo/', views.InstitutionLogoUploadAPIView.as_view(), name='institution-upload-logo'),
 
     path('filieres/', views.FiliereListCreateAPIView.as_view(), name='filiere-list-create'),
     path('filieres/<int:pk>/', views.FiliereDetailAPIView.as_view(), name='filiere-detail'),

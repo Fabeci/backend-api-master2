@@ -72,6 +72,7 @@ class InstitutionSerializer(serializers.ModelSerializer):
     # ===== LECTURE : objets complets =====
     pays = PaysSerializer(read_only=True)
     admin_account_data = serializers.SerializerMethodField(read_only=True)
+    logo_url           = serializers.SerializerMethodField(read_only=True)  # ✅ URL absolue
 
     # ===== ÉCRITURE : IDs =====
     pays_id = serializers.PrimaryKeyRelatedField(
@@ -80,6 +81,7 @@ class InstitutionSerializer(serializers.ModelSerializer):
         write_only=True,
         required=True,
     )
+    logo              = serializers.ImageField(write_only=True, required=False, allow_null=True)
 
     # Admin: deux modes possibles
     admin_account = AdminAccountInlineSerializer(write_only=True, required=False)
@@ -97,6 +99,7 @@ class InstitutionSerializer(serializers.ModelSerializer):
             "telephone_2",
             "email",
             "logo",
+            "logo_url",
             "description",
             "statut",
             "type_institution",
@@ -109,6 +112,17 @@ class InstitutionSerializer(serializers.ModelSerializer):
             "admin_account_data",
         ]
         read_only_fields = ["id", "date_creation"]
+        
+    def get_logo_url(self, obj):
+        """Retourne toujours une URL absolue ou None."""
+        if not obj.logo:
+            return None
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.logo.url)
+        from django.conf import settings
+        base = getattr(settings, "SITE_URL", "http://localhost:8000").rstrip("/")
+        return f"{base}{settings.MEDIA_URL}{obj.logo.name}"
 
     def get_admin_account_data(self, obj):
         # 1) FK directe: institution.admin

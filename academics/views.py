@@ -11,6 +11,7 @@ from rest_framework import status, permissions
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
+from rest_framework.parsers import MultiPartParser, FormParser
 from academics.models import (
     Classe, Departement, Filiere, Groupe,
     Inscription, Institution, Matiere, Specialite, DomaineEtude
@@ -144,6 +145,61 @@ class InstitutionAPIView(APIView):
         institution.delete()
         return api_success("Institution supprimée", data=None, http_status=status.HTTP_204_NO_CONTENT)
 
+
+# À ajouter dans academics/views.py
+
+class InstitutionLogoUploadAPIView(APIView):
+    """
+    PATCH /api/institutions/<pk>/upload-logo/
+    Upload ou suppression du logo d'une institution.
+    Seul l'Admin de l'institution ou un SuperUser peut modifier le logo.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]   # ← parsers multipart explicites
+
+    def patch(self, request, pk):
+        institution = get_object_or_404(Institution, pk=pk)
+
+        # Vérification des droits
+        user = request.user
+        role_name = getattr(getattr(user, "role", None), "name", None)
+        is_admin_of_inst = (
+            role_name == "Admin"
+            and hasattr(user, "institution")
+            and user.institution_id == institution.id
+        )
+        if not user.is_superuser and not is_admin_of_inst:
+            return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
+
+        # Upload
+        logo_file = request.FILES.get("logo")
+        if logo_file:
+            # Supprimer l'ancien logo s'il existe
+            if institution.logo:
+                institution.logo.delete(save=False)
+            institution.logo = logo_file
+            institution.save(update_fields=["logo"])
+
+            serializer = InstitutionSerializer(institution, context={"request": request})
+            return api_success(
+                "Logo mis à jour",
+                {"logo_url": serializer.data.get("logo_url")},
+                status.HTTP_200_OK,
+            )
+
+        # Suppression du logo
+        if "remove_logo" in request.data and request.data["remove_logo"] in ("1", "true", "True"):
+            if institution.logo:
+                institution.logo.delete(save=False)
+                institution.logo = None
+                institution.save(update_fields=["logo"])
+            return api_success("Logo supprimé", {"logo_url": None}, status.HTTP_200_OK)
+
+        return api_error(
+            "Aucun fichier fourni. Envoyez 'logo' (fichier) ou 'remove_logo=1'.",
+            http_status=status.HTTP_400_BAD_REQUEST,
+        )
+        
 # ============================================================================
 # GROUPE
 # ============================================================================
