@@ -117,9 +117,16 @@ class Classe(models.Model):
         ]
 
     def clean(self):
-        # Cohérence institution/année
-        if self.annee_scolaire and self.annee_scolaire.institution_id != self.institution_id:
-            raise ValidationError("L'année scolaire ne correspond pas à l'institution de la classe.")
+        # Cohérence institution/année — ne vérifier que si les deux sont renseignés
+        if (
+            self.annee_scolaire_id
+            and self.institution_id
+            and self.annee_scolaire.institution_id is not None
+            and self.annee_scolaire.institution_id != self.institution_id
+        ):
+            raise ValidationError(
+                "L'année scolaire ne correspond pas à l'institution de la classe."
+            )
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -176,13 +183,19 @@ class Groupe(models.Model):
         ]
 
     def clean(self):
-        # Cohérence institution/année avec classe et année scolaire
         if self.classe:
             if self.classe.institution_id != self.institution_id:
                 raise ValidationError("Le groupe et sa classe doivent appartenir à la même institution.")
             if self.classe.annee_scolaire_id != self.annee_scolaire_id:
                 raise ValidationError("Le groupe et sa classe doivent appartenir à la même année scolaire.")
-        if self.annee_scolaire and self.annee_scolaire.institution_id != self.institution_id:
+        
+        # ✅ Ne vérifier que si les deux sont renseignés ET que l'année a bien une institution
+        if (
+            self.annee_scolaire_id
+            and self.institution_id
+            and self.annee_scolaire.institution_id is not None
+            and self.annee_scolaire.institution_id != self.institution_id
+        ):
             raise ValidationError("L'année scolaire du groupe ne correspond pas à son institution.")
 
     def save(self, *args, **kwargs):
@@ -253,14 +266,23 @@ class Inscription(models.Model):
         ]
 
     def clean(self):
-        # Cohérence inscription vs institution/année
-        if self.annee_scolaire and self.annee_scolaire.institution_id != self.institution_id:
+        # ✅ Ne vérifier que si les deux sont renseignés ET que l'année a une institution
+        if (
+            self.annee_scolaire_id
+            and self.institution_id
+            and self.annee_scolaire.institution_id is not None
+            and self.annee_scolaire.institution_id != self.institution_id
+        ):
             raise ValidationError("L'année scolaire de l'inscription ne correspond pas à l'institution.")
 
         if self.classe:
             if self.classe.institution_id != self.institution_id:
                 raise ValidationError("La classe choisie n'appartient pas à la même institution que l'inscription.")
-            if self.classe.annee_scolaire_id != self.annee_scolaire_id:
+            if (
+                self.classe.annee_scolaire_id
+                and self.annee_scolaire_id
+                and self.classe.annee_scolaire_id != self.annee_scolaire_id
+            ):
                 raise ValidationError("La classe choisie n'appartient pas à la même année scolaire que l'inscription.")
 
     def save(self, *args, **kwargs):

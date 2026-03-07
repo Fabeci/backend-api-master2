@@ -12,6 +12,7 @@ from users.permissions import IsAdminOrHigher
 from users.utils import BaseModelViewSet
 
 from .serializers import (
+    ModifierMotDePasseSerializer,
     RegisterSerializer,
     VerifyEmailSerializer,
     ResendCodeSerializer,
@@ -152,26 +153,37 @@ class IsStaffOrReadOnly(permissions.BasePermission):
 
 class IsAdminOrHigherOrSelf(permissions.BasePermission):
     """
-    SuperUser / Admin / Responsable : accès total.
-    Autres : uniquement leur propre objet (pk == user.pk).
+    Permission :
+    - SuperUser             : accès total (lecture + écriture)
+    - Admin / Responsable   : accès total (selon queryset)
+    - Tout utilisateur auth : lecture seule (GET, HEAD, OPTIONS)
+    - Utilisateur lui-même  : peut modifier son propre profil
     """
+
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
         if request.user.is_superuser:
             return True
-        role = _role_name(request.user)
-        if role in ['Admin', 'Responsable']:
+
+        role_name = request.user.role.name if request.user.role else None
+        if role_name in ['Admin', 'Responsable']:
             return True
+
+        # ✅ Lecture autorisée pour TOUS les utilisateurs authentifiés
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        # ✅ Écriture autorisée uniquement sur son propre profil
         pk = view.kwargs.get('pk')
         if pk is not None and str(pk) == str(request.user.pk):
             return True
         return False
+    
+# =========================
+# Helpers internes (évite les 500 AttributeError)
+# =========================
 
-
-# =============================================================================
-# Mixin partagé : upload_photo + change_password
-# =============================================================================
 
 # ─── Mixin partagé : upload_photo + change_password ──────────────────────────
 
@@ -272,25 +284,25 @@ class AdminViewSet(ProfileActionsMixin, BaseModelViewSet):
 class ParentViewSet(ProfileActionsMixin, BaseModelViewSet):
     queryset           = Parent.objects.all()
     serializer_class   = ParentCrudSerializer
-    permission_classes = [IsAdminOrHigher]
+    permission_classes = [IsAdminOrHigherOrSelf]  # ✅ au lieu de IsAdminOrHigher
 
     def get_queryset(self):
-        user = self.request.user
+        user      = self.request.user
+        role_name = _role_name(user)
+        inst      = _user_institution(user)
+
         if user.is_superuser:
             return Parent.objects.all()
-        inst = _user_institution(user)
-        if inst:
-            return Parent.objects.filter(institution=inst)
+
+        # ✅ Parent peut voir/modifier son profil
+        if role_name == "Parent":
+            return Parent.objects.filter(pk=user.pk)
+
+        # ✅ Admin / Responsable : parents de leur institution
+        if role_name in ["Admin", "Responsable"]:
+            return Parent.objects.filter(institution=inst) if inst else Parent.objects.none()
+
         return Parent.objects.none()
-
-    def perform_create(self, serializer):
-        user = self.request.user
-        inst = _user_institution(user)
-        if not user.is_superuser and inst:
-            serializer.save(institution=inst)
-        else:
-            serializer.save()
-
 
 class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):
     queryset           = Apprenant.objects.all()
@@ -348,13 +360,26 @@ class FormateurViewSet(ProfileActionsMixin, BaseModelViewSet):
         if user.is_superuser:
             return Formateur.objects.all()
 
-        if role_name in ["Admin", "Responsable"]:
-            return Formateur.objects.filter(institution=inst) if inst else Formateur.objects.none()
 
         # ✅ Un formateur peut voir et modifier son propre profil
         if role_name == "Formateur":
             return Formateur.objects.filter(pk=user.pk)
+        inst = _user_institution(user)
+        role_name = _role_name(user)
 
+        # ✅ Admin / Responsable / Formateur : limité à leur institution
+        if role_name in ['Admin', 'Responsable', 'Formateur']:
+            if inst:
+                return Formateur.objects.filter(institution=inst)
+            return Formateur.objects.none()
+
+        # ✅ Apprenant (et autres rôles authentifiés) :
+        # Lecture seule autorisée → on expose les formateurs de leur institution
+        # pour permettre l'affichage de la fiche enseignant dans les cours.
+        if inst:
+            return Formateur.objects.filter(institution=inst)
+
+        # Aucune institution → aucun résultat
         return Formateur.objects.none()
 
     def perform_create(self, serializer):
@@ -373,15 +398,27 @@ class FormateurViewSet(ProfileActionsMixin, BaseModelViewSet):
 class ResponsableAcademiqueViewSet(ProfileActionsMixin, BaseModelViewSet):
     queryset           = ResponsableAcademique.objects.all()
     serializer_class   = ResponsableAcademiqueCrudSerializer
-    permission_classes = [IsAdminOrHigher]
+
+    # ✅ RA peut modifier son profil (self), Admin/SuperUser gardent le contrôle
+    permission_classes = [IsAdminOrHigherOrSelf]   # ← au lieu de IsAdminOrHigher
 
     def get_queryset(self):
-        user = self.request.user
+        user      = self.request.user
+        role_name = _role_name(user)
+        inst      = _user_institution(user)
+
         if user.is_superuser:
             return ResponsableAcademique.objects.all()
-        inst = _user_institution(user)
-        if inst:
-            return ResponsableAcademique.objects.filter(institution=inst)
+
+        # ✅ Responsable académique : voit/modifie son propre profil
+        if role_name in ["Responsable", "ResponsableAcademique", "Responsable Académique"]:
+            return ResponsableAcademique.objects.filter(pk=user.pk)
+
+        # ✅ Admin/Responsable (selon ta politique) : RA de leur institution
+        # (si tu veux que Responsable puisse aussi voir tous les RA, laisse "Responsable" ici)
+        if role_name in ["Admin", "Responsable"]:
+            return ResponsableAcademique.objects.filter(institution=inst) if inst else ResponsableAcademique.objects.none()
+
         return ResponsableAcademique.objects.none()
 
     def perform_create(self, serializer):
@@ -395,3 +432,24 @@ class ResponsableAcademiqueViewSet(ProfileActionsMixin, BaseModelViewSet):
             serializer.save(**kwargs)
         else:
             serializer.save()
+            
+class ChangePasswordAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = ModifierMotDePasseSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        if not serializer.is_valid():
+            return api_error(
+                message="Erreur de validation",
+                errors=serializer.errors,
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer.save()
+        return api_success(
+            "Mot de passe modifié avec succès. Veuillez vous reconnecter.",
+            data=None,
+            http_status=status.HTTP_200_OK,
+        )

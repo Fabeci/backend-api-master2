@@ -386,7 +386,7 @@ class InscriptionCoursSerializer(serializers.ModelSerializer):
     institution_nom = serializers.CharField(source="institution.nom", read_only=True)
     annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
 
-    # ✅ écriture : apprenant_id / cours_id
+    # écriture : apprenant_id / cours_id
     apprenant_id = serializers.PrimaryKeyRelatedField(
         queryset=Apprenant.objects.all(),
         source='apprenant',
@@ -400,7 +400,7 @@ class InscriptionCoursSerializer(serializers.ModelSerializer):
         required=True,
     )
 
-    # ✅ forcer read_only (et donc non requis)
+    # read_only (hérités du cours)
     institution = serializers.PrimaryKeyRelatedField(read_only=True)
     annee_scolaire = serializers.PrimaryKeyRelatedField(read_only=True)
 
@@ -415,20 +415,32 @@ class InscriptionCoursSerializer(serializers.ModelSerializer):
             'annee_scolaire', 'annee_scolaire_nom'
         ]
         extra_kwargs = {
-            'statut': {'required': False},  # default = inscrit
+            'statut': {'required': False},
+            'date_inscription': {'required': False},
         }
 
-    def create(self, validated_data):
+    def _inherit_context_from_cours(self, validated_data):
         """
-        ✅ Héritage automatique AVANT save()
-        (utile si tu veux que l’objet soit cohérent même avant le save custom).
+        Force institution + annee_scolaire depuis le cours
+        (évite les inscriptions avec institution_id NULL -> invisibles côté LIST).
         """
-        cours = validated_data.get('cours')
+        cours = validated_data.get('cours') or getattr(self.instance, 'cours', None)
         if cours:
-            validated_data['institution'] = cours.institution
-            validated_data['annee_scolaire'] = cours.annee_scolaire
+            # Si ton modèle InscriptionCours autorise null=True, ça évite de mettre None
+            if getattr(cours, 'institution_id', None):
+                validated_data['institution'] = cours.institution
+            if getattr(cours, 'annee_scolaire_id', None):
+                validated_data['annee_scolaire'] = cours.annee_scolaire
+        return validated_data
+
+    def create(self, validated_data):
+        validated_data = self._inherit_context_from_cours(validated_data)
         return super().create(validated_data)
 
+    def update(self, instance, validated_data):
+        validated_data = self._inherit_context_from_cours(validated_data)
+        return super().update(instance, validated_data)
+    
 class SuiviSerializer(serializers.ModelSerializer):
     apprenant = ApprenantSerializer(read_only=True)
     cours = CoursSerializer(read_only=True)

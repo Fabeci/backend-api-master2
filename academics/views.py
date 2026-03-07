@@ -9,7 +9,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.shortcuts import get_object_or_404
+
 from rest_framework.parsers import MultiPartParser, FormParser
+
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from academics.models import (
     Classe, Departement, Filiere, Groupe,
     Inscription, Institution, Matiere, Specialite, DomaineEtude
@@ -18,6 +21,7 @@ from academics.serializers import (
     ClasseSerializer, DepartementSerializer, FiliereSerializer,
     GroupeSerializer, InscriptionSerializer, InstitutionSerializer
 )
+
 
 # Import des utilitaires de filtrage
 from .utils import (
@@ -59,38 +63,47 @@ def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST
 
 class InstitutionAPIView(APIView):
     """
-    Gestion des institutions avec filtrage par rôle.
-
-    - SuperUser : Toutes les institutions
-    - Admin/Responsable : Leur institution uniquement
-    - Formateur/Apprenant : Leur institution uniquement
+    - GET/PUT/PATCH/DELETE : Auth obligatoire + filtrage par rôle
+    - POST : Public (AllowAny) pour permettre onboarding / signup institution
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]  # défaut
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    # def get_throttles(self):
+    #     # Limite uniquement la création publique
+    #     if self.request.method == "POST" and not getattr(self.request.user, "is_authenticated", False):
+    #         return [InstitutionCreateAnonThrottle()]
+    #     return super().get_throttles()
 
     def get(self, request, pk=None):
         if pk:
-            # Détail : vérifier l'accès
             institution = get_filtered_academic_object(Institution, pk, request, "Institution")
             serializer = InstitutionSerializer(institution)
             return api_success("Institution trouvée", serializer.data, status.HTTP_200_OK)
 
-        # Liste : filtrée par rôle
         qs = Institution.objects.all()
         qs = filter_academics_queryset(qs, request, "Institution", is_detail=False)
-
         serializer = InstitutionSerializer(qs, many=True)
         return api_success("Liste des institutions", serializer.data, status.HTTP_200_OK)
 
     def post(self, request):
-        """Création (Admin/SuperUser uniquement)"""
-        role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name != "Admin":
+        """
+        Création PUBLIC :
+        - on exige admin_account (création du compte admin + code d'activation)
+        - institution créée même sans user connecté
+        """
+        # ✅ sécurité : forcer un admin pour éviter institutions "orphelines"
+        if not request.data.get("admin_account") and not request.data.get("existing_admin_id"):
             return api_error(
-                "Seuls les Admins peuvent créer des institutions",
-                http_status=status.HTTP_403_FORBIDDEN
+                "Vous devez fournir admin_account (création admin) ou existing_admin_id.",
+                http_status=status.HTTP_400_BAD_REQUEST
             )
 
-        serializer = InstitutionSerializer(data=request.data)
+        serializer = InstitutionSerializer(data=request.data, context={"request": request})
         if serializer.is_valid():
             institution = serializer.save()
             return api_success(
@@ -106,11 +119,10 @@ class InstitutionAPIView(APIView):
 
     def put(self, request, pk):
         institution = get_filtered_academic_object(Institution, pk, request, "Institution")
-
         if not can_modify_academic_resource(request.user, institution, "Institution"):
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
-        serializer = InstitutionSerializer(institution, data=request.data)
+        serializer = InstitutionSerializer(institution, data=request.data, context={"request": request})
         if serializer.is_valid():
             serializer.save()
             return api_success("Institution mise à jour", serializer.data, status.HTTP_200_OK)
@@ -118,11 +130,10 @@ class InstitutionAPIView(APIView):
 
     def patch(self, request, pk):
         institution = get_filtered_academic_object(Institution, pk, request, "Institution")
-
         if not can_modify_academic_resource(request.user, institution, "Institution"):
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
-        serializer = InstitutionSerializer(institution, data=request.data, partial=True)
+        serializer = InstitutionSerializer(institution, data=request.data, partial=True, context={"request": request})
         if serializer.is_valid():
             serializer.save()
             return api_success("Institution mise à jour partiellement", serializer.data, status.HTTP_200_OK)
@@ -130,14 +141,12 @@ class InstitutionAPIView(APIView):
 
     def delete(self, request, pk):
         institution = get_filtered_academic_object(Institution, pk, request, "Institution")
-
         if not can_modify_academic_resource(request.user, institution, "Institution"):
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
         institution.delete()
         return api_success("Institution supprimée", data=None, http_status=status.HTTP_204_NO_CONTENT)
 
-# À ajouter dans academics/views.py
 
 class InstitutionLogoUploadAPIView(APIView):
     """
