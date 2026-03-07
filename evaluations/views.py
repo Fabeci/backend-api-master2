@@ -72,9 +72,11 @@ def _require_roles(user, *roles):
 
 
 def _formateur_owns_cours(user, cours):
-    """Vérifie que le formateur est l'enseignant du cours."""
-    return getattr(cours, 'enseignant_id', None) == user.id
-
+    institution_id = getattr(user, 'institution_id', None)
+    return (
+        getattr(cours, 'enseignant_id', None) == user.id and
+        getattr(cours, 'institution_id', None) == institution_id
+    )
 
 def _filter_by_institution(qs, user):
     """Filtre par institution de l'utilisateur."""
@@ -474,7 +476,14 @@ class EvaluationListCreateAPIView(APIView):
             if role in ('Admin', 'Responsable'):
                 qs = _filter_by_institution(qs, request.user)
             elif role == 'Formateur':
-                qs = qs.filter(cours__enseignant=request.user)
+                institution_id = getattr(request.user, 'institution_id', None)
+                if not institution_id:
+                    qs = qs.none()
+                else:
+                    qs = qs.filter(
+                        cours__enseignant=request.user,
+                        cours__institution_id=institution_id
+                    )
             elif role == 'Apprenant':
                 from courses.models import InscriptionCours
                 cours_ids = InscriptionCours.objects.filter(
@@ -529,6 +538,29 @@ class EvaluationDetailAPIView(APIView):
             return api_error("Accès non autorisé.", http_status=status.HTTP_403_FORBIDDEN)
 
         evaluation = get_object_or_404(Evaluation, pk=pk)
+
+        if role in ('Admin', 'Responsable'):
+            institution_id = getattr(request.user, 'institution_id', None)
+        if evaluation.cours.institution_id != institution_id:
+            return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+
+        elif role == 'Formateur':
+            if not _formateur_owns_cours(request.user, evaluation.cours):
+                return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+
+        elif role == 'Apprenant':
+            from courses.models import InscriptionCours
+            is_inscrit = InscriptionCours.objects.filter(
+                apprenant=request.user,
+                cours=evaluation.cours,
+                statut='inscrit'
+            ).exists()
+            if not is_inscrit or not evaluation.est_publiee:
+                return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+
+        else:
+            return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+
         return api_success("Évaluation trouvée.", EvaluationDetailSerializer(evaluation).data)
 
     def put(self, request, pk):

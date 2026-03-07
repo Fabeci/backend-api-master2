@@ -1,5 +1,10 @@
 # users/views.py
-
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.core.mail import send_mail
+from django.conf import settings
+from .models import User
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -453,3 +458,73 @@ class ChangePasswordAPIView(APIView):
             data=None,
             http_status=status.HTTP_200_OK,
         )
+        
+class PasswordResetAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email', '').strip().lower()
+        if not email:
+            return api_error("L'adresse email est requise.")
+
+        try:
+            user = User.objects.get(email__iexact=email, is_active=True)
+        except User.DoesNotExist:
+            # ✅ Ne pas révéler si l'email existe ou non (sécurité)
+            return api_success("Si cet email existe, un lien a été envoyé.")
+
+        uid   = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+
+        # ✅ URL frontend : adapte selon ton domaine
+        reset_url = f"{settings.FRONTEND_URL}/authentication/reset-password?token={token}&uid={uid}"
+
+        send_mail(
+            subject="Réinitialisation de votre mot de passe",
+            message=(
+                f"Bonjour {user.prenom},\n\n"
+                f"Cliquez sur le lien ci-dessous pour réinitialiser votre mot de passe :\n\n"
+                f"{reset_url}\n\n"
+                f"Ce lien est valide 24 heures.\n\n"
+                f"Si vous n'avez pas fait cette demande, ignorez cet email."
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+
+        return api_success("Si cet email existe, un lien a été envoyé.")
+
+
+class PasswordResetConfirmAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, uidb64=None, token=None):
+        # Accepte depuis l'URL OU depuis le body (frontend envoie dans le body)
+        uid_raw      = uidb64   or request.data.get('uid', '')
+        token_raw    = token    or request.data.get('token', '')
+        new_password = request.data.get('new_password', '').strip()
+
+        if not uid_raw or not token_raw:
+            return api_error("Lien invalide ou expiré.", http_status=status.HTTP_400_BAD_REQUEST)
+        if not new_password:
+            return api_error("Le nouveau mot de passe est requis.")
+        if len(new_password) < 8:
+            return api_error("Le mot de passe doit contenir au moins 8 caractères.")
+
+        try:
+            uid  = force_str(urlsafe_base64_decode(uid_raw))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return api_error("Lien invalide ou expiré.", http_status=status.HTTP_400_BAD_REQUEST)
+
+        if not default_token_generator.check_token(user, token_raw):
+            return api_error("Lien expiré ou déjà utilisé.", http_status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save(update_fields=['password'])
+
+        # ✅ Invalider tous les tokens DRF existants
+        Token.objects.filter(user=user).delete()
+
+        return api_success("Mot de passe réinitialisé avec succès. Vous pouvez vous connecter.")
