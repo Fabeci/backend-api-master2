@@ -102,24 +102,34 @@ def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST
 
 def _apply_context_filter(qs, context, field_institution='institution_id', field_annee='annee_scolaire_id'):
     """
-    ✅ HELPER CENTRAL — applique les filtres institution/annee_scolaire
-    de façon conditionnelle : on filtre UNIQUEMENT si au moins un objet
-    du QS courant possède ce champ renseigné (non null).
-
-    Cela évite d'éliminer silencieusement les objets dont institution
-    ou annee_scolaire n'a pas été renseigné à la création.
+    Applique les filtres institution/annee_scolaire de façon conditionnelle.
+    Détecte automatiquement le bon champ selon le modèle du queryset.
     """
-    if context.get('institution_id'):
-        if qs.filter(sequence__institution_id__isnull=False).exists():
-            qs = qs.filter(sequence__institution_id=context['institution_id'])
+    if context.get('bypass'):
         return qs
 
-    if context.get('annee_scolaire_id'):
-        if qs.filter(**{f'{field_annee}__isnull': False}).exists():
-            qs = qs.filter(**{field_annee: context['annee_scolaire_id']})
+    institution_id = context.get('institution_id')
+    annee_id = context.get('annee_scolaire_id')
+
+    if institution_id:
+        # ✅ Vérifie que le champ institution_id existe directement sur le modèle
+        model = qs.model
+        field_names = [f.name for f in model._meta.get_fields()]
+
+        if 'institution' in field_names or 'institution_id' in field_names:
+            # Filtre conditionnel : seulement si au moins un objet a institution renseigné
+            if qs.filter(institution_id__isnull=False).exists():
+                qs = qs.filter(institution_id=institution_id)
+        # Si le modèle n'a pas de champ institution direct, on laisse passer
+
+    if annee_id:
+        model = qs.model
+        field_names = [f.name for f in model._meta.get_fields()]
+        if 'annee_scolaire' in field_names or 'annee_scolaire_id' in field_names:
+            if qs.filter(annee_scolaire_id__isnull=False).exists():
+                qs = qs.filter(annee_scolaire_id=annee_id)
 
     return qs
-
 
 def _apply_sequence_context_filter(qs, context):
     """

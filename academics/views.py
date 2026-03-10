@@ -228,7 +228,7 @@ class GroupeListCreateAPIView(APIView):
     @transaction.atomic
     def post(self, request):
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error(
                 "Seuls les Admins/Responsables peuvent créer des groupes",
                 http_status=status.HTTP_403_FORBIDDEN
@@ -319,7 +319,7 @@ class ClasseListCreateAPIView(APIView):
 
     def post(self, request):
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error(
                 "Seuls les Admins/Responsables peuvent créer des classes",
                 http_status=status.HTTP_403_FORBIDDEN
@@ -404,7 +404,7 @@ class FiliereListCreateAPIView(APIView):
 
     def post(self, request):
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error(
                 "Seuls les Admins/Responsables peuvent créer des filières",
                 http_status=status.HTTP_403_FORBIDDEN
@@ -433,7 +433,7 @@ class FiliereDetailAPIView(APIView):
         filiere = self.get_object(pk)
 
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
         serializer = FiliereSerializer(filiere, data=request.data)
@@ -446,7 +446,7 @@ class FiliereDetailAPIView(APIView):
         filiere = self.get_object(pk)
 
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
         serializer = FiliereSerializer(filiere, data=request.data, partial=True)
@@ -459,7 +459,7 @@ class FiliereDetailAPIView(APIView):
         filiere = self.get_object(pk)
 
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
         filiere.delete()
@@ -483,7 +483,7 @@ class DepartementListCreateAPIView(APIView):
 
     def post(self, request):
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error(
                 "Seuls les Admins/Responsables peuvent créer des départements",
                 http_status=status.HTTP_403_FORBIDDEN
@@ -561,7 +561,7 @@ class InscriptionListCreateAPIView(APIView):
 
     def post(self, request):
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error(
                 "Seuls les Admins/Responsables peuvent créer des inscriptions",
                 http_status=status.HTTP_403_FORBIDDEN

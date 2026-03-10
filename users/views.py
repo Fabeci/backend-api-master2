@@ -115,6 +115,12 @@ class UserLoginAPIView(APIView):
             except Exception:
                 photo_url = None
 
+        # Récupérer institution complète
+        institution = getattr(user, "institution", None)
+        departement = getattr(user, "departement", None)
+        pays = getattr(user, "pays_residence", None)
+        annee = getattr(user, "annee_scolaire_active", None)
+        
         return api_success(
             "Authentification réussie.",
             data={
@@ -130,8 +136,12 @@ class UserLoginAPIView(APIView):
                     "is_staff":                 user.is_staff,
                     "is_superuser":             user.is_superuser,
                     "institution_id":           getattr(user, "institution_id", None),
+                    "institution":              {"id": institution.id, "nom": institution.nom} if institution else None,
                     "annee_scolaire_active_id": getattr(user, "annee_scolaire_active_id", None),
-                },
+                    "annee_scolaire_active":    {"id": annee.id, "libelle": str(annee)} if annee else None,
+                    "pays_residence":           {"id": pays.id, "nom": pays.nom, "code": pays.code} if pays else None,
+                    "departement":              {"id": departement.id, "nom": departement.nom} if departement else None,
+        },
             },
             http_status=status.HTTP_200_OK,
         )
@@ -304,7 +314,7 @@ class ParentViewSet(ProfileActionsMixin, BaseModelViewSet):
             return Parent.objects.filter(pk=user.pk)
 
         # ✅ Admin / Responsable : parents de leur institution
-        if role_name in ["Admin", "Responsable"]:
+        if role_name in ["Admin", "ResponsableAcademique"]:
             return Parent.objects.filter(institution=inst) if inst else Parent.objects.none()
 
         return Parent.objects.none()
@@ -322,7 +332,7 @@ class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):
         if user.is_superuser:
             return Apprenant.objects.all()
 
-        if role_name in ["Admin", "Responsable"]:
+        if role_name in ["Admin", "ResponsableAcademique"]:
             return Apprenant.objects.filter(institution=inst) if inst else Apprenant.objects.none()
 
         if role_name == "Formateur":
@@ -337,12 +347,16 @@ class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):
             ).values_list("apprenant_id", flat=True).distinct()
             return Apprenant.objects.filter(id__in=apprenant_ids)
 
-        # ✅ Un apprenant peut voir et modifier son propre profil
+        # ✅ Apprenant : voit les autres apprenants de son groupe
         if role_name == "Apprenant":
+            groupe_id = getattr(user, 'groupe_id', None)
+            if groupe_id:
+                return Apprenant.objects.filter(groupe_id=groupe_id)
+            # Fallback : son propre profil uniquement
             return Apprenant.objects.filter(pk=user.pk)
 
         return Apprenant.objects.none()
-
+    
     def perform_create(self, serializer):
         user = self.request.user
         inst = _user_institution(user)
@@ -410,19 +424,22 @@ class ResponsableAcademiqueViewSet(ProfileActionsMixin, BaseModelViewSet):
     def get_queryset(self):
         user      = self.request.user
         role_name = _role_name(user)
-        inst      = _user_institution(user)
 
         if user.is_superuser:
-            return ResponsableAcademique.objects.all()
+            return ResponsableAcademique.objects.select_related(
+                'institution', 'departement', 'pays_residence', 'role'
+            ).all()
 
-        # ✅ Responsable académique : voit/modifie son propre profil
         if role_name in ["Responsable", "ResponsableAcademique", "Responsable Académique"]:
-            return ResponsableAcademique.objects.filter(pk=user.pk)
+            return ResponsableAcademique.objects.select_related(
+                'institution', 'departement', 'pays_residence', 'role'
+            ).filter(pk=user.pk)
 
-        # ✅ Admin/Responsable (selon ta politique) : RA de leur institution
-        # (si tu veux que Responsable puisse aussi voir tous les RA, laisse "Responsable" ici)
-        if role_name in ["Admin", "Responsable"]:
-            return ResponsableAcademique.objects.filter(institution=inst) if inst else ResponsableAcademique.objects.none()
+        if role_name in ["Admin", "ResponsableAcademique"]:
+            inst = _user_institution(user)
+            return ResponsableAcademique.objects.select_related(
+                'institution', 'departement', 'pays_residence', 'role'
+            ).filter(institution=inst) if inst else ResponsableAcademique.objects.none()
 
         return ResponsableAcademique.objects.none()
 

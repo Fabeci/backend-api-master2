@@ -1,4 +1,4 @@
-# courses/utils.py — VERSION FIX INSCRIT/Inscrit + fallback apprenant
+# courses/utils.py — VERSION FIX RESPONSABLE + INSCRIT/Inscrit + fallback apprenant
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -16,6 +16,7 @@ def _set_done_flag(obj, done: bool):
     else:
         obj.est_termine = False
         obj.completed_at = None
+
 
 @transaction.atomic
 def recompute_cascade(apprenant, sequence: Sequence):
@@ -101,6 +102,10 @@ def get_user_context(request):
     else:
         ctx["role_name"] = str(_role) or None
 
+    # ✅ Normalisation des rôles
+    if ctx["role_name"] in ("ResponsableAcademique", "Responsable académique"):
+        ctx["role_name"] = "Responsable"
+
     # Fallback héritage multi-table
     if ctx["role_name"] is None:
         from users.models import Apprenant as _Apprenant
@@ -113,25 +118,24 @@ def get_user_context(request):
 
         ctx["strict"] = True
 
-    # ✅ FIX : priorité à l'inscription active
-    # user.annee_scolaire_active_id=1 mais inscription.annee_scolaire_id=2
-    apprenant_obj = _get_apprenant_obj(user)
-    if apprenant_obj is not None:
-        inscription = (
-            InscriptionCours.objects
-            .filter(apprenant=apprenant_obj)
-            .annotate(statut_l=Lower("statut"))
-            .filter(statut_l__in=["inscrit", "en_cours", "en cours", "encours", "Inscrit"])
-            .select_related("institution", "annee_scolaire")
-            .order_by("-id")
-            .first()
-        )
-        if inscription:
-            ctx["institution_id"] = inscription.institution_id
-            ctx["annee_scolaire_id"] = inscription.annee_scolaire_id
-            return ctx
+        # ✅ priorité à l'inscription active
+        apprenant_obj = _get_apprenant_obj(user)
+        if apprenant_obj is not None:
+            inscription = (
+                InscriptionCours.objects
+                .filter(apprenant=apprenant_obj)
+                .annotate(statut_l=Lower("statut"))
+                .filter(statut_l__in=["inscrit", "en_cours", "en cours", "encours"])
+                .select_related("institution", "annee_scolaire")
+                .order_by("-id")
+                .first()
+            )
+            if inscription:
+                ctx["institution_id"] = inscription.institution_id
+                ctx["annee_scolaire_id"] = inscription.annee_scolaire_id
+                return ctx
 
-    # fallback si pas d'inscription trouvée
+        # fallback si pas d'inscription trouvée
         ctx["institution_id"] = getattr(user, "institution_id", None)
         ctx["annee_scolaire_id"] = getattr(user, "annee_scolaire_active_id", None)
         return ctx
@@ -185,15 +189,18 @@ def _get_apprenant_cours_ids(user, institution_id=None):
     if apprenant is None:
         return InscriptionCours.objects.none().values_list("cours_id", flat=True)
 
-    # ✅ Ajout des variantes avec majuscule pour couvrir les anciennes données
-    active = ["inscrit", "en_cours", "en cours", "encours", "Inscrit", "En_cours", "En cours"]
+    active = ["inscrit", "en_cours", "en cours", "encours"]
 
     qs = (
         InscriptionCours.objects
         .filter(apprenant=apprenant)
         .annotate(statut_l=Lower("statut"))
-        .filter(statut_l__in=[s.lower() for s in active])
+        .filter(statut_l__in=active)
     )
+
+    if institution_id:
+        qs = qs.filter(institution_id=institution_id)
+
     return qs.values_list("cours_id", flat=True)
 
 
@@ -206,10 +213,13 @@ def filter_queryset_by_role(queryset, request, model_name="Cours"):
 
     role_name = ctx.get("role_name")
 
+    # normalisation défensive
+    if role_name in ("ResponsableAcademique", "Responsable académique"):
+        role_name = "Responsable"
+
     # APPRENANT
     if role_name == "Apprenant" or ctx.get("strict"):
         cours_ids = _get_apprenant_cours_ids(user, ctx.get("institution_id"))
-
         apprenant_obj = _get_apprenant_obj(user)
 
         if model_name == "Cours":
@@ -233,7 +243,7 @@ def filter_queryset_by_role(queryset, request, model_name="Cours"):
         if model_name == "InscriptionCours":
             if apprenant_obj is None:
                 return queryset.none()
-            return queryset.filter(apprenant=apprenant_obj)
+            return queryset.filter(cours_id__in=cours_ids)
 
         if model_name == "Participation":
             return queryset.filter(session__cours_id__in=cours_ids)
@@ -265,7 +275,56 @@ def filter_queryset_by_role(queryset, request, model_name="Cours"):
 
         return queryset.none()
 
-    # autres rôles: institution obligatoire
+    # PARENT
+    if role_name == "Parent":
+        from users.models import Apprenant, Parent as ParentModel
+        from .models import InscriptionCours
+
+        try:
+            parent_obj = ParentModel.objects.get(pk=user.pk)
+            enfant_ids = Apprenant.objects.filter(
+                tuteur=parent_obj
+            ).values_list("id", flat=True)
+
+            cours_ids = (
+                InscriptionCours.objects
+                .filter(apprenant_id__in=enfant_ids)
+                .values_list("cours_id", flat=True)
+                .distinct()
+            )
+        except Exception:
+            return queryset.none()
+
+        if model_name == "Cours":
+            return queryset.filter(id__in=cours_ids)
+
+        if model_name == "Module":
+            return queryset.filter(cours_id__in=cours_ids)
+
+        if model_name == "Sequence":
+            return queryset.filter(module__cours_id__in=cours_ids)
+
+        if model_name == "BlocContenu":
+            return queryset.filter(sequence__module__cours_id__in=cours_ids)
+
+        if model_name == "RessourceSequence":
+            return queryset.filter(sequence__module__cours_id__in=cours_ids)
+
+        if model_name == "Session":
+            return queryset.filter(cours_id__in=cours_ids)
+
+        if model_name == "InscriptionCours":
+            return queryset.filter(apprenant_id__in=enfant_ids)
+
+        if model_name == "Suivi":
+            return queryset.filter(apprenant_id__in=enfant_ids)
+
+        if model_name == "Participation":
+            return queryset.filter(session__cours_id__in=cours_ids)
+
+        return queryset.none()
+
+    # autres rôles
     if not ctx.get("institution_id"):
         return queryset.none()
 
@@ -274,7 +333,7 @@ def filter_queryset_by_role(queryset, request, model_name="Cours"):
     if role_name == "Admin":
         return queryset.filter(institution_id=institution_id)
 
-    if role_name == "Responsable":
+    if role_name in ("Responsable", "ResponsableAcademique"):
         filters = {"institution_id": institution_id}
         if ctx.get("annee_scolaire_id"):
             filters["annee_scolaire_id"] = ctx["annee_scolaire_id"]
@@ -325,7 +384,6 @@ def filter_queryset_by_role(queryset, request, model_name="Cours"):
 
     return queryset.none()
 
-
 def get_filtered_object(model_class, pk, request, model_name):
     qs = model_class.objects.all()
     qs = filter_queryset_by_role(qs, request, model_name)
@@ -338,7 +396,8 @@ def can_create_in_context(user, parent_obj=None):
 
     role_name = user.role.name if hasattr(user, "role") and user.role else None
 
-    if role_name in ["Admin", "Responsable"]:
+    # ✅ FIX ICI AUSSI
+    if role_name in ["Admin", "Responsable", "ResponsableAcademique"]:
         return True
 
     if role_name == "Formateur":
