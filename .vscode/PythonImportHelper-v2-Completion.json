@@ -2411,6 +2411,38 @@
         "documentation": {}
     },
     {
+        "label": "Parent",
+        "importPath": "users.models",
+        "description": "users.models",
+        "isExtraImport": true,
+        "detail": "users.models",
+        "documentation": {}
+    },
+    {
+        "label": "Apprenant",
+        "importPath": "users.models",
+        "description": "users.models",
+        "isExtraImport": true,
+        "detail": "users.models",
+        "documentation": {}
+    },
+    {
+        "label": "Parent",
+        "importPath": "users.models",
+        "description": "users.models",
+        "isExtraImport": true,
+        "detail": "users.models",
+        "documentation": {}
+    },
+    {
+        "label": "Apprenant",
+        "importPath": "users.models",
+        "description": "users.models",
+        "isExtraImport": true,
+        "detail": "users.models",
+        "documentation": {}
+    },
+    {
         "label": "UserRole",
         "importPath": "users.models",
         "description": "users.models",
@@ -2576,6 +2608,22 @@
         "description": "django.core.mail",
         "isExtraImport": true,
         "detail": "django.core.mail",
+        "documentation": {}
+    },
+    {
+        "label": "send_mail",
+        "importPath": "django.core.mail",
+        "description": "django.core.mail",
+        "isExtraImport": true,
+        "detail": "django.core.mail",
+        "documentation": {}
+    },
+    {
+        "label": "settings",
+        "importPath": "django.conf",
+        "description": "django.conf",
+        "isExtraImport": true,
+        "detail": "django.conf",
         "documentation": {}
     },
     {
@@ -3974,6 +4022,22 @@
         "documentation": {}
     },
     {
+        "label": "InscriptionCours",
+        "importPath": "courses.models",
+        "description": "courses.models",
+        "isExtraImport": true,
+        "detail": "courses.models",
+        "documentation": {}
+    },
+    {
+        "label": "InscriptionCours",
+        "importPath": "courses.models",
+        "description": "courses.models",
+        "isExtraImport": true,
+        "detail": "courses.models",
+        "documentation": {}
+    },
+    {
         "label": "Session",
         "importPath": "courses.models",
         "description": "courses.models",
@@ -4638,6 +4702,14 @@
         "documentation": {}
     },
     {
+        "label": "default_token_generator",
+        "importPath": "django.contrib.auth.tokens",
+        "description": "django.contrib.auth.tokens",
+        "isExtraImport": true,
+        "detail": "django.contrib.auth.tokens",
+        "documentation": {}
+    },
+    {
         "label": "urlsafe_base64_encode",
         "importPath": "django.utils.http",
         "description": "django.utils.http",
@@ -4662,6 +4734,22 @@
         "documentation": {}
     },
     {
+        "label": "urlsafe_base64_encode",
+        "importPath": "django.utils.http",
+        "description": "django.utils.http",
+        "isExtraImport": true,
+        "detail": "django.utils.http",
+        "documentation": {}
+    },
+    {
+        "label": "urlsafe_base64_decode",
+        "importPath": "django.utils.http",
+        "description": "django.utils.http",
+        "isExtraImport": true,
+        "detail": "django.utils.http",
+        "documentation": {}
+    },
+    {
         "label": "api_error",
         "importPath": "academics.views",
         "description": "academics.views",
@@ -4675,6 +4763,22 @@
         "description": "academics.views",
         "isExtraImport": true,
         "detail": "academics.views",
+        "documentation": {}
+    },
+    {
+        "label": "force_bytes",
+        "importPath": "django.utils.encoding",
+        "description": "django.utils.encoding",
+        "isExtraImport": true,
+        "detail": "django.utils.encoding",
+        "documentation": {}
+    },
+    {
+        "label": "force_str",
+        "importPath": "django.utils.encoding",
+        "description": "django.utils.encoding",
+        "isExtraImport": true,
+        "detail": "django.utils.encoding",
         "documentation": {}
     },
     {
@@ -6936,7 +7040,7 @@
         "kind": 2,
         "importPath": "courses.utils",
         "description": "courses.utils",
-        "peekOfCode": "def filter_queryset_by_role(queryset, request, model_name=\"Cours\"):\n    user = request.user\n    ctx = get_user_context(request)\n    if ctx.get(\"bypass\"):\n        return queryset\n    role_name = ctx.get(\"role_name\")\n    # APPRENANT\n    if role_name == \"Apprenant\" or ctx.get(\"strict\"):\n        cours_ids = _get_apprenant_cours_ids(user, ctx.get(\"institution_id\"))\n        apprenant_obj = _get_apprenant_obj(user)",
+        "peekOfCode": "def filter_queryset_by_role(queryset, request, model_name=\"Cours\"):\n    user = request.user\n    ctx = get_user_context(request)\n    if ctx.get(\"bypass\"):\n        return queryset\n    role_name = ctx.get(\"role_name\")\n    # normalisation défensive\n    if role_name in (\"ResponsableAcademique\", \"Responsable académique\"):\n        role_name = \"Responsable\"\n    # APPRENANT",
         "detail": "courses.utils",
         "documentation": {}
     },
@@ -6945,7 +7049,7 @@
         "kind": 2,
         "importPath": "courses.utils",
         "description": "courses.utils",
-        "peekOfCode": "def get_filtered_object(model_class, pk, request, model_name):\n    qs = model_class.objects.all()\n    qs = filter_queryset_by_role(qs, request, model_name)\n    return get_object_or_404(qs, pk=pk)\ndef can_create_in_context(user, parent_obj=None):\n    if user.is_superuser:\n        return True\n    role_name = user.role.name if hasattr(user, \"role\") and user.role else None\n    if role_name in [\"Admin\", \"Responsable\"]:\n        return True",
+        "peekOfCode": "def get_filtered_object(model_class, pk, request, model_name):\n    qs = model_class.objects.all()\n    qs = filter_queryset_by_role(qs, request, model_name)\n    return get_object_or_404(qs, pk=pk)\ndef can_create_in_context(user, parent_obj=None):\n    if user.is_superuser:\n        return True\n    role_name = user.role.name if hasattr(user, \"role\") and user.role else None\n    # ✅ FIX ICI AUSSI\n    if role_name in [\"Admin\", \"Responsable\", \"ResponsableAcademique\"]:",
         "detail": "courses.utils",
         "documentation": {}
     },
@@ -6954,7 +7058,7 @@
         "kind": 2,
         "importPath": "courses.utils",
         "description": "courses.utils",
-        "peekOfCode": "def can_create_in_context(user, parent_obj=None):\n    if user.is_superuser:\n        return True\n    role_name = user.role.name if hasattr(user, \"role\") and user.role else None\n    if role_name in [\"Admin\", \"Responsable\"]:\n        return True\n    if role_name == \"Formateur\":\n        if parent_obj is None:\n            return True\n        cours = None",
+        "peekOfCode": "def can_create_in_context(user, parent_obj=None):\n    if user.is_superuser:\n        return True\n    role_name = user.role.name if hasattr(user, \"role\") and user.role else None\n    # ✅ FIX ICI AUSSI\n    if role_name in [\"Admin\", \"Responsable\", \"ResponsableAcademique\"]:\n        return True\n    if role_name == \"Formateur\":\n        if parent_obj is None:\n            return True",
         "detail": "courses.utils",
         "documentation": {}
     },
@@ -7908,7 +8012,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class EvaluationListCreateAPIView(APIView):\n    \"\"\"\n    Permissions :\n    - SuperAdmin   : BLOQUÉ\n    - Admin/Responsable : CRUD complet\n    - Formateur    : CRUD sur ses cours\n    - Apprenant    : Lecture seule (ses cours, sans bonnes réponses)\n    - Parent       : BLOQUÉ\n    \"\"\"\n    permission_classes = [IsAuthenticated]",
+        "peekOfCode": "class EvaluationListCreateAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        try:\n            cours_id = request.query_params.get('cours')\n            enseignant_id = request.query_params.get('enseignant')",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7917,7 +8021,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class EvaluationDetailAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        if role == 'Parent':\n            return api_error(\"Accès non autorisé.\", http_status=status.HTTP_403_FORBIDDEN)\n        evaluation = get_object_or_404(Evaluation, pk=pk)",
+        "peekOfCode": "class EvaluationDetailAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        evaluation = get_object_or_404(Evaluation, pk=pk)\n        if role in ('Admin', 'ResponsableAcademique'):\n            institution_id = getattr(request.user, 'institution_id', None)",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7935,7 +8039,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class EvaluationAccessibiliteAPIView(APIView):\n    \"\"\"Accessible à tous sauf SuperAdmin et Parent.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        if _get_role(request.user) == 'Parent':\n            return api_error(\"Accès non autorisé.\", http_status=status.HTTP_403_FORBIDDEN)\n        try:",
+        "peekOfCode": "class EvaluationAccessibiliteAPIView(APIView):\n    \"\"\"Accessible à tous sauf SuperAdmin.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        try:\n            evaluation = get_object_or_404(Evaluation, pk=pk)",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -8034,7 +8138,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class EvaluationsACorrigerAPIView(APIView):\n    \"\"\"Liste des évaluations à corriger : Formateur/Admin/Responsable.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')\n        if err:\n            return err\n        try:\n            role = _get_role(request.user)\n            qs = PassageEvaluation.objects.select_related('apprenant', 'evaluation').filter(statut='soumis')",
+        "peekOfCode": "class EvaluationsACorrigerAPIView(APIView):\n    \"\"\"Liste des évaluations à corriger : Formateur/Admin/Responsable.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        err = _require_roles(request.user, 'Admin', 'ResponsableAcademique', 'Formateur')\n        if err:\n            return err\n        try:\n            role = _get_role(request.user)\n            qs = PassageEvaluation.objects.select_related('apprenant', 'evaluation').filter(statut='soumis')",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -10464,7 +10568,7 @@
         "kind": 6,
         "importPath": "users.serializers",
         "description": "users.serializers",
-        "peekOfCode": "class BaseUserCrudSerializer(serializers.ModelSerializer):\n    password = serializers.CharField(\n        write_only=True, required=False, allow_blank=True, min_length=8\n    )\n    pays_residence    = PaysSerializer(read_only=True)\n    pays_residence_id = serializers.PrimaryKeyRelatedField(\n        source=\"pays_residence\",\n        queryset=Pays.objects.all(),\n        write_only=True, required=False, allow_null=True,\n    )",
+        "peekOfCode": "class BaseUserCrudSerializer(serializers.ModelSerializer):\n    password = serializers.CharField(\n        write_only=True, required=False, allow_blank=True, min_length=8\n    )\n    pays_residence = serializers.SerializerMethodField(read_only=True)\n    pays_residence_id = serializers.PrimaryKeyRelatedField(\n        source=\"pays_residence\",\n        queryset=Pays.objects.all(),\n        write_only=True, required=False, allow_null=True,\n    )",
         "detail": "users.serializers",
         "documentation": {}
     },
@@ -10482,7 +10586,7 @@
         "kind": 6,
         "importPath": "users.serializers",
         "description": "users.serializers",
-        "peekOfCode": "class ParentCrudSerializer(BaseUserCrudSerializer):\n    # ✅ LECTURE : Objet institution complet\n    institution = serializers.SerializerMethodField(read_only=True)\n    # ✅ ÉCRITURE : ID uniquement\n    institution_id = serializers.PrimaryKeyRelatedField(\n        source=\"institution\",\n        queryset=Institution.objects.all(),\n        write_only=True,\n        required=False,\n        allow_null=True,",
+        "peekOfCode": "class ParentCrudSerializer(BaseUserCrudSerializer):\n    institution = serializers.SerializerMethodField(read_only=True)\n    institution_id = serializers.PrimaryKeyRelatedField(\n        source=\"institution\",\n        queryset=Institution.objects.all(),\n        write_only=True, required=False, allow_null=True,\n    )\n    # ✅ Liste des enfants (Apprenant.tuteur = FK vers Parent)\n    enfants = serializers.SerializerMethodField(read_only=True)\n    class Meta(BaseUserCrudSerializer.Meta):",
         "detail": "users.serializers",
         "documentation": {}
     },
@@ -10491,7 +10595,7 @@
         "kind": 6,
         "importPath": "users.serializers",
         "description": "users.serializers",
-        "peekOfCode": "class ApprenantCrudSerializer(BaseUserCrudSerializer):\n    matricule = serializers.CharField(required=False, allow_null=True, allow_blank=True)\n    date_naissance = serializers.DateField(required=False, allow_null=True)\n    # ✅ LECTURE : Objets complets\n    groupe = serializers.SerializerMethodField(read_only=True)\n    tuteur = serializers.SerializerMethodField(read_only=True)\n    # ✅ ÉCRITURE : IDs uniquement\n    groupe_id = serializers.PrimaryKeyRelatedField(\n        source=\"groupe\",\n        queryset=Groupe.objects.all(),",
+        "peekOfCode": "class ApprenantCrudSerializer(BaseUserCrudSerializer):\n    matricule      = serializers.CharField(required=False, allow_null=True, allow_blank=True)\n    date_naissance = serializers.DateField(required=False, allow_null=True)\n    groupe = serializers.SerializerMethodField(read_only=True)\n    tuteur = serializers.SerializerMethodField(read_only=True)\n    # ✅ AJOUTER institution\n    institution = serializers.SerializerMethodField(read_only=True)\n    groupe_id = serializers.PrimaryKeyRelatedField(\n        source=\"groupe\", queryset=Groupe.objects.all(),\n        write_only=True, required=False, allow_null=True,",
         "detail": "users.serializers",
         "documentation": {}
     },
@@ -10509,7 +10613,7 @@
         "kind": 6,
         "importPath": "users.serializers",
         "description": "users.serializers",
-        "peekOfCode": "class ResponsableAcademiqueCrudSerializer(BaseUserCrudSerializer):\n    # ✅ LECTURE : Objets complets\n    institution = serializers.SerializerMethodField(read_only=True)\n    departement = serializers.SerializerMethodField(read_only=True)\n    # ✅ ÉCRITURE : IDs uniquement\n    institution_id = serializers.PrimaryKeyRelatedField(\n        source=\"institution\",\n        queryset=Institution.objects.all(),\n        write_only=True,\n        required=False,",
+        "peekOfCode": "class ResponsableAcademiqueCrudSerializer(BaseUserCrudSerializer):\n    institution = serializers.SerializerMethodField(read_only=True)\n    departement = serializers.SerializerMethodField(read_only=True)\n    institution_id = serializers.PrimaryKeyRelatedField(\n        source=\"institution\",\n        queryset=Institution.objects.all(),\n        write_only=True, required=False, allow_null=True,\n    )\n    departement_id = serializers.PrimaryKeyRelatedField(\n        source=\"departement\",",
         "detail": "users.serializers",
         "documentation": {}
     },
@@ -10563,7 +10667,7 @@
         "kind": 5,
         "importPath": "users.urls",
         "description": "users.urls",
-        "peekOfCode": "urlpatterns = [\n    path('login/', UserLoginAPIView.as_view(), name='user-login'),\n    # Nouveau flow unifié\n    path('register/', RegisterAPIView.as_view(), name='register'),\n    path('verify-email/', VerifyEmailAPIView.as_view(), name='verify_email'),\n    path('resend-code/', ResendCodeAPIView.as_view(), name='resend_code'),\n    path('logout/', LogoutAPIView.as_view(), name='logout'),\n    path('change-password/', ChangePasswordAPIView.as_view(), name='change-password'),\n    path('', include(router.urls)),\n    # Password reset (si déjà en place)",
+        "peekOfCode": "urlpatterns = [\n    path('login/', UserLoginAPIView.as_view(), name='user-login'),\n    # Nouveau flow unifié\n    path('register/', RegisterAPIView.as_view(), name='register'),\n    path('verify-email/', VerifyEmailAPIView.as_view(), name='verify_email'),\n    path('resend-code/', ResendCodeAPIView.as_view(), name='resend_code'),\n    path('logout/', LogoutAPIView.as_view(), name='logout'),\n    path('change-password/', ChangePasswordAPIView.as_view(), name='change-password'),\n    # ✅ Password reset\n    path('password-reset/',                              PasswordResetAPIView.as_view(),        name='password_reset'),",
         "detail": "users.urls",
         "documentation": {}
     },
@@ -10716,7 +10820,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class ResponsableAcademiqueViewSet(ProfileActionsMixin, BaseModelViewSet):\n    queryset           = ResponsableAcademique.objects.all()\n    serializer_class   = ResponsableAcademiqueCrudSerializer\n    # ✅ RA peut modifier son profil (self), Admin/SuperUser gardent le contrôle\n    permission_classes = [IsAdminOrHigherOrSelf]   # ← au lieu de IsAdminOrHigher\n    def get_queryset(self):\n        user      = self.request.user\n        role_name = _role_name(user)\n        inst      = _user_institution(user)\n        if user.is_superuser:",
+        "peekOfCode": "class ResponsableAcademiqueViewSet(ProfileActionsMixin, BaseModelViewSet):\n    queryset           = ResponsableAcademique.objects.all()\n    serializer_class   = ResponsableAcademiqueCrudSerializer\n    # ✅ RA peut modifier son profil (self), Admin/SuperUser gardent le contrôle\n    permission_classes = [IsAdminOrHigherOrSelf]   # ← au lieu de IsAdminOrHigher\n    def get_queryset(self):\n        user      = self.request.user\n        role_name = _role_name(user)\n        if user.is_superuser:\n            return ResponsableAcademique.objects.select_related(",
         "detail": "users.views",
         "documentation": {}
     },
@@ -10726,6 +10830,24 @@
         "importPath": "users.views",
         "description": "users.views",
         "peekOfCode": "class ChangePasswordAPIView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def post(self, request):\n        serializer = ModifierMotDePasseSerializer(\n            data=request.data,\n            context={'request': request}\n        )\n        if not serializer.is_valid():\n            return api_error(\n                message=\"Erreur de validation\",",
+        "detail": "users.views",
+        "documentation": {}
+    },
+    {
+        "label": "PasswordResetAPIView",
+        "kind": 6,
+        "importPath": "users.views",
+        "description": "users.views",
+        "peekOfCode": "class PasswordResetAPIView(APIView):\n    permission_classes = [permissions.AllowAny]\n    def post(self, request):\n        email = request.data.get('email', '').strip().lower()\n        if not email:\n            return api_error(\"L'adresse email est requise.\")\n        try:\n            user = User.objects.get(email__iexact=email, is_active=True)\n        except User.DoesNotExist:\n            # ✅ Ne pas révéler si l'email existe ou non (sécurité)",
+        "detail": "users.views",
+        "documentation": {}
+    },
+    {
+        "label": "PasswordResetConfirmAPIView",
+        "kind": 6,
+        "importPath": "users.views",
+        "description": "users.views",
+        "peekOfCode": "class PasswordResetConfirmAPIView(APIView):\n    permission_classes = [permissions.AllowAny]\n    def post(self, request, uidb64=None, token=None):\n        # Accepte depuis l'URL OU depuis le body (frontend envoie dans le body)\n        uid_raw      = uidb64   or request.data.get('uid', '')\n        token_raw    = token    or request.data.get('token', '')\n        new_password = request.data.get('new_password', '').strip()\n        if not uid_raw or not token_raw:\n            return api_error(\"Lien invalide ou expiré.\", http_status=status.HTTP_400_BAD_REQUEST)\n        if not new_password:",
         "detail": "users.views",
         "documentation": {}
     },
