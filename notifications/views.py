@@ -1,95 +1,211 @@
 # notifications/views.py
-from rest_framework import permissions, status
+
+from django.utils import timezone
+from django.db.models import Count, Q
+from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, DestroyModelMixin
 
-from .models import Notification
-from .serializers import NotificationSerializer
-
-
-# ── Helpers réponse unifiée (même pattern que users/views.py) ─────────────────
-
-def api_success(message: str, data=None, http_status=status.HTTP_200_OK):
-    return Response(
-        {"success": True, "status": http_status, "message": message, "data": data},
-        status=http_status,
-    )
-
-def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST):
-    payload = {"success": False, "status": http_status, "message": message}
-    if errors is not None:
-        payload["errors"] = errors
-    return Response(payload, status=http_status)
+from .models import Notification, PreferenceNotification, DigestNotification, CanalNotification
+from .serializers import (
+    NotificationSerializer,
+    NotificationListSerializer,
+    MarquerLueSerializer,
+    PreferenceNotificationSerializer,
+    DigestNotificationSerializer,
+)
 
 
-# ── ViewSet ───────────────────────────────────────────────────────────────────
+# ============================================================================
+# NOTIFICATION VIEWSET
+# ============================================================================
 
-class NotificationViewSet(ListModelMixin, RetrieveModelMixin, DestroyModelMixin, GenericViewSet):
+class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Endpoints :
-      GET    /api/notifications/              → liste des notifications de l'utilisateur connecté
-      GET    /api/notifications/{id}/         → détail d'une notification
-      DELETE /api/notifications/{id}/         → supprimer une notification
-      PATCH  /api/notifications/{id}/read/    → marquer comme lue
-      POST   /api/notifications/read-all/     → marquer TOUTES comme lues
-      DELETE /api/notifications/delete-all/   → supprimer TOUTES les notifications lues
-      GET    /api/notifications/unread-count/ → nombre de non lues
+    Centre de notifications de l'utilisateur connecté.
+
+    GET  /notifications/                  → liste (allégée)
+    GET  /notifications/{id}/             → détail complet
+    GET  /notifications/non_lues/         → non lues uniquement
+    GET  /notifications/compteur/         → { total, non_lues, par_priorite }
+    POST /notifications/marquer_lues/     → marquer une liste (ou toutes) comme lues
+    POST /notifications/{id}/marquer_lue/ → marquer une seule comme lue
+    DELETE /notifications/supprimer_lues/ → supprimer toutes les notifs lues
     """
-    serializer_class   = NotificationSerializer
+
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Notification.objects.filter(
-            user=self.request.user
-        ).order_by('-created_at')
-
-    # ── list : supporte ?unread=true ─────────────────────────────────────────
-    def list(self, request, *args, **kwargs):
-        qs = self.get_queryset()
-        unread_only = request.query_params.get('unread', '').lower() in ('1', 'true', 'yes')
-        if unread_only:
-            qs = qs.filter(is_read=False)
-        serializer = self.get_serializer(qs, many=True)
-        return api_success(
-            "Notifications récupérées.",
-            data={
-                "notifications": serializer.data,
-                "total":         qs.count(),
-                "unread_count":  self.get_queryset().filter(is_read=False).count(),
-            }
+        user = self.request.user
+        qs   = (
+            Notification.objects
+            .filter(recipient=user)
+            .select_related("sender", "institution", "annee_scolaire")
+            .order_by("-created_at")
         )
 
-    # ── PATCH /notifications/{id}/read/ ──────────────────────────────────────
-    @action(detail=True, methods=['patch'], url_path='read')
-    def mark_read(self, request, pk=None):
-        notification = self.get_object()
-        if notification.is_read:
-            return api_success("Déjà marquée comme lue.", data=self.get_serializer(notification).data)
-        notification.mark_as_read()
-        return api_success("Notification marquée comme lue.", data=self.get_serializer(notification).data)
+        # Filtres query params
+        type_     = self.request.query_params.get("type")
+        canal     = self.request.query_params.get("canal")
+        priorite  = self.request.query_params.get("priorite")
+        is_read   = self.request.query_params.get("is_read")
+        expirees  = self.request.query_params.get("expirees", "false")
 
-    # ── POST /notifications/read-all/ ─────────────────────────────────────────
-    @action(detail=False, methods=['post'], url_path='read-all')
-    def mark_all_read(self, request):
-        updated = self.get_queryset().filter(is_read=False).update(is_read=True)
-        return api_success(f"{updated} notification(s) marquée(s) comme lue(s).", data={"updated": updated})
+        if type_:
+            qs = qs.filter(type=type_)
+        if canal:
+            qs = qs.filter(canal=canal)
+        if priorite:
+            qs = qs.filter(priorite=priorite)
+        if is_read is not None:
+            qs = qs.filter(is_read=is_read.lower() == "true")
 
-    # ── DELETE /notifications/delete-all/ ─────────────────────────────────────
-    @action(detail=False, methods=['delete'], url_path='delete-all')
-    def delete_all_read(self, request):
-        deleted_count, _ = self.get_queryset().filter(is_read=True).delete()
-        return api_success(f"{deleted_count} notification(s) lue(s) supprimée(s).", data={"deleted": deleted_count})
+        # Par défaut on masque les expirées
+        if expirees.lower() == "false":
+            qs = qs.filter(
+                Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())
+            )
 
-    # ── GET /notifications/unread-count/ ─────────────────────────────────────
-    @action(detail=False, methods=['get'], url_path='unread-count')
-    def unread_count(self, request):
-        count = self.get_queryset().filter(is_read=False).count()
-        return api_success("Compteur récupéré.", data={"unread_count": count})
+        return qs
 
-    # ── destroy : override pour réponse unifiée ───────────────────────────────
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        instance.delete()
-        return api_success("Notification supprimée.", http_status=status.HTTP_200_OK)
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return NotificationSerializer
+        return NotificationListSerializer
+
+    # ── Actions custom ────────────────────────────────────────────────────────
+
+    @action(detail=False, methods=["get"], url_path="non_lues")
+    def non_lues(self, request):
+        """Retourne uniquement les notifications non lues."""
+        qs = self.get_queryset().filter(is_read=False)
+        serializer = NotificationListSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="compteur")
+    def compteur(self, request):
+        """
+        Retourne un résumé des compteurs pour le badge du centre de notifications.
+        {
+            "total":     12,
+            "non_lues":   5,
+            "par_priorite": { "basse": 1, "moyenne": 2, "haute": 1, "critique": 1 }
+            "par_canal":    { "in_app": 10, "email": 2 }
+        }
+        """
+        qs = self.get_queryset()
+
+        total    = qs.count()
+        non_lues = qs.filter(is_read=False).count()
+
+        par_priorite = {
+            item["priorite"]: item["count"]
+            for item in qs.filter(is_read=False)
+                          .values("priorite")
+                          .annotate(count=Count("id"))
+        }
+        par_canal = {
+            item["canal"]: item["count"]
+            for item in qs.values("canal").annotate(count=Count("id"))
+        }
+
+        return Response({
+            "total":        total,
+            "non_lues":     non_lues,
+            "par_priorite": par_priorite,
+            "par_canal":    par_canal,
+        })
+
+    @action(detail=False, methods=["post"], url_path="marquer_lues")
+    def marquer_lues(self, request):
+        """
+        Marque une liste de notifications comme lues.
+        Si `ids` est absent → marque TOUTES les non lues.
+        Body: { "ids": [1, 2, 3] }  (optionnel)
+        """
+        serializer = MarquerLueSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        ids = serializer.validated_data.get("ids")
+        qs  = self.get_queryset().filter(is_read=False)
+
+        if ids:
+            qs = qs.filter(id__in=ids)
+
+        count = qs.update(is_read=True, read_at=timezone.now())
+        return Response({"marquees": count}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="marquer_lue")
+    def marquer_lue(self, request, pk=None):
+        """Marque une notification unique comme lue."""
+        notif = self.get_object()
+        notif.marquer_comme_lue()
+        return Response({"detail": "Notification marquée comme lue."}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["delete"], url_path="supprimer_lues")
+    def supprimer_lues(self, request):
+        """Supprime toutes les notifications déjà lues de l'utilisateur connecté."""
+        count, _ = self.get_queryset().filter(is_read=True).delete()
+        return Response({"supprimees": count}, status=status.HTTP_200_OK)
+
+
+# ============================================================================
+# PRÉFÉRENCES VIEWSET
+# ============================================================================
+
+class PreferenceNotificationViewSet(viewsets.ModelViewSet):
+    """
+    Gestion des préférences de notification de l'utilisateur connecté.
+
+    GET    /preferences/          → liste ses préférences
+    POST   /preferences/          → créer une préférence
+    PATCH  /preferences/{id}/     → modifier est_active
+    DELETE /preferences/{id}/     → supprimer
+    POST   /preferences/reset/    → remettre les préférences par défaut
+    """
+
+    permission_classes   = [permissions.IsAuthenticated]
+    serializer_class     = PreferenceNotificationSerializer
+    http_method_names    = ["get", "post", "patch", "delete", "head", "options"]
+
+    def get_queryset(self):
+        return PreferenceNotification.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=["post"], url_path="reset")
+    def reset(self, request):
+        """
+        Remet toutes les préférences de l'utilisateur à leur valeur par défaut
+        (supprime les entrées personnalisées → comportement = tout activé).
+        """
+        count, _ = self.get_queryset().delete()
+        return Response(
+            {"detail": f"{count} préférence(s) réinitialisée(s)."},
+            status=status.HTTP_200_OK
+        )
+
+
+# ============================================================================
+# DIGEST VIEWSET
+# ============================================================================
+
+class DigestNotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Historique des digests envoyés à l'utilisateur connecté.
+
+    GET /digests/       → liste
+    GET /digests/{id}/  → détail avec les notifications groupées
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class   = DigestNotificationSerializer
+
+    def get_queryset(self):
+        return (
+            DigestNotification.objects
+            .filter(user=self.request.user)
+            .prefetch_related("notifications")
+            .order_by("-created_at")
+        )

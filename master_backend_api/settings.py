@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     'evaluations',
     'feedback',
     'locations',
-    'notifications',
+    'notifications.apps.NotificationsConfig',
     'progress',
     'resources',
     'users',
