@@ -1651,6 +1651,14 @@
         "documentation": {}
     },
     {
+        "label": "status",
+        "importPath": "rest_framework",
+        "description": "rest_framework",
+        "isExtraImport": true,
+        "detail": "rest_framework",
+        "documentation": {}
+    },
+    {
         "label": "serializers",
         "importPath": "rest_framework",
         "description": "rest_framework",
@@ -3276,19 +3284,11 @@
         "documentation": {}
     },
     {
-        "label": "MultiPartParser",
-        "importPath": "rest_framework.parsers",
-        "description": "rest_framework.parsers",
+        "label": "Response",
+        "importPath": "rest_framework.response",
+        "description": "rest_framework.response",
         "isExtraImport": true,
-        "detail": "rest_framework.parsers",
-        "documentation": {}
-    },
-    {
-        "label": "FormParser",
-        "importPath": "rest_framework.parsers",
-        "description": "rest_framework.parsers",
-        "isExtraImport": true,
-        "detail": "rest_framework.parsers",
+        "detail": "rest_framework.response",
         "documentation": {}
     },
     {
@@ -3305,6 +3305,70 @@
         "description": "rest_framework.parsers",
         "isExtraImport": true,
         "detail": "rest_framework.parsers",
+        "documentation": {}
+    },
+    {
+        "label": "MultiPartParser",
+        "importPath": "rest_framework.parsers",
+        "description": "rest_framework.parsers",
+        "isExtraImport": true,
+        "detail": "rest_framework.parsers",
+        "documentation": {}
+    },
+    {
+        "label": "FormParser",
+        "importPath": "rest_framework.parsers",
+        "description": "rest_framework.parsers",
+        "isExtraImport": true,
+        "detail": "rest_framework.parsers",
+        "documentation": {}
+    },
+    {
+        "label": "AllowAny",
+        "importPath": "rest_framework.permissions",
+        "description": "rest_framework.permissions",
+        "isExtraImport": true,
+        "detail": "rest_framework.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "IsAuthenticated",
+        "importPath": "rest_framework.permissions",
+        "description": "rest_framework.permissions",
+        "isExtraImport": true,
+        "detail": "rest_framework.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "IsAuthenticated",
+        "importPath": "rest_framework.permissions",
+        "description": "rest_framework.permissions",
+        "isExtraImport": true,
+        "detail": "rest_framework.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "IsAuthenticated",
+        "importPath": "rest_framework.permissions",
+        "description": "rest_framework.permissions",
+        "isExtraImport": true,
+        "detail": "rest_framework.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "IsAuthenticated",
+        "importPath": "rest_framework.permissions",
+        "description": "rest_framework.permissions",
+        "isExtraImport": true,
+        "detail": "rest_framework.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "BasePermission",
+        "importPath": "rest_framework.permissions",
+        "description": "rest_framework.permissions",
+        "isExtraImport": true,
+        "detail": "rest_framework.permissions",
         "documentation": {}
     },
     {
@@ -3405,6 +3469,14 @@
     },
     {
         "label": "filter_academics_queryset",
+        "importPath": "academics.utils",
+        "description": "academics.utils",
+        "isExtraImport": true,
+        "detail": "academics.utils",
+        "documentation": {}
+    },
+    {
+        "label": "get_role_name",
         "importPath": "academics.utils",
         "description": "academics.utils",
         "isExtraImport": true,
@@ -4014,30 +4086,6 @@
         "documentation": {}
     },
     {
-        "label": "IsAuthenticated",
-        "importPath": "rest_framework.permissions",
-        "description": "rest_framework.permissions",
-        "isExtraImport": true,
-        "detail": "rest_framework.permissions",
-        "documentation": {}
-    },
-    {
-        "label": "IsAuthenticated",
-        "importPath": "rest_framework.permissions",
-        "description": "rest_framework.permissions",
-        "isExtraImport": true,
-        "detail": "rest_framework.permissions",
-        "documentation": {}
-    },
-    {
-        "label": "IsAuthenticated",
-        "importPath": "rest_framework.permissions",
-        "description": "rest_framework.permissions",
-        "isExtraImport": true,
-        "detail": "rest_framework.permissions",
-        "documentation": {}
-    },
-    {
         "label": "get_object_or_404",
         "importPath": "rest_framework.generics",
         "description": "rest_framework.generics",
@@ -4101,6 +4149,54 @@
         "importPath": "json",
         "description": "json",
         "detail": "json",
+        "documentation": {}
+    },
+    {
+        "label": "post_save",
+        "importPath": "django.db.models.signals",
+        "description": "django.db.models.signals",
+        "isExtraImport": true,
+        "detail": "django.db.models.signals",
+        "documentation": {}
+    },
+    {
+        "label": "post_migrate",
+        "importPath": "django.db.models.signals",
+        "description": "django.db.models.signals",
+        "isExtraImport": true,
+        "detail": "django.db.models.signals",
+        "documentation": {}
+    },
+    {
+        "label": "post_save",
+        "importPath": "django.db.models.signals",
+        "description": "django.db.models.signals",
+        "isExtraImport": true,
+        "detail": "django.db.models.signals",
+        "documentation": {}
+    },
+    {
+        "label": "receiver",
+        "importPath": "django.dispatch",
+        "description": "django.dispatch",
+        "isExtraImport": true,
+        "detail": "django.dispatch",
+        "documentation": {}
+    },
+    {
+        "label": "receiver",
+        "importPath": "django.dispatch",
+        "description": "django.dispatch",
+        "isExtraImport": true,
+        "detail": "django.dispatch",
+        "documentation": {}
+    },
+    {
+        "label": "Lower",
+        "importPath": "django.db.models.functions",
+        "description": "django.db.models.functions",
+        "isExtraImport": true,
+        "detail": "django.db.models.functions",
         "documentation": {}
     },
     {
@@ -4523,30 +4619,6 @@
         "description": "django.contrib.contenttypes.models",
         "isExtraImport": true,
         "detail": "django.contrib.contenttypes.models",
-        "documentation": {}
-    },
-    {
-        "label": "post_migrate",
-        "importPath": "django.db.models.signals",
-        "description": "django.db.models.signals",
-        "isExtraImport": true,
-        "detail": "django.db.models.signals",
-        "documentation": {}
-    },
-    {
-        "label": "post_save",
-        "importPath": "django.db.models.signals",
-        "description": "django.db.models.signals",
-        "isExtraImport": true,
-        "detail": "django.db.models.signals",
-        "documentation": {}
-    },
-    {
-        "label": "receiver",
-        "importPath": "django.dispatch",
-        "description": "django.dispatch",
-        "isExtraImport": true,
-        "detail": "django.dispatch",
         "documentation": {}
     },
     {
@@ -5231,11 +5303,29 @@
         "documentation": {}
     },
     {
+        "label": "get_role_name",
+        "kind": 2,
+        "importPath": "academics.utils",
+        "description": "academics.utils",
+        "peekOfCode": "def get_role_name(user):\n    \"\"\"Retourne le nom du rôle de l'utilisateur.\"\"\"\n    if hasattr(user, 'role') and user.role:\n        return user.role.name\n    return None\ndef get_parent_enfants_ids(user):\n    \"\"\"Retourne les IDs des enfants d'un parent.\"\"\"\n    from users.models import Apprenant\n    return list(\n        Apprenant.objects.filter(tuteur=user).values_list('id', flat=True)",
+        "detail": "academics.utils",
+        "documentation": {}
+    },
+    {
+        "label": "get_parent_enfants_ids",
+        "kind": 2,
+        "importPath": "academics.utils",
+        "description": "academics.utils",
+        "peekOfCode": "def get_parent_enfants_ids(user):\n    \"\"\"Retourne les IDs des enfants d'un parent.\"\"\"\n    from users.models import Apprenant\n    return list(\n        Apprenant.objects.filter(tuteur=user).values_list('id', flat=True)\n    )\ndef get_user_academic_context(request):\n    \"\"\"\n    Extrait le contexte académique de l'utilisateur.\n    Returns:",
+        "detail": "academics.utils",
+        "documentation": {}
+    },
+    {
         "label": "get_user_academic_context",
         "kind": 2,
         "importPath": "academics.utils",
         "description": "academics.utils",
-        "peekOfCode": "def get_user_academic_context(request):\n    \"\"\"\n    Extrait le contexte académique de l'utilisateur.\n    Returns:\n        dict: {\n            'bypass': bool,              # True pour SuperUser\n            'institution_id': int|None,  # ID institution\n            'role_name': str|None,       # Nom du rôle\n            'user_classe_id': int|None,  # ID de la classe de l'apprenant\n            'user_groupe_id': int|None,  # ID du groupe de l'apprenant",
+        "peekOfCode": "def get_user_academic_context(request):\n    \"\"\"\n    Extrait le contexte académique de l'utilisateur.\n    Returns:\n        dict: {\n            'bypass': bool,              # True pour SuperAdmin (Institution seulement)\n            'blocked': bool,             # True pour SuperAdmin sur ressources internes\n            'institution_id': int|None,\n            'role_name': str|None,\n            'user_classe_id': int|None,",
         "detail": "academics.utils",
         "documentation": {}
     },
@@ -5244,7 +5334,7 @@
         "kind": 2,
         "importPath": "academics.utils",
         "description": "academics.utils",
-        "peekOfCode": "def filter_academics_queryset(queryset, request, model_name, is_detail=False):\n    \"\"\"\n    Filtre un queryset academics selon le rôle.\n    Args:\n        queryset: QuerySet Django\n        request: Request Django\n        model_name: 'Institution', 'Groupe', 'Classe', 'Inscription', etc.\n        is_detail: True si c'est une vue détail (filtrage plus strict)\n    Returns:\n        QuerySet filtré",
+        "peekOfCode": "def filter_academics_queryset(queryset, request, model_name, is_detail=False):\n    \"\"\"\n    Filtre un queryset academics selon le rôle.\n    Args:\n        queryset   : QuerySet Django\n        request    : Request Django\n        model_name : 'Institution', 'Groupe', 'Classe', 'Inscription', etc.\n        is_detail  : True si c'est une vue détail (filtrage plus strict)\n    Returns:\n        QuerySet filtré",
         "detail": "academics.utils",
         "documentation": {}
     },
@@ -5253,7 +5343,7 @@
         "kind": 2,
         "importPath": "academics.utils",
         "description": "academics.utils",
-        "peekOfCode": "def get_filtered_academic_object(model_class, pk, request, model_name):\n    \"\"\"\n    Récupère un objet académique filtré par rôle (vue détail).\n    Usage:\n        groupe = get_filtered_academic_object(Groupe, groupe_id, request, 'Groupe')\n    \"\"\"\n    qs = model_class.objects.all()\n    qs = filter_academics_queryset(qs, request, model_name, is_detail=True)\n    return get_object_or_404(qs, pk=pk)\ndef can_modify_academic_resource(user, obj, model_name):",
+        "peekOfCode": "def get_filtered_academic_object(model_class, pk, request, model_name):\n    \"\"\"\n    Récupère un objet académique filtré par rôle (vue détail).\n    \"\"\"\n    qs = model_class.objects.all()\n    qs = filter_academics_queryset(qs, request, model_name, is_detail=True)\n    return get_object_or_404(qs, pk=pk)\ndef can_modify_academic_resource(user, obj, model_name):\n    \"\"\"\n    Vérifie si l'utilisateur peut modifier une ressource académique.",
         "detail": "academics.utils",
         "documentation": {}
     },
@@ -5262,7 +5352,7 @@
         "kind": 2,
         "importPath": "academics.utils",
         "description": "academics.utils",
-        "peekOfCode": "def can_modify_academic_resource(user, obj, model_name):\n    \"\"\"\n    Vérifie si l'utilisateur peut modifier une ressource académique.\n    Args:\n        user: Utilisateur\n        obj: Objet à modifier\n        model_name: Type de ressource\n    Returns:\n        bool: True si autorisé\n    \"\"\"",
+        "peekOfCode": "def can_modify_academic_resource(user, obj, model_name):\n    \"\"\"\n    Vérifie si l'utilisateur peut modifier une ressource académique.\n    SuperAdmin : peut modifier Institution uniquement\n    Admin/Responsable : peuvent modifier dans leur institution\n    Formateur : peut modifier les groupes où il enseigne\n    Apprenant/Parent : aucune modification\n    \"\"\"\n    if getattr(user, 'is_superuser', False):\n        # SuperAdmin : uniquement Institution",
         "detail": "academics.utils",
         "documentation": {}
     },
@@ -5271,7 +5361,7 @@
         "kind": 2,
         "importPath": "academics.utils",
         "description": "academics.utils",
-        "peekOfCode": "def get_user_groupes_ids(user):\n    \"\"\"\n    Retourne les IDs des groupes où l'utilisateur enseigne (Formateur).\n    Utile pour des requêtes complexes.\n    \"\"\"\n    role_name = user.role.name if hasattr(user, 'role') and user.role else None\n    if role_name == 'Formateur':\n        from .models import Groupe\n        return list(Groupe.objects.filter(\n            enseignants=user,",
+        "peekOfCode": "def get_user_groupes_ids(user):\n    \"\"\"Retourne les IDs des groupes où le formateur enseigne.\"\"\"\n    role_name = get_role_name(user)\n    if role_name == 'Formateur':\n        from .models import Groupe\n        return list(Groupe.objects.filter(\n            formateurs=user,\n            institution_id=user.institution_id\n        ).values_list('id', flat=True))\n    return []",
         "detail": "academics.utils",
         "documentation": {}
     },
@@ -5280,7 +5370,7 @@
         "kind": 2,
         "importPath": "academics.utils",
         "description": "academics.utils",
-        "peekOfCode": "def get_user_classe_id(user):\n    \"\"\"\n    Retourne l'ID de la classe de l'apprenant.\n    \"\"\"\n    role_name = user.role.name if hasattr(user, 'role') and user.role else None\n    if role_name == 'Apprenant':\n        from .models import Inscription\n        inscription = Inscription.objects.filter(\n            apprenant=user,\n            statut=\"actif\"",
+        "peekOfCode": "def get_user_classe_id(user):\n    \"\"\"Retourne l'ID de la classe de l'apprenant.\"\"\"\n    role_name = get_role_name(user)\n    if role_name == 'Apprenant':\n        from .models import Inscription\n        inscription = Inscription.objects.filter(\n            apprenant=user,\n            statut=\"actif\"\n        ).select_related('classe').first()\n        if inscription and inscription.classe:",
         "detail": "academics.utils",
         "documentation": {}
     },
@@ -5289,7 +5379,7 @@
         "kind": 6,
         "importPath": "academics.views",
         "description": "academics.views",
-        "peekOfCode": "class InstitutionAPIView(APIView):\n    \"\"\"\n    Gestion des institutions avec filtrage par rôle.\n    - SuperUser : Toutes les institutions\n    - Admin/Responsable : Leur institution uniquement\n    - Formateur/Apprenant : Leur institution uniquement\n    \"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, pk=None):\n        if pk:",
+        "peekOfCode": "class InstitutionAPIView(APIView):\n    \"\"\"\n    - GET/PUT/PATCH/DELETE : Auth obligatoire + filtrage par rôle\n    - POST : Public (AllowAny) pour permettre onboarding / signup institution\n    \"\"\"\n    permission_classes = [IsAuthenticated]  # défaut\n    def get_permissions(self):\n        if self.request.method == \"POST\":\n            return [AllowAny()]\n        return [IsAuthenticated()]",
         "detail": "academics.views",
         "documentation": {}
     },
@@ -5415,7 +5505,7 @@
         "kind": 6,
         "importPath": "academics.viewsets",
         "description": "academics.viewsets",
-        "peekOfCode": "class DomaineEtudeViewSet(BaseModelViewSet):\n    queryset = DomaineEtude.objects.all()\n    serializer_class = DomaineEtudeSerializer\n    permission_classes = [permissions.IsAuthenticated]\n    def get_queryset(self):\n        qs = super().get_queryset()\n        # list vs detail\n        is_detail = self.action in (\"retrieve\", \"update\", \"partial_update\", \"destroy\")\n        return filter_academics_queryset(qs, self.request, \"DomaineEtude\", is_detail=is_detail)\nclass MatiereViewSet(BaseModelViewSet):",
+        "peekOfCode": "class DomaineEtudeViewSet(BaseModelViewSet):\n    \"\"\"\n    DomaineEtude :\n    - SuperAdmin   : BLOQUÉ\n    - Admin        : CRUD complet\n    - Responsable  : CRUD complet\n    - Formateur    : Lecture seule\n    - Apprenant    : Lecture seule\n    - Parent       : BLOQUÉ\n    \"\"\"",
         "detail": "academics.viewsets",
         "documentation": {}
     },
@@ -5424,7 +5514,7 @@
         "kind": 6,
         "importPath": "academics.viewsets",
         "description": "academics.viewsets",
-        "peekOfCode": "class MatiereViewSet(BaseModelViewSet):\n    queryset = Matiere.objects.all()\n    serializer_class = MatiereSerializer\n    permission_classes = [permissions.IsAuthenticated]\n    def get_queryset(self):\n        qs = super().get_queryset()\n        is_detail = self.action in (\"retrieve\", \"update\", \"partial_update\", \"destroy\")\n        return filter_academics_queryset(qs, self.request, \"Matiere\", is_detail=is_detail)\nclass SpecialiteViewSet(BaseModelViewSet):\n    queryset = Specialite.objects.all()",
+        "peekOfCode": "class MatiereViewSet(BaseModelViewSet):\n    \"\"\"\n    Matiere :\n    - SuperAdmin   : BLOQUÉ\n    - Admin        : CRUD complet\n    - Responsable  : CRUD complet\n    - Formateur    : Lecture seule\n    - Apprenant    : Lecture seule\n    - Parent       : BLOQUÉ\n    \"\"\"",
         "detail": "academics.viewsets",
         "documentation": {}
     },
@@ -5433,7 +5523,7 @@
         "kind": 6,
         "importPath": "academics.viewsets",
         "description": "academics.viewsets",
-        "peekOfCode": "class SpecialiteViewSet(BaseModelViewSet):\n    queryset = Specialite.objects.all()\n    serializer_class = SpecialiteSerializer\n    permission_classes = [permissions.IsAuthenticated]\n    def get_queryset(self):\n        qs = super().get_queryset()\n        is_detail = self.action in (\"retrieve\", \"update\", \"partial_update\", \"destroy\")\n        return filter_academics_queryset(qs, self.request, \"Specialite\", is_detail=is_detail)\nclass AnneeScolaireViewSet(BaseModelViewSet):\n    queryset = AnneeScolaire.objects.all()",
+        "peekOfCode": "class SpecialiteViewSet(BaseModelViewSet):\n    \"\"\"\n    Specialite :\n    - SuperAdmin   : BLOQUÉ\n    - Admin        : CRUD complet\n    - Responsable  : CRUD complet\n    - Formateur    : Lecture seule\n    - Apprenant    : Lecture seule\n    - Parent       : BLOQUÉ\n    \"\"\"",
         "detail": "academics.viewsets",
         "documentation": {}
     },
@@ -5442,7 +5532,7 @@
         "kind": 6,
         "importPath": "academics.viewsets",
         "description": "academics.viewsets",
-        "peekOfCode": "class AnneeScolaireViewSet(BaseModelViewSet):\n    queryset = AnneeScolaire.objects.all()\n    serializer_class = AnneeScolaireSerializer\n    permission_classes = [permissions.IsAuthenticated]\n    def get_queryset(self):\n        qs = super().get_queryset()\n        is_detail = self.action in (\"retrieve\", \"update\", \"partial_update\", \"destroy\")\n        return filter_academics_queryset(qs, self.request, \"AnneeScolaire\", is_detail=is_detail)",
+        "peekOfCode": "class AnneeScolaireViewSet(BaseModelViewSet):\n    \"\"\"\n    AnneeScolaire :\n    - SuperAdmin   : BLOQUÉ\n    - Admin        : CRUD complet\n    - Responsable  : Lecture seule\n    - Formateur    : Lecture seule\n    - Apprenant    : Lecture seule\n    - Parent       : Lecture seule (années actives de ses enfants)\n    \"\"\"",
         "detail": "academics.viewsets",
         "documentation": {}
     },
@@ -6459,7 +6549,7 @@
         "kind": 6,
         "importPath": "courses.apps",
         "description": "courses.apps",
-        "peekOfCode": "class CoursesConfig(AppConfig):\n    default_auto_field = 'django.db.models.BigAutoField'\n    name = 'courses'",
+        "peekOfCode": "class CoursesConfig(AppConfig):\n    default_auto_field = 'django.db.models.BigAutoField'\n    name = 'courses'\n    def ready(self):\n        import courses.signals  # noqa — déclenche l'enregistrement des signaux",
         "detail": "courses.apps",
         "documentation": {}
     },
@@ -6693,7 +6783,7 @@
         "kind": 6,
         "importPath": "courses.serializers",
         "description": "courses.serializers",
-        "peekOfCode": "class InscriptionCoursSerializer(serializers.ModelSerializer):\n    # lecture nested\n    apprenant = ApprenantSerializer(read_only=True)\n    cours = CoursSerializer(read_only=True)\n    institution_nom = serializers.CharField(source=\"institution.nom\", read_only=True)\n    annee_scolaire_nom = serializers.CharField(source=\"annee_scolaire.annee_format_classique\", read_only=True)\n    # ✅ écriture : apprenant_id / cours_id\n    apprenant_id = serializers.PrimaryKeyRelatedField(\n        queryset=Apprenant.objects.all(),\n        source='apprenant',",
+        "peekOfCode": "class InscriptionCoursSerializer(serializers.ModelSerializer):\n    # lecture nested\n    apprenant = ApprenantSerializer(read_only=True)\n    cours = CoursSerializer(read_only=True)\n    institution_nom = serializers.CharField(source=\"institution.nom\", read_only=True)\n    annee_scolaire_nom = serializers.CharField(source=\"annee_scolaire.annee_format_classique\", read_only=True)\n    # écriture : apprenant_id / cours_id\n    apprenant_id = serializers.PrimaryKeyRelatedField(\n        queryset=Apprenant.objects.all(),\n        source='apprenant',",
         "detail": "courses.serializers",
         "documentation": {}
     },
@@ -6788,6 +6878,24 @@
         "documentation": {}
     },
     {
+        "label": "inscrire_apprenants_groupe",
+        "kind": 2,
+        "importPath": "courses.signals",
+        "description": "courses.signals",
+        "peekOfCode": "def inscrire_apprenants_groupe(sender, instance, created, **kwargs):\n    \"\"\"\n    Après la création d'un cours, inscrit automatiquement\n    tous les apprenants de la classe du groupe associé.\n    \"\"\"\n    if not created:\n        return\n    groupe = instance.groupe\n    if not groupe:\n        return",
+        "detail": "courses.signals",
+        "documentation": {}
+    },
+    {
+        "label": "inscrire_apprenant_aux_cours_de_la_classe",
+        "kind": 2,
+        "importPath": "courses.signals",
+        "description": "courses.signals",
+        "peekOfCode": "def inscrire_apprenant_aux_cours_de_la_classe(sender, instance, created, **kwargs):\n    \"\"\"\n    Après l'inscription d'un apprenant dans une classe,\n    l'inscrit automatiquement à tous les cours de cette classe\n    (via les groupes de la classe).\n    \"\"\"\n    if not created:\n        return\n    classe = instance.classe\n    if not classe:",
+        "detail": "courses.signals",
+        "documentation": {}
+    },
+    {
         "label": "urlpatterns",
         "kind": 5,
         "importPath": "courses.urls",
@@ -6810,7 +6918,7 @@
         "kind": 2,
         "importPath": "courses.utils",
         "description": "courses.utils",
-        "peekOfCode": "def recompute_cascade(apprenant, sequence: Sequence):\n    \"\"\"\n    Recalcule l'état terminé pour:\n      sequence -> module -> cours\n    pour un apprenant donné.\n    \"\"\"\n    module = sequence.module\n    cours = module.cours\n    # ---- SEQUENCE DONE ? (tous les blocs de la séquence terminés)\n    blocs_ids = sequence.blocs_contenu.filter(est_visible=True).values_list(\"id\", flat=True)",
+        "peekOfCode": "def recompute_cascade(apprenant, sequence: Sequence):\n    \"\"\"\n    Recalcule l'état terminé pour:\n      sequence -> module -> cours\n    pour un apprenant donné.\n    \"\"\"\n    module = sequence.module\n    cours = module.cours\n    # ---- SEQUENCE DONE ?\n    blocs_ids = sequence.blocs_contenu.filter(est_visible=True).values_list(\"id\", flat=True)",
         "detail": "courses.utils",
         "documentation": {}
     },
@@ -6828,7 +6936,7 @@
         "kind": 2,
         "importPath": "courses.utils",
         "description": "courses.utils",
-        "peekOfCode": "def filter_queryset_by_role(queryset, request, model_name='Cours'):\n    \"\"\"\n    Filtre un queryset selon le rôle de l'utilisateur.\n    RÈGLES STRICTES :\n    - SuperUser : TOUT\n    - Admin : Son institution (toutes années)\n    - Responsable : Son institution + son année\n    - Formateur : SES cours uniquement (enseignant=user) + institution + année\n    - Apprenant : Cours inscrits uniquement\n    Args:",
+        "peekOfCode": "def filter_queryset_by_role(queryset, request, model_name=\"Cours\"):\n    user = request.user\n    ctx = get_user_context(request)\n    if ctx.get(\"bypass\"):\n        return queryset\n    role_name = ctx.get(\"role_name\")\n    # APPRENANT\n    if role_name == \"Apprenant\" or ctx.get(\"strict\"):\n        cours_ids = _get_apprenant_cours_ids(user, ctx.get(\"institution_id\"))\n        apprenant_obj = _get_apprenant_obj(user)",
         "detail": "courses.utils",
         "documentation": {}
     },
@@ -6837,7 +6945,7 @@
         "kind": 2,
         "importPath": "courses.utils",
         "description": "courses.utils",
-        "peekOfCode": "def get_filtered_object(model_class, pk, request, model_name):\n    \"\"\"\n    Récupère un objet filtré par rôle ou lève Http404.\n    Usage:\n        cours = get_filtered_object(Cours, cours_id, request, 'Cours')\n    \"\"\"\n    qs = model_class.objects.all()\n    qs = filter_queryset_by_role(qs, request, model_name)\n    return get_object_or_404(qs, pk=pk)\ndef can_create_in_context(user, parent_obj=None):",
+        "peekOfCode": "def get_filtered_object(model_class, pk, request, model_name):\n    qs = model_class.objects.all()\n    qs = filter_queryset_by_role(qs, request, model_name)\n    return get_object_or_404(qs, pk=pk)\ndef can_create_in_context(user, parent_obj=None):\n    if user.is_superuser:\n        return True\n    role_name = user.role.name if hasattr(user, \"role\") and user.role else None\n    if role_name in [\"Admin\", \"Responsable\"]:\n        return True",
         "detail": "courses.utils",
         "documentation": {}
     },
@@ -6846,7 +6954,7 @@
         "kind": 2,
         "importPath": "courses.utils",
         "description": "courses.utils",
-        "peekOfCode": "def can_create_in_context(user, parent_obj=None):\n    \"\"\"\n    Vérifie si l'utilisateur peut créer une ressource.\n    Pour Formateur : peut créer uniquement si parent_obj.enseignant == user\n    Args:\n        user: Utilisateur connecté\n        parent_obj: Objet parent (Cours, Module, Sequence, etc.)\n    Returns:\n        bool: True si autorisé\n    \"\"\"",
+        "peekOfCode": "def can_create_in_context(user, parent_obj=None):\n    if user.is_superuser:\n        return True\n    role_name = user.role.name if hasattr(user, \"role\") and user.role else None\n    if role_name in [\"Admin\", \"Responsable\"]:\n        return True\n    if role_name == \"Formateur\":\n        if parent_obj is None:\n            return True\n        cours = None",
         "detail": "courses.utils",
         "documentation": {}
     },
@@ -6864,7 +6972,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class CoursDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'un cours\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        \"\"\"Récupère un cours filtré par rôle\"\"\"\n        return get_filtered_object(Cours, pk, request, 'Cours')\n    def get(self, request, pk):\n        obj = self.get_object(pk, request)\n        return api_success(\n            \"Cours trouvé avec succès\", ",
+        "peekOfCode": "class CoursDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'un cours\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        return get_filtered_object(Cours, pk, request, 'Cours')\n    def get(self, request, pk):\n        obj = self.get_object(pk, request)\n        return api_success(\"Cours trouvé avec succès\", CoursSerializer(obj).data, status.HTTP_200_OK)\n    def put(self, request, pk):\n        obj = self.get_object(pk, request)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -6873,7 +6981,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class CoursModulesAPIView(APIView):\n    \"\"\"Liste les modules d'un cours\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, cours_id):\n        try:\n            # Vérifier l'accès au cours\n            cours = get_filtered_object(Cours, cours_id, request, 'Cours')\n            # Récupérer les modules\n            modules = Module.objects.filter(cours=cours).order_by('id')\n            serializer = ModuleSerializer(modules, many=True)",
+        "peekOfCode": "class CoursModulesAPIView(APIView):\n    \"\"\"Liste les modules d'un cours\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, cours_id):\n        try:\n            cours = get_filtered_object(Cours, cours_id, request, 'Cours')\n            modules = Module.objects.filter(cours=cours).order_by('id')\n            serializer = ModuleSerializer(modules, many=True)\n            return api_success(\n                f\"Modules du cours '{cours}' récupérés avec succès\",",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -6882,7 +6990,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class ModuleListCreateAPIView(APIView):\n    \"\"\"Liste et création de modules\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        try:\n            qs = Module.objects.select_related(\n                'cours', 'institution', 'annee_scolaire'\n            ).all()\n            # Filtrage par rôle (Formateur voit uniquement modules de SES cours)\n            qs = filter_queryset_by_role(qs, request, 'Module')",
+        "peekOfCode": "class ModuleListCreateAPIView(APIView):\n    \"\"\"Liste et création de modules\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        try:\n            qs = Module.objects.select_related('cours', 'institution', 'annee_scolaire').all()\n            qs = filter_queryset_by_role(qs, request, 'Module')\n            qs = qs.order_by('-id')\n            serializer = ModuleSerializer(qs, many=True)\n            return api_success(\"Liste des modules récupérée avec succès\", serializer.data, status.HTTP_200_OK)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -6891,7 +6999,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class ModuleDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'un module\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        return get_filtered_object(Module, pk, request, 'Module')\n    def get(self, request, pk):\n        obj = self.get_object(pk, request)\n        return api_success(\n            \"Module trouvé avec succès\",\n            ModuleSerializer(obj).data,",
+        "peekOfCode": "class ModuleDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'un module\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        return get_filtered_object(Module, pk, request, 'Module')\n    def get(self, request, pk):\n        obj = self.get_object(pk, request)\n        return api_success(\"Module trouvé avec succès\", ModuleSerializer(obj).data, status.HTTP_200_OK)\n    def put(self, request, pk):\n        obj = self.get_object(pk, request)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -6909,7 +7017,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class SequenceListCreateAPIView(APIView):\n    \"\"\"Liste et création de séquences\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        try:\n            qs = Sequence.objects.select_related(\n                'module', 'institution', 'annee_scolaire'\n            ).all()\n            # Filtrage par rôle (Formateur voit uniquement séquences de SES cours)\n            qs = filter_queryset_by_role(qs, request, 'Sequence')",
+        "peekOfCode": "class SequenceListCreateAPIView(APIView):\n    \"\"\"Liste et création de séquences\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        try:\n            qs = Sequence.objects.select_related('module', 'institution', 'annee_scolaire').all()\n            qs = filter_queryset_by_role(qs, request, 'Sequence')\n            qs = qs.order_by('-id')\n            serializer = SequenceSerializer(qs, many=True)\n            return api_success(\"Liste des séquences récupérée avec succès\", serializer.data, status.HTTP_200_OK)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -6918,7 +7026,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class SequenceDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'une séquence\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        return get_filtered_object(Sequence, pk, request, 'Sequence')\n    def _check_edit_permission(self, request, sequence):\n        # ✅ IMPORTANT : vérif sur le module parent (comme dans POST)\n        module = sequence.module\n        if not can_create_in_context(request.user, module):\n            return api_error(",
+        "peekOfCode": "class SequenceDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'une séquence\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        return get_filtered_object(Sequence, pk, request, 'Sequence')\n    def _check_edit_permission(self, request, sequence):\n        module = sequence.module\n        if not can_create_in_context(request.user, module):\n            return api_error(\n                \"Vous ne pouvez pas modifier/supprimer cette séquence\",",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -6927,7 +7035,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class SequenceBlocsAPIView(APIView):\n    \"\"\"Liste les blocs de contenu d'une séquence\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, sequence_id):\n        \"\"\"Récupère les blocs de contenu d'une séquence\"\"\"\n        try:\n            context = get_user_context(request)\n            sequence_qs = Sequence.objects.all()\n            if context.get('institution_id'):\n                sequence_qs = sequence_qs.filter(institution_id=context['institution_id'])",
+        "peekOfCode": "class SequenceBlocsAPIView(APIView):\n    \"\"\"Liste les blocs de contenu d'une séquence\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, sequence_id):\n        \"\"\"Récupère les blocs de contenu d'une séquence\"\"\"\n        try:\n            context = get_user_context(request)\n            # ✅ #2 FIX : filtre conditionnel sur la séquence\n            sequence_qs = Sequence.objects.all()\n            sequence_qs = _apply_context_filter(sequence_qs, context)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -6936,7 +7044,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class SequenceRessourcesAPIView(APIView):\n    \"\"\"Liste les ressources d'une séquence\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, sequence_id):\n        \"\"\"Récupère les ressources d'une séquence\"\"\"\n        try:\n            context = get_user_context(request)\n            sequence_qs = Sequence.objects.all()\n            if context.get('institution_id'):\n                sequence_qs = sequence_qs.filter(institution_id=context['institution_id'])",
+        "peekOfCode": "class SequenceRessourcesAPIView(APIView):\n    \"\"\"Liste les ressources d'une séquence\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, sequence_id):\n        \"\"\"Récupère les ressources d'une séquence\"\"\"\n        try:\n            context = get_user_context(request)\n            # ✅ #3 FIX : filtre conditionnel sur la séquence\n            sequence_qs = Sequence.objects.all()\n            sequence_qs = _apply_context_filter(sequence_qs, context)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -6945,7 +7053,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class BlocContenuListCreateAPIView(APIView):\n    \"\"\"Liste et création de blocs de contenu\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère les blocs de contenu filtrés\"\"\"\n        try:\n            context = get_user_context(request)\n            blocs = BlocContenu.objects.select_related('sequence').all()\n            # Filtrer par séquence si fourni\n            sequence_id = request.query_params.get('sequence')",
+        "peekOfCode": "class BlocContenuListCreateAPIView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère les blocs de contenu filtrés — avec debug temporaire\"\"\"\n        try:\n            context = get_user_context(request)\n            blocs = BlocContenu.objects.select_related('sequence').all()\n            sequence_id = request.query_params.get('sequence')\n            print(f\"\\n[BLOCS DEBUG] =============================\")\n            print(f\"[BLOCS DEBUG] user={request.user} (pk={request.user.pk})\")",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -6954,7 +7062,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class BlocContenuDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'un bloc\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        \"\"\"Récupère un bloc par son ID avec filtrage contexte\"\"\"\n        context = get_user_context(request)\n        qs = BlocContenu.objects.select_related('sequence')\n        if context.get('institution_id'):\n            qs = qs.filter(sequence__institution_id=context['institution_id'])\n        if context.get('annee_scolaire_id'):",
+        "peekOfCode": "class BlocContenuDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'un bloc\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        \"\"\"Récupère un bloc par son ID avec filtrage contexte conditionnel\"\"\"\n        context = get_user_context(request)\n        qs = BlocContenu.objects.select_related('sequence')\n        # ✅ #4 FIX : filtre conditionnel\n        qs = _apply_sequence_context_filter(qs, context)\n        return get_object_or_404(qs, pk=pk)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -6972,7 +7080,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class RessourceSequenceListCreateAPIView(APIView):\n    \"\"\"Liste et ajout de ressources/pièces jointes\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère les ressources filtrées\"\"\"\n        try:\n            context = get_user_context(request)\n            ressources = RessourceSequence.objects.select_related(\n                'sequence', 'ajoute_par'\n            ).all()",
+        "peekOfCode": "class RessourceSequenceListCreateAPIView(APIView):\n    \"\"\"Liste et ajout de ressources/pièces jointes\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        try:\n            context = get_user_context(request)\n            ressources = RessourceSequence.objects.select_related('sequence', 'ajoute_par').all()\n            sequence_id = request.query_params.get('sequence')\n            if sequence_id:\n                ressources = ressources.filter(sequence_id=sequence_id)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -6981,7 +7089,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class RessourceSequenceDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'une ressource\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        \"\"\"Récupère une ressource par son ID avec filtrage contexte\"\"\"\n        context = get_user_context(request)\n        qs = RessourceSequence.objects.select_related('sequence', 'ajoute_par')\n        if context.get('institution_id'):\n            qs = qs.filter(sequence__institution_id=context['institution_id'])\n        if context.get('annee_scolaire_id'):",
+        "peekOfCode": "class RessourceSequenceDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'une ressource\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        context = get_user_context(request)\n        qs = RessourceSequence.objects.select_related('sequence', 'ajoute_par')\n        # ✅ #6 FIX : filtre conditionnel\n        qs = _apply_sequence_context_filter(qs, context)\n        return get_object_or_404(qs, pk=pk)\n    def get(self, request, pk):",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -6990,7 +7098,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class RessourceTelechargementAPIView(APIView):\n    \"\"\"Gère le téléchargement des ressources\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, pk):\n        \"\"\"Télécharge une ressource\"\"\"\n        try:\n            context = get_user_context(request)\n            qs = RessourceSequence.objects.all()\n            # Filtrer par contexte\n            if context.get('institution_id'):",
+        "peekOfCode": "class RessourceTelechargementAPIView(APIView):\n    \"\"\"Gère le téléchargement des ressources\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, pk):\n        try:\n            context = get_user_context(request)\n            qs = RessourceSequence.objects.all()\n            # ✅ #7 FIX : filtre conditionnel\n            qs = _apply_sequence_context_filter(qs, context)\n            ressource = get_object_or_404(qs, pk=pk)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -6999,7 +7107,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class InscriptionCoursListCreateAPIView(APIView):\n    \"\"\"Liste et création d'inscriptions aux cours\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        try:\n            context = get_user_context(request)\n            qs = InscriptionCours.objects.select_related(\n                'apprenant', 'cours', 'institution', 'annee_scolaire'\n            ).all()\n            if context.get('institution_id'):",
+        "peekOfCode": "class InscriptionCoursListCreateAPIView(APIView):\n    \"\"\"Liste et création d'inscriptions aux cours\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        print(\"=== DEBUG InscriptionCoursListCreateAPIView ===\")\n        print(\"user:\", request.user)\n        print(\"user pk:\", request.user.pk)\n        print(\"user type:\", type(request.user))\n        print(\"role raw:\", getattr(request.user, \"role\", None))\n        try:",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7008,7 +7116,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class InscriptionCoursDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'une inscription\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        \"\"\"\n        ✅ FIX : on récupère l'inscription par PK uniquement,\n        SANS filtre institution/annee_scolaire.\n        Raison : ces filtres sont utiles pour le LIST (pagination/scope),\n        mais pour retrieve/update/delete ils provoquent des faux 404\n        si l'objet existe mais que le contexte utilisateur ne correspond",
+        "peekOfCode": "class InscriptionCoursDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'une inscription\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        try:\n            return InscriptionCours.objects.select_related(\n                'apprenant', 'cours', 'institution', 'annee_scolaire'\n            ).get(pk=pk)\n        except InscriptionCours.DoesNotExist:\n            raise Http404(f\"Inscription {pk} introuvable.\")",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7017,7 +7125,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class SuiviListCreateAPIView(APIView):\n    \"\"\"Liste et création de suivis\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère la liste des suivis filtrés par contexte\"\"\"\n        try:\n            context = get_user_context(request)\n            qs = Suivi.objects.select_related(\n                'apprenant', 'cours', 'institution', 'annee_scolaire'\n            ).all()",
+        "peekOfCode": "class SuiviListCreateAPIView(APIView):\n    \"\"\"Liste et création de suivis\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        try:\n            context = get_user_context(request)\n            qs = Suivi.objects.select_related('apprenant', 'cours', 'institution', 'annee_scolaire').all()\n            qs = _apply_context_filter(qs, context)\n            qs = qs.order_by('-date_debut')\n            serializer = SuiviSerializer(qs, many=True)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7026,7 +7134,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class SuiviDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'un suivi\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        \"\"\"Récupère un suivi par son ID avec filtrage contexte\"\"\"\n        context = get_user_context(request)\n        qs = Suivi.objects.select_related(\n            'apprenant', 'cours', 'institution', 'annee_scolaire'\n        )\n        if context.get('institution_id'):",
+        "peekOfCode": "class SuiviDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'un suivi\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        context = get_user_context(request)\n        qs = Suivi.objects.select_related('apprenant', 'cours', 'institution', 'annee_scolaire')\n        qs = _apply_context_filter(qs, context)\n        return get_object_or_404(qs, pk=pk)\n    def get(self, request, pk):\n        obj = self.get_object(pk, request)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7035,7 +7143,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class SessionListCreateAPIView(APIView):\n    \"\"\"Liste et création de sessions\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère la liste des sessions filtrées par contexte\"\"\"\n        try:\n            context = get_user_context(request)\n            qs = Session.objects.select_related(\n                'formateur', 'cours', 'institution', 'annee_scolaire'\n            ).all()",
+        "peekOfCode": "class SessionListCreateAPIView(APIView):\n    \"\"\"Liste et création de sessions\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        try:\n            context = get_user_context(request)\n            qs = Session.objects.select_related('formateur', 'cours', 'institution', 'annee_scolaire').all()\n            qs = _apply_context_filter(qs, context)\n            qs = qs.order_by('-date_debut')\n            serializer = SessionSerializer(qs, many=True)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7044,7 +7152,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class SessionDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'une session\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        \"\"\"Récupère une session par son ID avec filtrage contexte\"\"\"\n        context = get_user_context(request)\n        qs = Session.objects.select_related(\n            'formateur', 'cours', 'institution', 'annee_scolaire'\n        )\n        if context.get('institution_id'):",
+        "peekOfCode": "class SessionDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'une session\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        context = get_user_context(request)\n        qs = Session.objects.select_related('formateur', 'cours', 'institution', 'annee_scolaire')\n        qs = _apply_context_filter(qs, context)\n        return get_object_or_404(qs, pk=pk)\n    def get(self, request, pk):\n        obj = self.get_object(pk, request)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7053,7 +7161,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class SessionParticipantsAPIView(APIView):\n    \"\"\"Liste les participants d'une session\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, pk):\n        \"\"\"Récupère les participants d'une session\"\"\"\n        try:\n            context = get_user_context(request)\n            session_qs = Session.objects.all()\n            if context.get('institution_id'):\n                session_qs = session_qs.filter(institution_id=context['institution_id'])",
+        "peekOfCode": "class SessionParticipantsAPIView(APIView):\n    \"\"\"Liste les participants d'une session\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, pk):\n        try:\n            context = get_user_context(request)\n            session_qs = Session.objects.all()\n            session_qs = _apply_context_filter(session_qs, context)\n            session = get_object_or_404(session_qs, pk=pk)\n            participations = Participation.objects.filter(session=session).select_related('apprenant')",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7062,7 +7170,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class ParticipationListCreateAPIView(APIView):\n    \"\"\"Liste et création de participations\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère la liste des participations filtrées par contexte\"\"\"\n        try:\n            context = get_user_context(request)\n            qs = Participation.objects.select_related(\n                'session', 'apprenant', 'institution', 'annee_scolaire'\n            ).all()",
+        "peekOfCode": "class ParticipationListCreateAPIView(APIView):\n    \"\"\"Liste et création de participations\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        try:\n            context = get_user_context(request)\n            qs = Participation.objects.select_related('session', 'apprenant', 'institution', 'annee_scolaire').all()\n            qs = _apply_context_filter(qs, context)\n            qs = qs.order_by('-created_at')\n            serializer = ParticipationSerializer(qs, many=True)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7071,7 +7179,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class ParticipationDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'une participation\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        \"\"\"Récupère une participation par son ID avec filtrage contexte\"\"\"\n        context = get_user_context(request)\n        qs = Participation.objects.select_related(\n            'session', 'apprenant', 'institution', 'annee_scolaire'\n        )\n        if context.get('institution_id'):",
+        "peekOfCode": "class ParticipationDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour et suppression d'une participation\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk, request):\n        context = get_user_context(request)\n        qs = Participation.objects.select_related('session', 'apprenant', 'institution', 'annee_scolaire')\n        qs = _apply_context_filter(qs, context)\n        return get_object_or_404(qs, pk=pk)\n    def get(self, request, pk):\n        obj = self.get_object(pk, request)",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7089,7 +7197,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class BlocProgressToggleAPIView(APIView):\n    \"\"\"Marque un bloc comme terminé ou non terminé\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def put(self, request, bloc_id):\n        \"\"\"Toggle le statut de progression d'un bloc\"\"\"\n        try:\n            serializer = ProgressToggleSerializer(data=request.data)\n            if not serializer.is_valid():\n                return api_error(\n                    \"Erreur de validation\",",
+        "peekOfCode": "class BlocProgressToggleAPIView(APIView):\n    \"\"\"Marque un bloc comme terminé ou non terminé\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def put(self, request, bloc_id):\n        try:\n            serializer = ProgressToggleSerializer(data=request.data)\n            if not serializer.is_valid():\n                return api_error(\"Erreur de validation\", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)\n            apprenant = request.user.apprenant if hasattr(request.user, 'apprenant') else None\n            if not apprenant:",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7098,7 +7206,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class SequenceProgressListAPIView(APIView):\n    \"\"\"Liste les progressions sur les séquences\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère la liste des progressions de séquences\"\"\"\n        try:\n            apprenant_id = request.query_params.get('apprenant')\n            if apprenant_id:\n                qs = SequenceProgress.objects.filter(apprenant_id=apprenant_id)\n            else:",
+        "peekOfCode": "class SequenceProgressListAPIView(APIView):\n    \"\"\"Liste les progressions sur les séquences\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        try:\n            apprenant_id = request.query_params.get('apprenant')\n            if apprenant_id:\n                qs = SequenceProgress.objects.filter(apprenant_id=apprenant_id)\n            else:\n                if hasattr(request.user, 'apprenant'):",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7107,7 +7215,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class SequenceProgressToggleAPIView(APIView):\n    \"\"\"Marque une séquence comme terminée ou non terminée\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def put(self, request, sequence_id):\n        \"\"\"Toggle le statut de progression d'une séquence\"\"\"\n        try:\n            serializer = ProgressToggleSerializer(data=request.data)\n            if not serializer.is_valid():\n                return api_error(\n                    \"Erreur de validation\",",
+        "peekOfCode": "class SequenceProgressToggleAPIView(APIView):\n    \"\"\"Marque une séquence comme terminée ou non terminée\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def put(self, request, sequence_id):\n        try:\n            serializer = ProgressToggleSerializer(data=request.data)\n            if not serializer.is_valid():\n                return api_error(\"Erreur de validation\", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)\n            apprenant = request.user.apprenant if hasattr(request.user, 'apprenant') else None\n            if not apprenant:",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7116,7 +7224,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class ModuleProgressListAPIView(APIView):\n    \"\"\"Liste les progressions sur les modules\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère la liste des progressions de modules\"\"\"\n        try:\n            apprenant_id = request.query_params.get('apprenant')\n            if apprenant_id:\n                qs = ModuleProgress.objects.filter(apprenant_id=apprenant_id)\n            else:",
+        "peekOfCode": "class ModuleProgressListAPIView(APIView):\n    \"\"\"Liste les progressions sur les modules\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        try:\n            apprenant_id = request.query_params.get('apprenant')\n            if apprenant_id:\n                qs = ModuleProgress.objects.filter(apprenant_id=apprenant_id)\n            else:\n                if hasattr(request.user, 'apprenant'):",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7125,7 +7233,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class ModuleProgressToggleAPIView(APIView):\n    \"\"\"Marque un module comme terminé ou non terminé\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def put(self, request, module_id):\n        \"\"\"Toggle le statut de progression d'un module\"\"\"\n        try:\n            serializer = ProgressToggleSerializer(data=request.data)\n            if not serializer.is_valid():\n                return api_error(\n                    \"Erreur de validation\",",
+        "peekOfCode": "class ModuleProgressToggleAPIView(APIView):\n    \"\"\"Marque un module comme terminé ou non terminé\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def put(self, request, module_id):\n        try:\n            serializer = ProgressToggleSerializer(data=request.data)\n            if not serializer.is_valid():\n                return api_error(\"Erreur de validation\", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)\n            apprenant = request.user.apprenant if hasattr(request.user, 'apprenant') else None\n            if not apprenant:",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7134,7 +7242,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class CoursProgressListAPIView(APIView):\n    \"\"\"Liste les progressions sur les cours\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère la liste des progressions de cours\"\"\"\n        try:\n            apprenant_id = request.query_params.get('apprenant')\n            if apprenant_id:\n                qs = CoursProgress.objects.filter(apprenant_id=apprenant_id)\n            else:",
+        "peekOfCode": "class CoursProgressListAPIView(APIView):\n    \"\"\"Liste les progressions sur les cours\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        try:\n            apprenant_id = request.query_params.get('apprenant')\n            if apprenant_id:\n                qs = CoursProgress.objects.filter(apprenant_id=apprenant_id)\n            else:\n                if hasattr(request.user, 'apprenant'):",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7143,7 +7251,7 @@
         "kind": 6,
         "importPath": "courses.views",
         "description": "courses.views",
-        "peekOfCode": "class CoursProgressToggleAPIView(APIView):\n    \"\"\"Marque un cours comme terminé ou non terminé\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def put(self, request, cours_id):\n        \"\"\"Toggle le statut de progression d'un cours\"\"\"\n        try:\n            serializer = ProgressToggleSerializer(data=request.data)\n            if not serializer.is_valid():\n                return api_error(\n                    \"Erreur de validation\",",
+        "peekOfCode": "class CoursProgressToggleAPIView(APIView):\n    \"\"\"Marque un cours comme terminé ou non terminé\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def put(self, request, cours_id):\n        try:\n            serializer = ProgressToggleSerializer(data=request.data)\n            if not serializer.is_valid():\n                return api_error(\"Erreur de validation\", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)\n            apprenant = request.user.apprenant if hasattr(request.user, 'apprenant') else None\n            if not apprenant:",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -7746,7 +7854,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class QuizListCreateAPIView(APIView):\n    \"\"\"Liste tous les quiz ou crée un nouveau quiz\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère la liste de tous les quiz\"\"\"\n        try:\n            sequence_id = request.query_params.get('sequence')\n            quizz = Quiz.objects.select_related('sequence').all()\n            if sequence_id:\n                quizz = quizz.filter(sequence_id=sequence_id)",
+        "peekOfCode": "class QuizListCreateAPIView(APIView):\n    \"\"\"\n    Permissions :\n    - SuperAdmin   : BLOQUÉ\n    - Admin/Responsable : CRUD complet\n    - Formateur    : CRUD sur ses cours\n    - Apprenant    : Lecture seule (ses cours)\n    - Parent       : BLOQUÉ\n    \"\"\"\n    permission_classes = [IsAuthenticated]",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7755,43 +7863,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class QuizDetailAPIView(APIView):\n    \"\"\"Détails d'un quiz avec toutes ses questions\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        \"\"\"Récupère les détails d'un quiz\"\"\"\n        quiz = get_object_or_404(Quiz, pk=pk)\n        serializer = QuizDetailSerializer(quiz)\n        return api_success(\n            \"Quiz trouvé avec succès\",\n            serializer.data,",
-        "detail": "evaluations.views",
-        "documentation": {}
-    },
-    {
-        "label": "PassageQuizListCreateAPIView",
-        "kind": 6,
-        "importPath": "evaluations.views",
-        "description": "evaluations.views",
-        "peekOfCode": "class PassageQuizListCreateAPIView(APIView):\n    \"\"\"Liste des passages de quiz ou création d'un nouveau passage\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère la liste des passages de quiz\"\"\"\n        try:\n            apprenant_id = request.query_params.get('apprenant')\n            quiz_id = request.query_params.get('quiz')\n            passages = PassageQuiz.objects.select_related(\n                'apprenant',",
-        "detail": "evaluations.views",
-        "documentation": {}
-    },
-    {
-        "label": "PassageQuizDetailAPIView",
-        "kind": 6,
-        "importPath": "evaluations.views",
-        "description": "evaluations.views",
-        "peekOfCode": "class PassageQuizDetailAPIView(APIView):\n    \"\"\"Détails d'un passage de quiz\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        \"\"\"Récupère les détails d'un passage de quiz\"\"\"\n        passage = get_object_or_404(PassageQuiz, pk=pk)\n        serializer = PassageQuizDetailSerializer(passage)\n        return api_success(\n            \"Détails du passage de quiz récupérés avec succès\",\n            serializer.data,",
-        "detail": "evaluations.views",
-        "documentation": {}
-    },
-    {
-        "label": "ReponseQuizSubmitAPIView",
-        "kind": 6,
-        "importPath": "evaluations.views",
-        "description": "evaluations.views",
-        "peekOfCode": "class ReponseQuizSubmitAPIView(APIView):\n    \"\"\"Soumettre une réponse à une question de quiz\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request):\n        \"\"\"Soumet une réponse à une question de quiz\"\"\"\n        try:\n            passage_quiz_id = request.data.get('passage_quiz')\n            question_id = request.data.get('question')\n            choix_ids = request.data.get('choix_selectionnes', [])\n            if not passage_quiz_id or not question_id:",
-        "detail": "evaluations.views",
-        "documentation": {}
-    },
-    {
-        "label": "PassageQuizTerminerAPIView",
-        "kind": 6,
-        "importPath": "evaluations.views",
-        "description": "evaluations.views",
-        "peekOfCode": "class PassageQuizTerminerAPIView(APIView):\n    \"\"\"Terminer un quiz et calculer le score final\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request, pk):\n        \"\"\"Termine un passage de quiz et calcule le score final\"\"\"\n        try:\n            passage = get_object_or_404(PassageQuiz, pk=pk)\n            if passage.termine:\n                return api_error(\n                    \"Ce quiz a déjà été terminé\",",
+        "peekOfCode": "class QuizDetailAPIView(APIView):\n    \"\"\"Détails d'un quiz avec permissions par rôle.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        if _get_role(request.user) == 'Parent':\n            return api_error(\"Accès non autorisé.\", http_status=status.HTTP_403_FORBIDDEN)\n        quiz = get_object_or_404(Quiz, pk=pk)",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7800,7 +7872,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class QuestionListCreateAPIView(APIView):\n    \"\"\"Liste toutes les questions ou crée une nouvelle question\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère la liste des questions\"\"\"\n        try:\n            quiz_id = request.query_params.get('quiz')\n            evaluation_id = request.query_params.get('evaluation')\n            questions = Question.objects.prefetch_related('reponses_predefinies').all()\n            if quiz_id:",
+        "peekOfCode": "class QuestionListCreateAPIView(APIView):\n    \"\"\"\n    Permissions :\n    - SuperAdmin   : BLOQUÉ\n    - Admin/Responsable : CRUD complet\n    - Formateur    : CRUD sur ses quiz/évaluations\n    - Apprenant    : Lecture seule SANS champ est_correcte\n    - Parent       : BLOQUÉ\n    \"\"\"\n    permission_classes = [IsAuthenticated]",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7809,7 +7881,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class QuestionDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour ou suppression d'une question\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        \"\"\"Récupère les détails d'une question\"\"\"\n        question = get_object_or_404(Question, pk=pk)\n        serializer = QuestionSerializer(question)\n        return api_success(\n            \"Question trouvée avec succès\",\n            serializer.data,",
+        "peekOfCode": "class QuestionDetailAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        if role == 'Parent':\n            return api_error(\"Accès non autorisé.\", http_status=status.HTTP_403_FORBIDDEN)\n        question = get_object_or_404(Question, pk=pk)",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7818,7 +7890,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class ReponseListCreateAPIView(APIView):\n    \"\"\"Liste toutes les réponses prédéfinies ou crée une nouvelle réponse\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère la liste des réponses prédéfinies\"\"\"\n        try:\n            question_id = request.query_params.get('question')\n            reponses = Reponse.objects.select_related('question').all()\n            if question_id:\n                reponses = reponses.filter(question_id=question_id)",
+        "peekOfCode": "class ReponseListCreateAPIView(APIView):\n    \"\"\"\n    Réponses prédéfinies :\n    - Apprenant : lecture SANS est_correcte\n    - Parent : BLOQUÉ\n    \"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        err = _block_super_admin(request.user)\n        if err:",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7827,7 +7899,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class ReponseDetailAPIView(APIView):\n    \"\"\"Détails, mise à jour ou suppression d'une réponse prédéfinie\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        \"\"\"Récupère les détails d'une réponse\"\"\"\n        reponse = get_object_or_404(Reponse, pk=pk)\n        serializer = ReponseSerializer(reponse)\n        return api_success(\n            \"Réponse trouvée avec succès\",\n            serializer.data,",
+        "peekOfCode": "class ReponseDetailAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        if role == 'Parent':\n            return api_error(\"Accès non autorisé.\", http_status=status.HTTP_403_FORBIDDEN)\n        reponse = get_object_or_404(Reponse, pk=pk)",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7836,7 +7908,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class EvaluationListCreateAPIView(APIView):\n    \"\"\"Liste toutes les évaluations ou crée une nouvelle évaluation\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère la liste des évaluations\"\"\"\n        try:\n            cours_id = request.query_params.get('cours')\n            enseignant_id = request.query_params.get('enseignant')\n            est_publiee = request.query_params.get('publiee')\n            evaluations = Evaluation.objects.select_related(",
+        "peekOfCode": "class EvaluationListCreateAPIView(APIView):\n    \"\"\"\n    Permissions :\n    - SuperAdmin   : BLOQUÉ\n    - Admin/Responsable : CRUD complet\n    - Formateur    : CRUD sur ses cours\n    - Apprenant    : Lecture seule (ses cours, sans bonnes réponses)\n    - Parent       : BLOQUÉ\n    \"\"\"\n    permission_classes = [IsAuthenticated]",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7845,7 +7917,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class EvaluationDetailAPIView(APIView):\n    \"\"\"Détails d'une évaluation avec toutes ses questions\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        \"\"\"Récupère les détails d'une évaluation\"\"\"\n        evaluation = get_object_or_404(Evaluation, pk=pk)\n        serializer = EvaluationDetailSerializer(evaluation)\n        return api_success(\n            \"Évaluation trouvée avec succès\",\n            serializer.data,",
+        "peekOfCode": "class EvaluationDetailAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        if role == 'Parent':\n            return api_error(\"Accès non autorisé.\", http_status=status.HTTP_403_FORBIDDEN)\n        evaluation = get_object_or_404(Evaluation, pk=pk)",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7854,7 +7926,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class EvaluationPublierAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def post(self, request, pk):\n        try:\n            evaluation = get_object_or_404(Evaluation, pk=pk)\n            action = request.data.get('action', 'publier')\n            if action not in ['publier', 'depublier']:\n                return api_error(\n                    \"Action invalide. Utilisez 'publier' ou 'depublier'\",\n                    http_status=status.HTTP_400_BAD_REQUEST",
+        "peekOfCode": "class EvaluationPublierAPIView(APIView):\n    \"\"\"Publier/dépublier : Admin, Responsable, Formateur (propriétaire).\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request, pk):\n        err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')\n        if err:\n            return err\n        try:\n            evaluation = get_object_or_404(Evaluation, pk=pk)\n            if _get_role(request.user) == 'Formateur':",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7863,7 +7935,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class EvaluationAccessibiliteAPIView(APIView):\n    \"\"\"Vérifier l'accessibilité d'une évaluation pour un apprenant\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        \"\"\"\n        Retourne les informations d'accessibilité d'une évaluation\n        Inclut: est_accessible, peut_commencer, peut_reprendre, passage existant, etc.\n        \"\"\"\n        try:\n            evaluation = get_object_or_404(Evaluation, pk=pk)",
+        "peekOfCode": "class EvaluationAccessibiliteAPIView(APIView):\n    \"\"\"Accessible à tous sauf SuperAdmin et Parent.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        if _get_role(request.user) == 'Parent':\n            return api_error(\"Accès non autorisé.\", http_status=status.HTTP_403_FORBIDDEN)\n        try:",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7872,7 +7944,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class PassageEvaluationDemarrerAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def post(self, request):\n        try:\n            apprenant_id = request.data.get('apprenant')\n            evaluation_id = request.data.get('evaluation')\n            if not apprenant_id or not evaluation_id:\n                return api_error(\n                    \"Les champs 'apprenant' et 'evaluation' sont requis\",\n                    http_status=status.HTTP_400_BAD_REQUEST",
+        "peekOfCode": "class PassageEvaluationDemarrerAPIView(APIView):\n    \"\"\"Démarrer un passage : Apprenant uniquement.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request):\n        err = _require_roles(request.user, 'Apprenant')\n        if err:\n            return err\n        try:\n            apprenant_id = request.data.get('apprenant')\n            evaluation_id = request.data.get('evaluation')",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7881,7 +7953,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class PassageEvaluationReprendreAPIView(APIView):\n    \"\"\"Reprendre une évaluation en cours\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        \"\"\"\n        Récupère un passage en cours pour le reprendre\n        Vérifie que le statut est 'en_cours' et que la date_fin n'est pas dépassée\n        \"\"\"\n        try:\n            passage = get_object_or_404(PassageEvaluation, pk=pk)",
+        "peekOfCode": "class PassageEvaluationReprendreAPIView(APIView):\n    \"\"\"Reprendre : Apprenant (le sien) uniquement.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _require_roles(request.user, 'Apprenant')\n        if err:\n            return err\n        try:\n            passage = get_object_or_404(PassageEvaluation, pk=pk)\n            if passage.apprenant_id != request.user.id:",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7890,7 +7962,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class PassageEvaluationSauvegarderAPIView(APIView):\n    \"\"\"Sauvegarder la progression (pour évaluations simples)\"\"\"\n    permission_classes = [IsAuthenticated]\n    def put(self, request, pk):\n        \"\"\"\n        Sauvegarde les réponses d'une évaluation simple en cours\n        Body: {\"reponse_texte\": \"...\", \"fichier_reponse\": file}\n        \"\"\"\n        try:\n            passage = get_object_or_404(PassageEvaluation, pk=pk)",
+        "peekOfCode": "class PassageEvaluationSauvegarderAPIView(APIView):\n    \"\"\"Sauvegarder : Apprenant (le sien) uniquement.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def put(self, request, pk):\n        err = _require_roles(request.user, 'Apprenant')\n        if err:\n            return err\n        try:\n            passage = get_object_or_404(PassageEvaluation, pk=pk)\n            if passage.apprenant_id != request.user.id:",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7899,7 +7971,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class PassageEvaluationSoumettreAPIView(APIView):\n    \"\"\"Soumettre une évaluation (bascule irréversible)\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request, pk):\n        \"\"\"\n        Soumet une évaluation pour correction\n        - Vérifie que le statut est 'en_cours'\n        - Vérifie que la date_fin n'est pas dépassée\n        - Auto-corrige si 100% QCM\n        - Sinon, passe en statut 'soumis'",
+        "peekOfCode": "class PassageEvaluationSoumettreAPIView(APIView):\n    \"\"\"Soumettre : Apprenant (le sien) uniquement.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request, pk):\n        err = _require_roles(request.user, 'Apprenant')\n        if err:\n            return err\n        try:\n            passage = get_object_or_404(PassageEvaluation, pk=pk)\n            if passage.apprenant_id != request.user.id:",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7908,7 +7980,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class PassageEvaluationListAPIView(APIView):\n    \"\"\"Liste des passages d'évaluations avec filtres\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère la liste des passages d'évaluations\"\"\"\n        try:\n            apprenant_id = request.query_params.get('apprenant')\n            evaluation_id = request.query_params.get('evaluation')\n            statut = request.query_params.get('statut')\n            passages = PassageEvaluation.objects.select_related(",
+        "peekOfCode": "class PassageEvaluationListAPIView(APIView):\n    \"\"\"\n    Liste des passages :\n    - Admin/Responsable : tous les passages de l'institution\n    - Formateur : passages de ses cours\n    - Apprenant : ses propres passages\n    - Parent : passages de ses enfants\n    \"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request):",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7917,7 +7989,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class PassageEvaluationDetailAPIView(APIView):\n    \"\"\"Détails d'un passage d'évaluation\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        \"\"\"Récupère les détails d'un passage d'évaluation\"\"\"\n        passage = get_object_or_404(PassageEvaluation, pk=pk)\n        serializer = PassageEvaluationDetailSerializer(passage)\n        return api_success(\n            \"Détails du passage d'évaluation récupérés avec succès\",\n            serializer.data,",
+        "peekOfCode": "class PassageEvaluationDetailAPIView(APIView):\n    \"\"\"Détail d'un passage selon rôle.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        passage = get_object_or_404(PassageEvaluation, pk=pk)\n        if role == 'Apprenant' and passage.apprenant_id != request.user.id:",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7926,7 +7998,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class ReponseQuestionSauvegarderAPIView(APIView):\n    \"\"\"Sauvegarder une réponse à une question (pendant l'évaluation)\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request):\n        \"\"\"\n        Crée ou met à jour une réponse à une question\n        Body: {\n            \"passage_evaluation\": 1,\n            \"question\": 5,\n            \"choix_selectionnes\": [2],",
+        "peekOfCode": "class ReponseQuestionSauvegarderAPIView(APIView):\n    \"\"\"Sauvegarder une réponse : Apprenant uniquement.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request):\n        err = _require_roles(request.user, 'Apprenant')\n        if err:\n            return err\n        try:\n            passage_evaluation_id = request.data.get('passage_evaluation')\n            question_id = request.data.get('question')",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7935,7 +8007,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class ReponseQuestionDetailAPIView(APIView):\n    \"\"\"Détails d'une réponse à une question\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        \"\"\"Récupère les détails d'une réponse\"\"\"\n        reponse = get_object_or_404(ReponseQuestion, pk=pk)\n        serializer = ReponseQuestionSerializer(reponse)\n        return api_success(\n            \"Réponse trouvée avec succès\",\n            serializer.data,",
+        "peekOfCode": "class ReponseQuestionDetailAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        reponse = get_object_or_404(ReponseQuestion, pk=pk)\n        if role == 'Apprenant' and reponse.passage_evaluation.apprenant_id != request.user.id:\n            return api_error(\"Accès refusé.\", http_status=status.HTTP_403_FORBIDDEN)",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7944,7 +8016,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class CorrectionReponseAPIView(APIView):\n    \"\"\"Corriger une réponse individuelle (correction manuelle)\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request, pk):\n        \"\"\"\n        Corrige une réponse manuelle\n        Body: {\n            \"points_obtenus\": 7.5,\n            \"commentaire_correcteur\": \"Bonne réponse mais...\"\n        }",
+        "peekOfCode": "class CorrectionReponseAPIView(APIView):\n    \"\"\"Corriger une réponse manuelle : Admin, Responsable, Formateur.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request, pk):\n        err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')\n        if err:\n            return err\n        try:\n            reponse = get_object_or_404(ReponseQuestion, pk=pk)\n            if _get_role(request.user) == 'Formateur':",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7953,7 +8025,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class CorrectionEvaluationAPIView(APIView):\n    \"\"\"Corriger une évaluation complète et attribuer la note finale\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request, pk):\n        \"\"\"\n        Corrige une évaluation complète\n        Body: {\n            \"note\": 15.5,\n            \"commentaire_enseignant\": \"Bon travail général...\"\n        }",
+        "peekOfCode": "class CorrectionEvaluationAPIView(APIView):\n    \"\"\"Corriger une évaluation : Admin, Responsable, Formateur.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request, pk):\n        err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')\n        if err:\n            return err\n        try:\n            passage = get_object_or_404(PassageEvaluation, pk=pk)\n            if _get_role(request.user) == 'Formateur':",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7962,7 +8034,43 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class EvaluationsACorrigerAPIView(APIView):\n    \"\"\"Liste des évaluations en attente de correction\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        \"\"\"Récupère les évaluations en attente de correction\"\"\"\n        try:\n            enseignant_id = request.query_params.get('enseignant')\n            passages = PassageEvaluation.objects.select_related(\n                'apprenant',\n                'evaluation'",
+        "peekOfCode": "class EvaluationsACorrigerAPIView(APIView):\n    \"\"\"Liste des évaluations à corriger : Formateur/Admin/Responsable.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')\n        if err:\n            return err\n        try:\n            role = _get_role(request.user)\n            qs = PassageEvaluation.objects.select_related('apprenant', 'evaluation').filter(statut='soumis')",
+        "detail": "evaluations.views",
+        "documentation": {}
+    },
+    {
+        "label": "PassageQuizListCreateAPIView",
+        "kind": 6,
+        "importPath": "evaluations.views",
+        "description": "evaluations.views",
+        "peekOfCode": "class PassageQuizListCreateAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        try:\n            apprenant_id = request.query_params.get('apprenant')\n            quiz_id = request.query_params.get('quiz')",
+        "detail": "evaluations.views",
+        "documentation": {}
+    },
+    {
+        "label": "PassageQuizDetailAPIView",
+        "kind": 6,
+        "importPath": "evaluations.views",
+        "description": "evaluations.views",
+        "peekOfCode": "class PassageQuizDetailAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        passage = get_object_or_404(PassageQuiz, pk=pk)\n        if role == 'Apprenant' and passage.apprenant_id != request.user.id:\n            return api_error(\"Accès refusé.\", http_status=status.HTTP_403_FORBIDDEN)",
+        "detail": "evaluations.views",
+        "documentation": {}
+    },
+    {
+        "label": "ReponseQuizSubmitAPIView",
+        "kind": 6,
+        "importPath": "evaluations.views",
+        "description": "evaluations.views",
+        "peekOfCode": "class ReponseQuizSubmitAPIView(APIView):\n    \"\"\"Soumettre une réponse quiz : Apprenant uniquement.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request):\n        err = _require_roles(request.user, 'Apprenant')\n        if err:\n            return err\n        try:\n            passage_quiz_id = request.data.get('passage_quiz')\n            question_id = request.data.get('question')",
+        "detail": "evaluations.views",
+        "documentation": {}
+    },
+    {
+        "label": "PassageQuizTerminerAPIView",
+        "kind": 6,
+        "importPath": "evaluations.views",
+        "description": "evaluations.views",
+        "peekOfCode": "class PassageQuizTerminerAPIView(APIView):\n    \"\"\"Terminer un quiz : Apprenant (le sien) uniquement.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def post(self, request, pk):\n        err = _require_roles(request.user, 'Apprenant')\n        if err:\n            return err\n        try:\n            passage = get_object_or_404(PassageQuiz, pk=pk)\n            if passage.apprenant_id != request.user.id:",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7971,7 +8079,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class StatistiquesApprenantAPIView(APIView):\n    \"\"\"Statistiques d'un apprenant\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, apprenant_id):\n        \"\"\"Récupère les statistiques complètes d'un apprenant\"\"\"\n        try:\n            # Quiz\n            passages_quiz = PassageQuiz.objects.filter(\n                apprenant_id=apprenant_id,\n                termine=True",
+        "peekOfCode": "class StatistiquesApprenantAPIView(APIView):\n    \"\"\"\n    Stats apprenant :\n    - Apprenant : ses propres stats\n    - Admin/Responsable/Formateur : stats de tout apprenant de leur institution\n    - Parent : stats de ses enfants\n    \"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, apprenant_id):\n        err = _block_super_admin(request.user)",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7980,7 +8088,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class StatistiquesEvaluationAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request, evaluation_id):\n        try:\n            evaluation = get_object_or_404(Evaluation, pk=evaluation_id)\n            tous_passages = PassageEvaluation.objects.filter(evaluation_id=evaluation_id)\n            passages_corriges = tous_passages.filter(statut='corrige')\n            stats = {\n                'evaluation_id':        evaluation_id,\n                'nb_passages':          tous_passages.count(),",
+        "peekOfCode": "class StatistiquesEvaluationAPIView(APIView):\n    \"\"\"Stats évaluation : Admin, Responsable, Formateur uniquement.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, evaluation_id):\n        err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')\n        if err:\n            return err\n        try:\n            evaluation = get_object_or_404(Evaluation, pk=evaluation_id)\n            if _get_role(request.user) == 'Formateur':",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7989,7 +8097,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class EvaluationExportAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        evaluation = get_object_or_404(Evaluation, pk=pk)\n        export_format = request.query_params.get(\"format\", \"csv\").lower()\n        detail = request.query_params.get(\"detail\", \"false\").lower() == \"true\"\n        # ✅ Apprenant hérite de AbstractUser via user_ptr → pas de __user\n        passages = (\n            PassageEvaluation.objects\n            .select_related(\"apprenant\", \"evaluation\", \"evaluation__cours\")",
+        "peekOfCode": "class EvaluationExportAPIView(APIView):\n    \"\"\"Export : Admin, Responsable, Formateur (propriétaire).\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')\n        if err:\n            return err\n        evaluation = get_object_or_404(Evaluation, pk=pk)\n        if _get_role(request.user) == 'Formateur':\n            if not _formateur_owns_cours(request.user, evaluation.cours):",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -7998,7 +8106,7 @@
         "kind": 2,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "def api_success(message: str, data=None, http_status=status.HTTP_200_OK):\n    \"\"\"Réponse standardisée pour les succès\"\"\"\n    return Response(\n        {\n            \"success\": True,\n            \"status\": http_status,\n            \"message\": message,\n            \"data\": data,\n        },\n        status=http_status,",
+        "peekOfCode": "def api_success(message: str, data=None, http_status=status.HTTP_200_OK):\n    return Response(\n        {\"success\": True, \"status\": http_status, \"message\": message, \"data\": data},\n        status=http_status,\n    )\ndef api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST, data=None):\n    payload = {\"success\": False, \"status\": http_status, \"message\": message, \"data\": data}\n    if errors is not None:\n        payload[\"errors\"] = errors\n    return Response(payload, status=http_status)",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -8007,7 +8115,7 @@
         "kind": 2,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST, data=None):\n    \"\"\"Réponse standardisée pour les erreurs\"\"\"\n    payload = {\n        \"success\": False,\n        \"status\": http_status,\n        \"message\": message,\n        \"data\": data,\n    }\n    if errors is not None:\n        payload[\"errors\"] = errors",
+        "peekOfCode": "def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST, data=None):\n    payload = {\"success\": False, \"status\": http_status, \"message\": message, \"data\": data}\n    if errors is not None:\n        payload[\"errors\"] = errors\n    return Response(payload, status=http_status)\n# ============================================================================\n# QUIZ\n# ============================================================================\nclass QuizListCreateAPIView(APIView):\n    \"\"\"",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -9524,6 +9632,240 @@
         "documentation": {}
     },
     {
+        "label": "IsSuperAdmin",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class IsSuperAdmin(BasePermission):\n    \"\"\"Seuls les SuperAdmins (is_superuser).\"\"\"\n    def has_permission(self, request, view):\n        return request.user.is_authenticated and is_super_admin(request.user)\nclass IsAdminOfInstitution(BasePermission):\n    \"\"\"Admin dans son institution.\"\"\"\n    def has_permission(self, request, view):\n        return request.user.is_authenticated and is_admin(request.user)\n    def has_object_permission(self, request, view, obj):\n        return same_institution(request.user, obj)",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "IsAdminOfInstitution",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class IsAdminOfInstitution(BasePermission):\n    \"\"\"Admin dans son institution.\"\"\"\n    def has_permission(self, request, view):\n        return request.user.is_authenticated and is_admin(request.user)\n    def has_object_permission(self, request, view, obj):\n        return same_institution(request.user, obj)\nclass IsResponsable(BasePermission):\n    def has_permission(self, request, view):\n        return request.user.is_authenticated and is_responsable(request.user)\n    def has_object_permission(self, request, view, obj):",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "IsResponsable",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class IsResponsable(BasePermission):\n    def has_permission(self, request, view):\n        return request.user.is_authenticated and is_responsable(request.user)\n    def has_object_permission(self, request, view, obj):\n        return same_institution(request.user, obj)\nclass IsFormateur(BasePermission):\n    def has_permission(self, request, view):\n        return request.user.is_authenticated and is_formateur(request.user)\nclass IsApprenant(BasePermission):\n    def has_permission(self, request, view):",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "IsFormateur",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class IsFormateur(BasePermission):\n    def has_permission(self, request, view):\n        return request.user.is_authenticated and is_formateur(request.user)\nclass IsApprenant(BasePermission):\n    def has_permission(self, request, view):\n        return request.user.is_authenticated and is_apprenant(request.user)\nclass IsParent(BasePermission):\n    \"\"\"Parent : lecture seule uniquement sur les données de ses enfants.\"\"\"\n    def has_permission(self, request, view):\n        from rest_framework.request import Request",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "IsApprenant",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class IsApprenant(BasePermission):\n    def has_permission(self, request, view):\n        return request.user.is_authenticated and is_apprenant(request.user)\nclass IsParent(BasePermission):\n    \"\"\"Parent : lecture seule uniquement sur les données de ses enfants.\"\"\"\n    def has_permission(self, request, view):\n        from rest_framework.request import Request\n        if not request.user.is_authenticated or not is_parent(request.user):\n            return False\n        # Parent ne peut jamais écrire",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "IsParent",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class IsParent(BasePermission):\n    \"\"\"Parent : lecture seule uniquement sur les données de ses enfants.\"\"\"\n    def has_permission(self, request, view):\n        from rest_framework.request import Request\n        if not request.user.is_authenticated or not is_parent(request.user):\n            return False\n        # Parent ne peut jamais écrire\n        if request.method not in ('GET', 'HEAD', 'OPTIONS'):\n            return False\n        return True",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "SuperAdminOnly",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class SuperAdminOnly(BasePermission):\n    \"\"\"Uniquement SuperAdmin pour toutes les opérations.\"\"\"\n    def has_permission(self, request, view):\n        return request.user.is_authenticated and is_super_admin(request.user)\nclass AdminOrResponsableOnly(BasePermission):\n    \"\"\"Admin ou Responsable uniquement.\"\"\"\n    def has_permission(self, request, view):\n        return request.user.is_authenticated and is_admin_or_responsable(request.user)\n    def has_object_permission(self, request, view, obj):\n        return same_institution(request.user, obj)",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "AdminOrResponsableOnly",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class AdminOrResponsableOnly(BasePermission):\n    \"\"\"Admin ou Responsable uniquement.\"\"\"\n    def has_permission(self, request, view):\n        return request.user.is_authenticated and is_admin_or_responsable(request.user)\n    def has_object_permission(self, request, view, obj):\n        return same_institution(request.user, obj)\nclass ReadOnlyForLowerRoles(BasePermission):\n    \"\"\"\n    - SuperAdmin : bloqué (ne gère pas les ressources internes)\n    - Admin/Responsable : tout",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "ReadOnlyForLowerRoles",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class ReadOnlyForLowerRoles(BasePermission):\n    \"\"\"\n    - SuperAdmin : bloqué (ne gère pas les ressources internes)\n    - Admin/Responsable : tout\n    - Formateur : lecture + actions sur ses propres ressources\n    - Apprenant : lecture seule\n    - Parent : lecture seule sur données de ses enfants\n    \"\"\"\n    def has_permission(self, request, view):\n        if not request.user.is_authenticated:",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "RoleBasedPermission",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class RoleBasedPermission(BasePermission):\n    \"\"\"\n    Permission générique basée sur les rôles.\n    Usage dans une vue :\n        permission_classes = [RoleBasedPermission]\n        required_roles_write = ['Admin', 'Responsable']\n        required_roles_read = ['Admin', 'Responsable', 'Formateur', 'Apprenant']\n        block_superadmin = True  # Pour bloquer SuperAdmin sur ressources internes\n    \"\"\"\n    # À surcharger dans la vue",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "InstitutionPermission",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class InstitutionPermission(BasePermission):\n    \"\"\"\n    Institution :\n    - SuperAdmin : CRUD complet\n    - Admin : lecture + modification de son institution\n    - Autres : lecture seule de leur institution\n    - Parent : lecture seule de l'institution de son enfant\n    \"\"\"\n    def has_permission(self, request, view):\n        if not request.user.is_authenticated:",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "CourseContentPermission",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class CourseContentPermission(BasePermission):\n    \"\"\"\n    Cours / Modules / Séquences / Blocs :\n    - SuperAdmin : bloqué\n    - Admin/Responsable : CRUD complet\n    - Formateur : CRUD sur SES cours uniquement\n    - Apprenant : lecture seule sur ses cours inscrits\n    - Parent : lecture seule sur cours de ses enfants\n    \"\"\"\n    def has_permission(self, request, view):",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "EvaluationPermission",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class EvaluationPermission(BasePermission):\n    \"\"\"\n    Quiz / Évaluations / Questions :\n    - SuperAdmin : bloqué\n    - Admin/Responsable : CRUD complet\n    - Formateur : CRUD sur ses cours\n    - Apprenant : lecture seule (sans les bonnes réponses)\n    - Parent : bloqué\n    \"\"\"\n    def has_permission(self, request, view):",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "PassagePermission",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class PassagePermission(BasePermission):\n    \"\"\"\n    PassageEvaluation / PassageQuiz / Réponses :\n    - SuperAdmin : bloqué\n    - Admin/Responsable : lecture + suppression\n    - Formateur : lecture sur ses cours\n    - Apprenant : CRUD sur SES passages uniquement\n    - Parent : lecture sur passages de ses enfants\n    \"\"\"\n    def has_permission(self, request, view):",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "ProgressPermission",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class ProgressPermission(BasePermission):\n    \"\"\"\n    BlocProgress / SequenceProgress / ModuleProgress / CoursProgress :\n    - SuperAdmin : bloqué\n    - Admin/Responsable : lecture seule\n    - Formateur : lecture seule\n    - Apprenant : CRUD sur SA progression uniquement\n    - Parent : lecture sur progression de ses enfants\n    \"\"\"\n    def has_permission(self, request, view):",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "AnalyticsPermission",
+        "kind": 6,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "class AnalyticsPermission(BasePermission):\n    \"\"\"\n    Analytics : lecture seule, jamais modifiable manuellement.\n    - SuperAdmin : bloqué\n    - Admin/Responsable/Formateur : lecture (toute leur institution)\n    - Apprenant : lecture sur ses propres analytics\n    - Parent : lecture sur analytics de ses enfants\n    \"\"\"\n    def has_permission(self, request, view):\n        if not request.user.is_authenticated:",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "get_role_name",
+        "kind": 2,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "def get_role_name(user):\n    \"\"\"Retourne le nom du rôle de l'utilisateur ou None.\"\"\"\n    if hasattr(user, 'role') and user.role:\n        return user.role.name\n    return None\ndef is_super_admin(user):\n    return getattr(user, 'is_superuser', False)\ndef is_admin(user):\n    return get_role_name(user) == 'Admin'\ndef is_responsable(user):",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "is_super_admin",
+        "kind": 2,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "def is_super_admin(user):\n    return getattr(user, 'is_superuser', False)\ndef is_admin(user):\n    return get_role_name(user) == 'Admin'\ndef is_responsable(user):\n    return get_role_name(user) == 'Responsable'\ndef is_formateur(user):\n    return get_role_name(user) == 'Formateur'\ndef is_apprenant(user):\n    return get_role_name(user) == 'Apprenant'",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "is_admin",
+        "kind": 2,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "def is_admin(user):\n    return get_role_name(user) == 'Admin'\ndef is_responsable(user):\n    return get_role_name(user) == 'Responsable'\ndef is_formateur(user):\n    return get_role_name(user) == 'Formateur'\ndef is_apprenant(user):\n    return get_role_name(user) == 'Apprenant'\ndef is_parent(user):\n    return get_role_name(user) == 'Parent'",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "is_responsable",
+        "kind": 2,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "def is_responsable(user):\n    return get_role_name(user) == 'Responsable'\ndef is_formateur(user):\n    return get_role_name(user) == 'Formateur'\ndef is_apprenant(user):\n    return get_role_name(user) == 'Apprenant'\ndef is_parent(user):\n    return get_role_name(user) == 'Parent'\ndef is_admin_or_responsable(user):\n    return get_role_name(user) in ('Admin', 'Responsable')",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "is_formateur",
+        "kind": 2,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "def is_formateur(user):\n    return get_role_name(user) == 'Formateur'\ndef is_apprenant(user):\n    return get_role_name(user) == 'Apprenant'\ndef is_parent(user):\n    return get_role_name(user) == 'Parent'\ndef is_admin_or_responsable(user):\n    return get_role_name(user) in ('Admin', 'Responsable')\ndef is_staff_level(user):\n    \"\"\"Admin ou Responsable ou SuperAdmin.\"\"\"",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "is_apprenant",
+        "kind": 2,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "def is_apprenant(user):\n    return get_role_name(user) == 'Apprenant'\ndef is_parent(user):\n    return get_role_name(user) == 'Parent'\ndef is_admin_or_responsable(user):\n    return get_role_name(user) in ('Admin', 'Responsable')\ndef is_staff_level(user):\n    \"\"\"Admin ou Responsable ou SuperAdmin.\"\"\"\n    return is_super_admin(user) or is_admin_or_responsable(user)\ndef same_institution(user, obj):",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "is_parent",
+        "kind": 2,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "def is_parent(user):\n    return get_role_name(user) == 'Parent'\ndef is_admin_or_responsable(user):\n    return get_role_name(user) in ('Admin', 'Responsable')\ndef is_staff_level(user):\n    \"\"\"Admin ou Responsable ou SuperAdmin.\"\"\"\n    return is_super_admin(user) or is_admin_or_responsable(user)\ndef same_institution(user, obj):\n    \"\"\"Vérifie que l'objet appartient à la même institution que l'utilisateur.\"\"\"\n    obj_institution_id = getattr(obj, 'institution_id', None)",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "is_admin_or_responsable",
+        "kind": 2,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "def is_admin_or_responsable(user):\n    return get_role_name(user) in ('Admin', 'Responsable')\ndef is_staff_level(user):\n    \"\"\"Admin ou Responsable ou SuperAdmin.\"\"\"\n    return is_super_admin(user) or is_admin_or_responsable(user)\ndef same_institution(user, obj):\n    \"\"\"Vérifie que l'objet appartient à la même institution que l'utilisateur.\"\"\"\n    obj_institution_id = getattr(obj, 'institution_id', None)\n    user_institution_id = getattr(user, 'institution_id', None)\n    if obj_institution_id is None or user_institution_id is None:",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "is_staff_level",
+        "kind": 2,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "def is_staff_level(user):\n    \"\"\"Admin ou Responsable ou SuperAdmin.\"\"\"\n    return is_super_admin(user) or is_admin_or_responsable(user)\ndef same_institution(user, obj):\n    \"\"\"Vérifie que l'objet appartient à la même institution que l'utilisateur.\"\"\"\n    obj_institution_id = getattr(obj, 'institution_id', None)\n    user_institution_id = getattr(user, 'institution_id', None)\n    if obj_institution_id is None or user_institution_id is None:\n        return False\n    return obj_institution_id == user_institution_id",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "same_institution",
+        "kind": 2,
+        "importPath": "shared.permissions",
+        "description": "shared.permissions",
+        "peekOfCode": "def same_institution(user, obj):\n    \"\"\"Vérifie que l'objet appartient à la même institution que l'utilisateur.\"\"\"\n    obj_institution_id = getattr(obj, 'institution_id', None)\n    user_institution_id = getattr(user, 'institution_id', None)\n    if obj_institution_id is None or user_institution_id is None:\n        return False\n    return obj_institution_id == user_institution_id\n# ============================================================================\n# PERMISSIONS GLOBALES\n# ============================================================================",
+        "detail": "shared.permissions",
+        "documentation": {}
+    },
+    {
         "label": "Command",
         "kind": 6,
         "importPath": "users.management.commands.roles",
@@ -10172,6 +10514,15 @@
         "documentation": {}
     },
     {
+        "label": "ModifierMotDePasseSerializer",
+        "kind": 6,
+        "importPath": "users.serializers",
+        "description": "users.serializers",
+        "peekOfCode": "class ModifierMotDePasseSerializer(serializers.Serializer):\n    current_password = serializers.CharField(write_only=True)\n    new_password = serializers.CharField(write_only=True, min_length=8)\n    confirm_password = serializers.CharField(write_only=True, min_length=8)\n    def validate_current_password(self, value):\n        user = self.context['request'].user\n        if not user.check_password(value):\n            raise serializers.ValidationError(\"Le mot de passe actuel est incorrect.\")\n        return value\n    def validate(self, data):",
+        "detail": "users.serializers",
+        "documentation": {}
+    },
+    {
         "label": "create_super_admin_group",
         "kind": 2,
         "importPath": "users.signals",
@@ -10212,7 +10563,7 @@
         "kind": 5,
         "importPath": "users.urls",
         "description": "users.urls",
-        "peekOfCode": "urlpatterns = [\n    path('login/', UserLoginAPIView.as_view(), name='user-login'),\n    # Nouveau flow unifié\n    path('register/', RegisterAPIView.as_view(), name='register'),\n    path('verify-email/', VerifyEmailAPIView.as_view(), name='verify_email'),\n    path('resend-code/', ResendCodeAPIView.as_view(), name='resend_code'),\n    path('logout/', LogoutAPIView.as_view(), name='logout'),\n    path('', include(router.urls)),\n    # Password reset (si déjà en place)\n    # path('password-reset/', PasswordResetAPIView.as_view(), name='password_reset'),",
+        "peekOfCode": "urlpatterns = [\n    path('login/', UserLoginAPIView.as_view(), name='user-login'),\n    # Nouveau flow unifié\n    path('register/', RegisterAPIView.as_view(), name='register'),\n    path('verify-email/', VerifyEmailAPIView.as_view(), name='verify_email'),\n    path('resend-code/', ResendCodeAPIView.as_view(), name='resend_code'),\n    path('logout/', LogoutAPIView.as_view(), name='logout'),\n    path('change-password/', ChangePasswordAPIView.as_view(), name='change-password'),\n    path('', include(router.urls)),\n    # Password reset (si déjà en place)",
         "detail": "users.urls",
         "documentation": {}
     },
@@ -10302,7 +10653,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class IsStaffOrReadOnly(permissions.BasePermission):\n    def has_permission(self, request, view):\n        if request.method in (\"GET\", \"HEAD\", \"OPTIONS\"):\n            return bool(request.user and request.user.is_authenticated)\n        return bool(request.user and request.user.is_authenticated and request.user.is_staff)\nclass IsAdminOrHigherOrSelf(permissions.BasePermission):\n    \"\"\"\n    SuperUser / Admin / Responsable : accès total.\n    Autres : uniquement leur propre objet (pk == user.pk).\n    \"\"\"",
+        "peekOfCode": "class IsStaffOrReadOnly(permissions.BasePermission):\n    def has_permission(self, request, view):\n        if request.method in (\"GET\", \"HEAD\", \"OPTIONS\"):\n            return bool(request.user and request.user.is_authenticated)\n        return bool(request.user and request.user.is_authenticated and request.user.is_staff)\nclass IsAdminOrHigherOrSelf(permissions.BasePermission):\n    \"\"\"\n    Permission :\n    - SuperUser             : accès total (lecture + écriture)\n    - Admin / Responsable   : accès total (selon queryset)",
         "detail": "users.views",
         "documentation": {}
     },
@@ -10311,7 +10662,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class IsAdminOrHigherOrSelf(permissions.BasePermission):\n    \"\"\"\n    SuperUser / Admin / Responsable : accès total.\n    Autres : uniquement leur propre objet (pk == user.pk).\n    \"\"\"\n    def has_permission(self, request, view):\n        if not request.user or not request.user.is_authenticated:\n            return False\n        if request.user.is_superuser:\n            return True",
+        "peekOfCode": "class IsAdminOrHigherOrSelf(permissions.BasePermission):\n    \"\"\"\n    Permission :\n    - SuperUser             : accès total (lecture + écriture)\n    - Admin / Responsable   : accès total (selon queryset)\n    - Tout utilisateur auth : lecture seule (GET, HEAD, OPTIONS)\n    - Utilisateur lui-même  : peut modifier son propre profil\n    \"\"\"\n    def has_permission(self, request, view):\n        if not request.user or not request.user.is_authenticated:",
         "detail": "users.views",
         "documentation": {}
     },
@@ -10338,7 +10689,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class ParentViewSet(ProfileActionsMixin, BaseModelViewSet):\n    queryset           = Parent.objects.all()\n    serializer_class   = ParentCrudSerializer\n    permission_classes = [IsAdminOrHigher]\n    def get_queryset(self):\n        user = self.request.user\n        if user.is_superuser:\n            return Parent.objects.all()\n        inst = _user_institution(user)\n        if inst:",
+        "peekOfCode": "class ParentViewSet(ProfileActionsMixin, BaseModelViewSet):\n    queryset           = Parent.objects.all()\n    serializer_class   = ParentCrudSerializer\n    permission_classes = [IsAdminOrHigherOrSelf]  # ✅ au lieu de IsAdminOrHigher\n    def get_queryset(self):\n        user      = self.request.user\n        role_name = _role_name(user)\n        inst      = _user_institution(user)\n        if user.is_superuser:\n            return Parent.objects.all()",
         "detail": "users.views",
         "documentation": {}
     },
@@ -10365,7 +10716,16 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class ResponsableAcademiqueViewSet(ProfileActionsMixin, BaseModelViewSet):\n    queryset           = ResponsableAcademique.objects.all()\n    serializer_class   = ResponsableAcademiqueCrudSerializer\n    permission_classes = [IsAdminOrHigher]\n    def get_queryset(self):\n        user = self.request.user\n        if user.is_superuser:\n            return ResponsableAcademique.objects.all()\n        inst = _user_institution(user)\n        if inst:",
+        "peekOfCode": "class ResponsableAcademiqueViewSet(ProfileActionsMixin, BaseModelViewSet):\n    queryset           = ResponsableAcademique.objects.all()\n    serializer_class   = ResponsableAcademiqueCrudSerializer\n    # ✅ RA peut modifier son profil (self), Admin/SuperUser gardent le contrôle\n    permission_classes = [IsAdminOrHigherOrSelf]   # ← au lieu de IsAdminOrHigher\n    def get_queryset(self):\n        user      = self.request.user\n        role_name = _role_name(user)\n        inst      = _user_institution(user)\n        if user.is_superuser:",
+        "detail": "users.views",
+        "documentation": {}
+    },
+    {
+        "label": "ChangePasswordAPIView",
+        "kind": 6,
+        "importPath": "users.views",
+        "description": "users.views",
+        "peekOfCode": "class ChangePasswordAPIView(APIView):\n    permission_classes = [permissions.IsAuthenticated]\n    def post(self, request):\n        serializer = ModifierMotDePasseSerializer(\n            data=request.data,\n            context={'request': request}\n        )\n        if not serializer.is_valid():\n            return api_error(\n                message=\"Erreur de validation\",",
         "detail": "users.views",
         "documentation": {}
     },

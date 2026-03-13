@@ -12,6 +12,8 @@ from django.shortcuts import get_object_or_404
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from rest_framework.parsers import MultiPartParser, FormParser
+
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from academics.models import (
     Classe, Departement, Filiere, Groupe,
     Inscription, Institution, Matiere, Specialite, DomaineEtude
@@ -20,6 +22,7 @@ from academics.serializers import (
     ClasseSerializer, DepartementSerializer, FiliereSerializer,
     GroupeSerializer, InscriptionSerializer, InstitutionSerializer
 )
+
 
 # Import des utilitaires de filtrage
 from .utils import (
@@ -71,11 +74,11 @@ class InstitutionAPIView(APIView):
             return [AllowAny()]
         return [IsAuthenticated()]
 
-    def get_throttles(self):
-        # Limite uniquement la création publique
-        if self.request.method == "POST" and not getattr(self.request.user, "is_authenticated", False):
-            return [InstitutionCreateAnonThrottle()]
-        return super().get_throttles()
+    # def get_throttles(self):
+    #     # Limite uniquement la création publique
+    #     if self.request.method == "POST" and not getattr(self.request.user, "is_authenticated", False):
+    #         return [InstitutionCreateAnonThrottle()]
+    #     return super().get_throttles()
 
     def get(self, request, pk=None):
         if pk:
@@ -145,8 +148,6 @@ class InstitutionAPIView(APIView):
         institution.delete()
         return api_success("Institution supprimée", data=None, http_status=status.HTTP_204_NO_CONTENT)
 
-
-# À ajouter dans academics/views.py
 
 class InstitutionLogoUploadAPIView(APIView):
     """
@@ -228,7 +229,7 @@ class GroupeListCreateAPIView(APIView):
     @transaction.atomic
     def post(self, request):
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error(
                 "Seuls les Admins/Responsables peuvent créer des groupes",
                 http_status=status.HTTP_403_FORBIDDEN
@@ -319,7 +320,7 @@ class ClasseListCreateAPIView(APIView):
 
     def post(self, request):
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error(
                 "Seuls les Admins/Responsables peuvent créer des classes",
                 http_status=status.HTTP_403_FORBIDDEN
@@ -404,7 +405,7 @@ class FiliereListCreateAPIView(APIView):
 
     def post(self, request):
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error(
                 "Seuls les Admins/Responsables peuvent créer des filières",
                 http_status=status.HTTP_403_FORBIDDEN
@@ -433,7 +434,7 @@ class FiliereDetailAPIView(APIView):
         filiere = self.get_object(pk)
 
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
         serializer = FiliereSerializer(filiere, data=request.data)
@@ -446,7 +447,7 @@ class FiliereDetailAPIView(APIView):
         filiere = self.get_object(pk)
 
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
         serializer = FiliereSerializer(filiere, data=request.data, partial=True)
@@ -459,7 +460,7 @@ class FiliereDetailAPIView(APIView):
         filiere = self.get_object(pk)
 
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
         filiere.delete()
@@ -483,7 +484,7 @@ class DepartementListCreateAPIView(APIView):
 
     def post(self, request):
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error(
                 "Seuls les Admins/Responsables peuvent créer des départements",
                 http_status=status.HTTP_403_FORBIDDEN
@@ -561,7 +562,7 @@ class InscriptionListCreateAPIView(APIView):
 
     def post(self, request):
         role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "Responsable"]:
+        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error(
                 "Seuls les Admins/Responsables peuvent créer des inscriptions",
                 http_status=status.HTTP_403_FORBIDDEN

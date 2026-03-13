@@ -325,12 +325,23 @@ class BaseUserCrudSerializer(serializers.ModelSerializer):
         write_only=True, required=False, allow_blank=True, min_length=8
     )
 
-    pays_residence    = PaysSerializer(read_only=True)
+    pays_residence = serializers.SerializerMethodField(read_only=True)
     pays_residence_id = serializers.PrimaryKeyRelatedField(
         source="pays_residence",
         queryset=Pays.objects.all(),
         write_only=True, required=False, allow_null=True,
     )
+
+    def get_pays_residence(self, obj):
+        pays = obj.pays_residence
+        if not pays:
+            return None
+        # ✅ Accès direct — correspond exactement à PaysSerializer {id, nom, code}
+        return {
+            "id":   pays.id,
+            "nom":  pays.nom,
+            "code": getattr(pays, "code", None),
+        }
 
     annee_scolaire_active    = serializers.SerializerMethodField(read_only=True)
     annee_scolaire_active_id = serializers.PrimaryKeyRelatedField(
@@ -455,39 +466,58 @@ class AdminCrudSerializer(BaseUserCrudSerializer):
 
 
 class ParentCrudSerializer(BaseUserCrudSerializer):
-    # ✅ LECTURE : Objet institution complet
     institution = serializers.SerializerMethodField(read_only=True)
-    
-    # ✅ ÉCRITURE : ID uniquement
     institution_id = serializers.PrimaryKeyRelatedField(
         source="institution",
         queryset=Institution.objects.all(),
-        write_only=True,
-        required=False,
-        allow_null=True,
+        write_only=True, required=False, allow_null=True,
     )
+
+    # ✅ Liste des enfants (Apprenant.tuteur = FK vers Parent)
+    enfants = serializers.SerializerMethodField(read_only=True)
 
     class Meta(BaseUserCrudSerializer.Meta):
         model = Parent
         fields = BaseUserCrudSerializer.Meta.fields + [
             "institution",
             "institution_id",
+            "enfants",   # ✅
         ]
-        read_only_fields = BaseUserCrudSerializer.Meta.read_only_fields + ["institution"]
+        read_only_fields = BaseUserCrudSerializer.Meta.read_only_fields + [
+            "institution", "enfants"
+        ]
 
     def get_institution(self, obj):
-        """Retourne l'objet institution complet"""
         if not obj.institution:
             return None
         serializers_dict = _get_academic_serializers()
         InstitutionSerializer = serializers_dict['InstitutionSerializer']
         return InstitutionSerializer(obj.institution).data
 
+    def get_enfants(self, obj):
+        # Apprenant.tuteur = ForeignKey(Parent) → related_name par défaut
+        enfants = Apprenant.objects.filter(tuteur=obj).select_related(
+            'annee_scolaire_active', 'groupe'
+        )
+        result = []
+        for a in enfants:
+            annee = a.annee_scolaire_active
+            result.append({
+                "id":     a.id,
+                "prenom": a.prenom,
+                "nom":    a.nom,
+                "matricule": a.matricule,
+                "annee_scolaire_active": {
+                    "id":      annee.id,
+                    "libelle": getattr(annee, 'libelle', str(annee)),
+                } if annee else None,
+            })
+        return result
+
     @transaction.atomic
     def create(self, validated_data):
         validated_data["role"] = _get_or_create_role("Parent")
         password = validated_data.pop("password", None)
-
         parent = Parent(**validated_data)
         if password:
             parent.set_password(password)
@@ -503,45 +533,50 @@ class ParentCrudSerializer(BaseUserCrudSerializer):
         instance.save()
         return instance
 
-
 class ApprenantCrudSerializer(BaseUserCrudSerializer):
-    matricule = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    matricule      = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     date_naissance = serializers.DateField(required=False, allow_null=True)
 
-    # ✅ LECTURE : Objets complets
     groupe = serializers.SerializerMethodField(read_only=True)
     tuteur = serializers.SerializerMethodField(read_only=True)
+    # ✅ AJOUTER institution
+    institution = serializers.SerializerMethodField(read_only=True)
 
-    # ✅ ÉCRITURE : IDs uniquement
     groupe_id = serializers.PrimaryKeyRelatedField(
-        source="groupe",
-        queryset=Groupe.objects.all(),
-        write_only=True,
-        required=False,
-        allow_null=True,
+        source="groupe", queryset=Groupe.objects.all(),
+        write_only=True, required=False, allow_null=True,
     )
     tuteur_id = serializers.PrimaryKeyRelatedField(
-        source="tuteur",
-        queryset=Parent.objects.all(),
-        write_only=True,
-        required=False,
-        allow_null=True,
+        source="tuteur", queryset=Parent.objects.all(),
+        write_only=True, required=False, allow_null=True,
     )
 
     class Meta(BaseUserCrudSerializer.Meta):
         model = Apprenant
         fields = BaseUserCrudSerializer.Meta.fields + [
-            "matricule",
-            "date_naissance",
-            "groupe",           # objet complet en lecture
-            "groupe_id",        # ID en écriture
-            "tuteur",           # objet complet en lecture
-            "tuteur_id",        # ID en écriture
+            "matricule", "date_naissance",
+            "groupe", "groupe_id",
+            "tuteur", "tuteur_id",
+            "institution",  # ✅ AJOUTER
         ]
-        read_only_fields = BaseUserCrudSerializer.Meta.read_only_fields + ["groupe", "tuteur"]
+        read_only_fields = BaseUserCrudSerializer.Meta.read_only_fields + [
+            "groupe", "tuteur", "institution"
+        ]
+
+    # ✅ AJOUTER cette méthode
+    def get_institution(self, obj):
+        # Essaie le champ direct d'abord
+        inst = getattr(obj, 'institution', None)
+        if not inst:
+            # Fallback : via le groupe
+            groupe = getattr(obj, 'groupe', None)
+            if groupe:
+                inst = getattr(groupe, 'institution', None)
+        if not inst:
+            return None
+        return {"id": inst.id, "nom": inst.nom}
 
     def get_groupe(self, obj):
-        """Retourne l'objet groupe complet"""
         if not hasattr(obj, 'groupe') or not obj.groupe:
             return None
         serializers_dict = _get_academic_serializers()
@@ -549,57 +584,15 @@ class ApprenantCrudSerializer(BaseUserCrudSerializer):
         return GroupeSerializer(obj.groupe).data
 
     def get_tuteur(self, obj):
-        """Retourne l'objet tuteur complet (Parent)"""
-        if not hasattr(obj, 'tuteur'):
-            return None
-        t = obj.tuteur
+        t = getattr(obj, 'tuteur', None)
         if not t:
             return None
         return {
-            "id": t.id,
-            "email": t.email,
-            "nom": t.nom,
-            "prenom": t.prenom,
+            "id": t.id, "email": t.email,
+            "nom": t.nom, "prenom": t.prenom,
             "telephone": t.telephone,
             "pays_residence": PaysSerializer(t.pays_residence).data if t.pays_residence else None,
         }
-
-    def validate_matricule(self, value):
-        if value is None:
-            return None
-        value = value.strip()
-        return value or None
-
-    @transaction.atomic
-    def create(self, validated_data):
-        validated_data["role"] = _get_or_create_role("Apprenant")
-        password = validated_data.pop("password", None)
-
-        m = validated_data.get("matricule")
-        if isinstance(m, str) and m.strip() == "":
-            validated_data["matricule"] = None
-
-        apprenant = Apprenant(**validated_data)
-        if password:
-            apprenant.set_password(password)
-        apprenant.save()
-        return apprenant
-
-    @transaction.atomic
-    def update(self, instance, validated_data):
-        instance = self._apply_password(instance, validated_data)
-
-        if "matricule" in validated_data:
-            m = validated_data.get("matricule")
-            validated_data["matricule"] = (m.strip() if isinstance(m, str) else m) or None
-
-        for k, v in validated_data.items():
-            setattr(instance, k, v)
-
-        instance.role = _get_or_create_role("Apprenant")
-        instance.save()
-        return instance
-
 
 class FormateurCrudSerializer(BaseUserCrudSerializer):
     # ✅ LECTURE : Objets complets (listes)
@@ -704,62 +697,58 @@ class FormateurCrudSerializer(BaseUserCrudSerializer):
 
 
 class ResponsableAcademiqueCrudSerializer(BaseUserCrudSerializer):
-    # ✅ LECTURE : Objets complets
     institution = serializers.SerializerMethodField(read_only=True)
     departement = serializers.SerializerMethodField(read_only=True)
 
-    # ✅ ÉCRITURE : IDs uniquement
     institution_id = serializers.PrimaryKeyRelatedField(
         source="institution",
         queryset=Institution.objects.all(),
-        write_only=True,
-        required=False,
-        allow_null=True,
+        write_only=True, required=False, allow_null=True,
     )
     departement_id = serializers.PrimaryKeyRelatedField(
         source="departement",
         queryset=Departement.objects.all(),
-        write_only=True,
-        required=False,
-        allow_null=True,
+        write_only=True, required=False, allow_null=True,
     )
 
     class Meta(BaseUserCrudSerializer.Meta):
         model = ResponsableAcademique
         fields = BaseUserCrudSerializer.Meta.fields + [
-            "institution",      # objet complet en lecture
-            "institution_id",   # ID en écriture
-            "departement",      # objet complet en lecture
-            "departement_id",   # ID en écriture
+            "institution", "institution_id",
+            "departement", "departement_id",
         ]
-        read_only_fields = BaseUserCrudSerializer.Meta.read_only_fields + ["institution", "departement"]
+        read_only_fields = BaseUserCrudSerializer.Meta.read_only_fields + [
+            "institution", "departement"
+        ]
 
     def get_institution(self, obj):
-        """Retourne l'objet institution complet"""
-        if not obj.institution:
+        # ✅ Accès direct — pas de serializer externe
+        inst = obj.institution
+        if not inst:
             return None
-        serializers_dict = _get_academic_serializers()
-        InstitutionSerializer = serializers_dict['InstitutionSerializer']
-        return InstitutionSerializer(obj.institution).data
+        return {"id": inst.id, "nom": inst.nom}
 
     def get_departement(self, obj):
-        """Retourne l'objet departement complet"""
-        if not obj.departement:
+        # ✅ Accès direct via select_related — contourne tout filtrage
+        dept = obj.departement
+        if not dept:
             return None
-        serializers_dict = _get_academic_serializers()
-        DepartementSerializer = serializers_dict['DepartementSerializer']
-        return DepartementSerializer(obj.departement).data
+        return {
+            "id":          dept.id,
+            "nom":         dept.nom,
+            "description": getattr(dept, "description", None),
+        }
 
-    @transaction.atomic
-    def create(self, validated_data):
-        validated_data["role"] = _get_or_create_role("ResponsableAcademique")
-        password = validated_data.pop("password", None)
+class ModifierMotDePasseSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True, min_length=8)
 
-        ra = ResponsableAcademique(**validated_data)
-        if password:
-            ra.set_password(password)
-        ra.save()
-        return ra
+    def validate_current_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Le mot de passe actuel est incorrect.")
+        return value
 
     @transaction.atomic
     def update(self, instance, validated_data):
@@ -781,7 +770,7 @@ class ModifierMotDePasseSerializer(serializers.Serializer):
         if not user.check_password(value):
             raise serializers.ValidationError("Le mot de passe actuel est incorrect.")
         return value
-
+    
     def validate(self, data):
         if data['new_password'] != data['confirm_password']:
             raise serializers.ValidationError({
