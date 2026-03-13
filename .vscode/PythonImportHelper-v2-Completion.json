@@ -2531,22 +2531,6 @@
         "documentation": {}
     },
     {
-        "label": "Apprenant",
-        "importPath": "users.models",
-        "description": "users.models",
-        "isExtraImport": true,
-        "detail": "users.models",
-        "documentation": {}
-    },
-    {
-        "label": "Parent",
-        "importPath": "users.models",
-        "description": "users.models",
-        "isExtraImport": true,
-        "detail": "users.models",
-        "documentation": {}
-    },
-    {
         "label": "User",
         "importPath": "users.models",
         "description": "users.models",
@@ -3508,35 +3492,19 @@
         "documentation": {}
     },
     {
-        "label": "MultiPartParser",
-        "importPath": "rest_framework.parsers",
-        "description": "rest_framework.parsers",
+        "label": "AllowAny",
+        "importPath": "rest_framework.permissions",
+        "description": "rest_framework.permissions",
         "isExtraImport": true,
-        "detail": "rest_framework.parsers",
+        "detail": "rest_framework.permissions",
         "documentation": {}
     },
     {
-        "label": "FormParser",
-        "importPath": "rest_framework.parsers",
-        "description": "rest_framework.parsers",
+        "label": "IsAuthenticated",
+        "importPath": "rest_framework.permissions",
+        "description": "rest_framework.permissions",
         "isExtraImport": true,
-        "detail": "rest_framework.parsers",
-        "documentation": {}
-    },
-    {
-        "label": "MultiPartParser",
-        "importPath": "rest_framework.parsers",
-        "description": "rest_framework.parsers",
-        "isExtraImport": true,
-        "detail": "rest_framework.parsers",
-        "documentation": {}
-    },
-    {
-        "label": "FormParser",
-        "importPath": "rest_framework.parsers",
-        "description": "rest_framework.parsers",
-        "isExtraImport": true,
-        "detail": "rest_framework.parsers",
+        "detail": "rest_framework.permissions",
         "documentation": {}
     },
     {
@@ -3585,6 +3553,38 @@
         "description": "rest_framework.permissions",
         "isExtraImport": true,
         "detail": "rest_framework.permissions",
+        "documentation": {}
+    },
+    {
+        "label": "MultiPartParser",
+        "importPath": "rest_framework.parsers",
+        "description": "rest_framework.parsers",
+        "isExtraImport": true,
+        "detail": "rest_framework.parsers",
+        "documentation": {}
+    },
+    {
+        "label": "FormParser",
+        "importPath": "rest_framework.parsers",
+        "description": "rest_framework.parsers",
+        "isExtraImport": true,
+        "detail": "rest_framework.parsers",
+        "documentation": {}
+    },
+    {
+        "label": "MultiPartParser",
+        "importPath": "rest_framework.parsers",
+        "description": "rest_framework.parsers",
+        "isExtraImport": true,
+        "detail": "rest_framework.parsers",
+        "documentation": {}
+    },
+    {
+        "label": "FormParser",
+        "importPath": "rest_framework.parsers",
+        "description": "rest_framework.parsers",
+        "isExtraImport": true,
+        "detail": "rest_framework.parsers",
         "documentation": {}
     },
     {
@@ -3814,6 +3814,14 @@
     },
     {
         "label": "Q",
+        "importPath": "django.db.models",
+        "description": "django.db.models",
+        "isExtraImport": true,
+        "detail": "django.db.models",
+        "documentation": {}
+    },
+    {
+        "label": "Sum",
         "importPath": "django.db.models",
         "description": "django.db.models",
         "isExtraImport": true,
@@ -4230,14 +4238,6 @@
         "documentation": {}
     },
     {
-        "label": "InscriptionCours",
-        "importPath": "courses.models",
-        "description": "courses.models",
-        "isExtraImport": true,
-        "detail": "courses.models",
-        "documentation": {}
-    },
-    {
         "label": "Session",
         "importPath": "courses.models",
         "description": "courses.models",
@@ -4561,6 +4561,38 @@
         "documentation": {}
     },
     {
+        "label": "action",
+        "importPath": "rest_framework.decorators",
+        "description": "rest_framework.decorators",
+        "isExtraImport": true,
+        "detail": "rest_framework.decorators",
+        "documentation": {}
+    },
+    {
+        "label": "action",
+        "importPath": "rest_framework.decorators",
+        "description": "rest_framework.decorators",
+        "isExtraImport": true,
+        "detail": "rest_framework.decorators",
+        "documentation": {}
+    },
+    {
+        "label": "action",
+        "importPath": "rest_framework.decorators",
+        "description": "rest_framework.decorators",
+        "isExtraImport": true,
+        "detail": "rest_framework.decorators",
+        "documentation": {}
+    },
+    {
+        "label": "action",
+        "importPath": "rest_framework.decorators",
+        "description": "rest_framework.decorators",
+        "isExtraImport": true,
+        "detail": "rest_framework.decorators",
+        "documentation": {}
+    },
+    {
         "label": "can_create_in_context",
         "importPath": "courses.utils",
         "description": "courses.utils",
@@ -4826,30 +4858,6 @@
         "description": "progress.models",
         "isExtraImport": true,
         "detail": "progress.models",
-        "documentation": {}
-    },
-    {
-        "label": "action",
-        "importPath": "rest_framework.decorators",
-        "description": "rest_framework.decorators",
-        "isExtraImport": true,
-        "detail": "rest_framework.decorators",
-        "documentation": {}
-    },
-    {
-        "label": "action",
-        "importPath": "rest_framework.decorators",
-        "description": "rest_framework.decorators",
-        "isExtraImport": true,
-        "detail": "rest_framework.decorators",
-        "documentation": {}
-    },
-    {
-        "label": "action",
-        "importPath": "rest_framework.decorators",
-        "description": "rest_framework.decorators",
-        "isExtraImport": true,
-        "detail": "rest_framework.decorators",
         "documentation": {}
     },
     {
@@ -7284,7 +7292,7 @@
         "kind": 5,
         "importPath": "courses.urls",
         "description": "courses.urls",
-        "peekOfCode": "urlpatterns = [\n    # Cours\n    path('cours/', CoursListCreateAPIView.as_view(), name='cours-list-create'),\n    path('cours/<int:pk>/', CoursDetailAPIView.as_view(), name='cours-detail'),\n    path('cours/<int:cours_id>/modules/', CoursModulesAPIView.as_view(), name='cours-modules'),\n    # Modules\n    path('modules/', ModuleListCreateAPIView.as_view(), name='module-list-create'),\n    path('modules/<int:pk>/', ModuleDetailAPIView.as_view(), name='module-detail'),\n    path('modules/<int:module_id>/sequences/', ModuleSequencesAPIView.as_view(), name='module-sequences'),\n    # Séquences",
+        "peekOfCode": "urlpatterns = [\n    # Cours\n    path('cours/', CoursListCreateAPIView.as_view(), name='cours-list-create'),\n    path('cours/<int:pk>/', CoursDetailAPIView.as_view(), name='cours-detail'),\n    path('cours/<int:cours_id>/modules/', CoursModulesAPIView.as_view(), name='cours-modules'),\n    path('cours/<int:pk>/indicateurs/',  CoursIndicateursAPIView.as_view()),\n    # Modules\n    path('modules/', ModuleListCreateAPIView.as_view(), name='module-list-create'),\n    path('modules/<int:pk>/', ModuleDetailAPIView.as_view(), name='module-detail'),\n    path('modules/<int:module_id>/sequences/', ModuleSequencesAPIView.as_view(), name='module-sequences'),",
         "detail": "courses.urls",
         "documentation": {}
     },
@@ -7636,6 +7644,15 @@
         "importPath": "courses.views",
         "description": "courses.views",
         "peekOfCode": "class CoursProgressToggleAPIView(APIView):\n    \"\"\"Marque un cours comme terminé ou non terminé\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def put(self, request, cours_id):\n        try:\n            serializer = ProgressToggleSerializer(data=request.data)\n            if not serializer.is_valid():\n                return api_error(\"Erreur de validation\", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)\n            apprenant = request.user.apprenant if hasattr(request.user, 'apprenant') else None\n            if not apprenant:",
+        "detail": "courses.views",
+        "documentation": {}
+    },
+    {
+        "label": "CoursIndicateursAPIView",
+        "kind": 6,
+        "importPath": "courses.views",
+        "description": "courses.views",
+        "peekOfCode": "class CoursIndicateursAPIView(APIView):\n    \"\"\"\n    GET /api/cours/<id>/indicateurs/?apprenant=<apprenant_id>\n    Retourne les indicateurs du cours pour un apprenant donné,\n    ou les indicateurs globaux (sessions) si apprenant absent.\n    \"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request, pk):\n        try:\n            cours = get_filtered_object(Cours, pk, request, 'Cours')",
         "detail": "courses.views",
         "documentation": {}
     },
@@ -8292,7 +8309,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class EvaluationListCreateAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        try:\n            cours_id = request.query_params.get('cours')\n            enseignant_id = request.query_params.get('enseignant')",
+        "peekOfCode": "class EvaluationListCreateAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request):\n        # --- 1. Blocage SuperAdmin ---\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        # --- 2. Rôle inconnu / non géré → refus immédiat ---\n        if role is None:",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -8319,7 +8336,7 @@
         "kind": 6,
         "importPath": "evaluations.views",
         "description": "evaluations.views",
-        "peekOfCode": "class EvaluationAccessibiliteAPIView(APIView):\n    \"\"\"Accessible à tous sauf SuperAdmin.\"\"\"\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        try:\n            evaluation = get_object_or_404(Evaluation, pk=pk)",
+        "peekOfCode": "class EvaluationAccessibiliteAPIView(APIView):\n    permission_classes = [IsAuthenticated]\n    def get(self, request, pk):\n        err = _block_super_admin(request.user)\n        if err:\n            return err\n        role = _get_role(request.user)\n        try:\n            evaluation = get_object_or_404(Evaluation, pk=pk)\n            apprenant_id = request.query_params.get('apprenant')",
         "detail": "evaluations.views",
         "documentation": {}
     },
@@ -11244,6 +11261,15 @@
         "kind": 6,
         "importPath": "users.serializers",
         "description": "users.serializers",
+        "peekOfCode": "class ModifierMotDePasseSerializer(serializers.Serializer):\n    current_password = serializers.CharField(write_only=True)\n    new_password = serializers.CharField(write_only=True, min_length=8)\n    confirm_password = serializers.CharField(write_only=True, min_length=8)\n    def validate_current_password(self, value):\n        user = self.context['request'].user\n        if not user.check_password(value):\n            raise serializers.ValidationError(\"Le mot de passe actuel est incorrect.\")\n        return value\n    @transaction.atomic",
+        "detail": "users.serializers",
+        "documentation": {}
+    },
+    {
+        "label": "ModifierMotDePasseSerializer",
+        "kind": 6,
+        "importPath": "users.serializers",
+        "description": "users.serializers",
         "peekOfCode": "class ModifierMotDePasseSerializer(serializers.Serializer):\n    current_password = serializers.CharField(write_only=True)\n    new_password = serializers.CharField(write_only=True, min_length=8)\n    confirm_password = serializers.CharField(write_only=True, min_length=8)\n    def validate_current_password(self, value):\n        user = self.context['request'].user\n        if not user.check_password(value):\n            raise serializers.ValidationError(\"Le mot de passe actuel est incorrect.\")\n        return value\n    def validate(self, data):",
         "detail": "users.serializers",
         "documentation": {}
@@ -11379,7 +11405,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class IsStaffOrReadOnly(permissions.BasePermission):\n    def has_permission(self, request, view):\n        if request.method in (\"GET\", \"HEAD\", \"OPTIONS\"):\n            return bool(request.user and request.user.is_authenticated)\n        return bool(request.user and request.user.is_authenticated and request.user.is_staff)\nclass IsAdminOrHigherOrSelf(permissions.BasePermission):\n    \"\"\"\n    Permission :\n    - SuperUser             : accès total (lecture + écriture)\n    - Admin / Responsable   : accès total (selon queryset)",
+        "peekOfCode": "class IsStaffOrReadOnly(permissions.BasePermission):\n    def has_permission(self, request, view):\n        if request.method in (\"GET\", \"HEAD\", \"OPTIONS\"):\n            return bool(request.user and request.user.is_authenticated)\n        return bool(request.user and request.user.is_authenticated and request.user.is_staff)\nclass IsAdminOrHigherOrSelf(permissions.BasePermission):\n    def has_permission(self, request, view):\n        if not request.user or not request.user.is_authenticated:\n            return False\n        if request.user.is_superuser:",
         "detail": "users.views",
         "documentation": {}
     },
@@ -11388,7 +11414,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class IsAdminOrHigherOrSelf(permissions.BasePermission):\n    \"\"\"\n    Permission :\n    - SuperUser             : accès total (lecture + écriture)\n    - Admin / Responsable   : accès total (selon queryset)\n    - Tout utilisateur auth : lecture seule (GET, HEAD, OPTIONS)\n    - Utilisateur lui-même  : peut modifier son propre profil\n    \"\"\"\n    def has_permission(self, request, view):\n        if not request.user or not request.user.is_authenticated:",
+        "peekOfCode": "class IsAdminOrHigherOrSelf(permissions.BasePermission):\n    def has_permission(self, request, view):\n        if not request.user or not request.user.is_authenticated:\n            return False\n        if request.user.is_superuser:\n            return True\n        role_name = request.user.role.name if request.user.role else None\n        if role_name in ['Admin', 'Responsable']:\n            return True\n        # ✅ Lecture autorisée pour TOUS les utilisateurs authentifiés",
         "detail": "users.views",
         "documentation": {}
     },
