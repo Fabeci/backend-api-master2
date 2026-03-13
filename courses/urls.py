@@ -6,6 +6,7 @@ from .views import (
     BlocContenuUploadView,
     BlocProgressListAPIView,
     BlocProgressToggleAPIView,
+    CoursIndicateursAPIView,
     CoursListCreateAPIView,
     CoursDetailAPIView,
     CoursModulesAPIView,
@@ -53,6 +54,7 @@ urlpatterns = [
     path('cours/', CoursListCreateAPIView.as_view(), name='cours-list-create'),
     path('cours/<int:pk>/', CoursDetailAPIView.as_view(), name='cours-detail'),
     path('cours/<int:cours_id>/modules/', CoursModulesAPIView.as_view(), name='cours-modules'),
+    path('cours/<int:pk>/indicateurs/',  CoursIndicateursAPIView.as_view()),
     
     # Modules
     path('modules/', ModuleListCreateAPIView.as_view(), name='module-list-create'),

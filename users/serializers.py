@@ -750,6 +750,27 @@ class ModifierMotDePasseSerializer(serializers.Serializer):
             raise serializers.ValidationError("Le mot de passe actuel est incorrect.")
         return value
 
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        instance = self._apply_password(instance, validated_data)
+        for k, v in validated_data.items():
+            setattr(instance, k, v)
+        instance.role = _get_or_create_role("ResponsableAcademique")
+        instance.save()
+        return instance
+
+
+class ModifierMotDePasseSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True, min_length=8)
+
+    def validate_current_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Le mot de passe actuel est incorrect.")
+        return value
+    
     def validate(self, data):
         if data['new_password'] != data['confirm_password']:
             raise serializers.ValidationError({

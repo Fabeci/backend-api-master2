@@ -36,11 +36,13 @@ urlpatterns = [
     path('logout/', LogoutAPIView.as_view(), name='logout'),
     path('change-password/', ChangePasswordAPIView.as_view(), name='change-password'),
 
+
     # ✅ Password reset
     path('password-reset/',                              PasswordResetAPIView.as_view(),        name='password_reset'),
     path('password-reset/confirm/',                      PasswordResetConfirmAPIView.as_view(), name='password_reset_confirm'),
     # ✅ Route alternative avec uid/token dans l'URL (optionnel)
     path('password-reset/confirm/<str:uidb64>/<str:token>/', PasswordResetConfirmAPIView.as_view(), name='password_reset_confirm_url'),
+
 
     path('', include(router.urls)),
 ]

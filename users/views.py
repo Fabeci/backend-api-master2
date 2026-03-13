@@ -167,14 +167,6 @@ class IsStaffOrReadOnly(permissions.BasePermission):
 
 
 class IsAdminOrHigherOrSelf(permissions.BasePermission):
-    """
-    Permission :
-    - SuperUser             : accès total (lecture + écriture)
-    - Admin / Responsable   : accès total (selon queryset)
-    - Tout utilisateur auth : lecture seule (GET, HEAD, OPTIONS)
-    - Utilisateur lui-même  : peut modifier son propre profil
-    """
-
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
@@ -347,16 +339,17 @@ class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):
             ).values_list("apprenant_id", flat=True).distinct()
             return Apprenant.objects.filter(id__in=apprenant_ids)
 
-        # ✅ Apprenant : voit les autres apprenants de son groupe
+        if role_name == "Parent":
+            return Apprenant.objects.filter(tuteur=user)
+
         if role_name == "Apprenant":
             groupe_id = getattr(user, 'groupe_id', None)
             if groupe_id:
                 return Apprenant.objects.filter(groupe_id=groupe_id)
-            # Fallback : son propre profil uniquement
             return Apprenant.objects.filter(pk=user.pk)
 
         return Apprenant.objects.none()
-    
+
     def perform_create(self, serializer):
         user = self.request.user
         inst = _user_institution(user)
@@ -364,7 +357,6 @@ class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):
             serializer.save(institution=inst)
         else:
             serializer.save()
-
 
 class FormateurViewSet(ProfileActionsMixin, BaseModelViewSet):
     queryset           = Formateur.objects.all()
@@ -378,6 +370,7 @@ class FormateurViewSet(ProfileActionsMixin, BaseModelViewSet):
 
         if user.is_superuser:
             return Formateur.objects.all()
+
 
 
         # ✅ Un formateur peut voir et modifier son propre profil
@@ -454,7 +447,7 @@ class ResponsableAcademiqueViewSet(ProfileActionsMixin, BaseModelViewSet):
             serializer.save(**kwargs)
         else:
             serializer.save()
-            
+
 class ChangePasswordAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -474,6 +467,7 @@ class ChangePasswordAPIView(APIView):
             "Mot de passe modifié avec succès. Veuillez vous reconnecter.",
             data=None,
             http_status=status.HTTP_200_OK,
+
         )
         
 class PasswordResetAPIView(APIView):

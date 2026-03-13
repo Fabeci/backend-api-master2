@@ -15,8 +15,6 @@ from django.http import HttpResponse
 from django.db.models import Prefetch
 from users.models import Apprenant, Parent as ParentModel
 from courses.models import InscriptionCours
-from users.models import Apprenant, Parent as ParentModel
-from courses.models import InscriptionCours
 from .models import Evaluation, PassageEvaluation, ReponseQuestion
 from .models import (
     Quiz, Question, Reponse, Evaluation, PassageEvaluation,
@@ -81,6 +79,7 @@ def _formateur_owns_cours(user, cours):
         getattr(cours, 'institution_id', None) == institution_id
     )
 
+
 def _filter_by_institution(qs, user):
     """Filtre par institution de l'utilisateur."""
     institution_id = getattr(user, 'institution_id', None)
@@ -98,7 +97,6 @@ def _filter_quiz_by_institution(qs, user):
 
 def _filter_passage_for_parent(qs, user, model='evaluation'):
     """Filtre les passages pour un parent (données de ses enfants)."""
-    from users.models import Apprenant
     enfants_ids = list(Apprenant.objects.filter(tuteur=user).values_list('id', flat=True))
     if not enfants_ids:
         return qs.none()
@@ -160,8 +158,6 @@ class QuizListCreateAPIView(APIView):
                     sequence__module__cours__enseignant=request.user
                 )
             elif role == 'Apprenant':
-                # Apprenant voit les quiz de ses cours inscrits
-                from courses.models import InscriptionCours
                 cours_ids = InscriptionCours.objects.filter(
                     apprenant=request.user, statut='inscrit'
                 ).values_list('cours_id', flat=True)
@@ -184,7 +180,6 @@ class QuizListCreateAPIView(APIView):
 
         serializer = QuizSerializer(data=request.data)
         if serializer.is_valid():
-            # Formateur : vérifier qu'il enseigne dans la séquence cible
             if _get_role(request.user) == 'Formateur':
                 sequence_id = request.data.get('sequence')
                 if sequence_id:
@@ -279,7 +274,6 @@ class QuestionListCreateAPIView(APIView):
                     Q(evaluation__cours__enseignant=request.user)
                 )
             elif role == 'Apprenant':
-                from courses.models import InscriptionCours
                 cours_ids = InscriptionCours.objects.filter(
                     apprenant=request.user, statut='inscrit'
                 ).values_list('cours_id', flat=True)
@@ -297,7 +291,6 @@ class QuestionListCreateAPIView(APIView):
 
             data = QuestionSerializer(qs, many=True).data
 
-            # Apprenant : masquer est_correcte dans les réponses prédéfinies
             if role == 'Apprenant':
                 data = _mask_correct_answers(data)
 
@@ -384,7 +377,6 @@ class ReponseListCreateAPIView(APIView):
 
             data = ReponseSerializer(qs, many=True).data
 
-            # Masquer est_correcte pour Apprenant
             if role == 'Apprenant':
                 for item in data:
                     item.pop('est_correcte', None)
@@ -454,10 +446,16 @@ class EvaluationListCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        # --- 1. Blocage SuperAdmin ---
         err = _block_super_admin(request.user)
         if err:
             return err
+
         role = _get_role(request.user)
+
+        # --- 2. Rôle inconnu / non géré → refus immédiat ---
+        if role is None:
+            return api_error("Rôle utilisateur introuvable.", http_status=status.HTTP_403_FORBIDDEN)
 
         try:
             cours_id = request.query_params.get('cours')
@@ -466,6 +464,7 @@ class EvaluationListCreateAPIView(APIView):
 
             qs = Evaluation.objects.select_related('cours', 'enseignant').prefetch_related('questions').all()
 
+            # --- 3. Filtrage par rôle ---
             if role in ('Admin', 'ResponsableAcademique'):
                 qs = _filter_by_institution(qs, request.user)
 
@@ -480,16 +479,12 @@ class EvaluationListCreateAPIView(APIView):
                     )
 
             elif role == 'Apprenant':
-                from courses.models import InscriptionCours
                 cours_ids = InscriptionCours.objects.filter(
                     apprenant=request.user, statut='inscrit'
                 ).values_list('cours_id', flat=True)
                 qs = qs.filter(cours_id__in=cours_ids, est_publiee=True)
 
             elif role == 'Parent':
-                # ✅ Parent voit les évaluations publiées des cours de ses enfants
-                from users.models import Apprenant, Parent as ParentModel
-                from courses.models import InscriptionCours
                 try:
                     parent_obj = ParentModel.objects.get(pk=request.user.pk)
                     enfant_ids = Apprenant.objects.filter(
@@ -503,8 +498,10 @@ class EvaluationListCreateAPIView(APIView):
                     qs = qs.none()
 
             else:
+                # Tout rôle non reconnu → liste vide (pas de None)
                 qs = qs.none()
 
+            # --- 4. Filtres additionnels ---
             if cours_id:
                 qs = qs.filter(cours_id=cours_id)
             if enseignant_id:
@@ -512,11 +509,17 @@ class EvaluationListCreateAPIView(APIView):
             if est_publiee is not None:
                 qs = qs.filter(est_publiee=est_publiee.lower() == 'true')
 
-            return api_success("Liste des évaluations récupérée.", EvaluationSerializer(qs, many=True).data)
+            return api_success(
+                "Liste des évaluations récupérée.",
+                EvaluationSerializer(qs, many=True).data
+            )
 
         except Exception as e:
-            return api_error("Erreur serveur.", errors={'detail': str(e)},
-                             http_status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return api_error(
+                "Erreur serveur.",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def post(self, request):
         err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')
@@ -537,6 +540,7 @@ class EvaluationListCreateAPIView(APIView):
             return api_success("Évaluation créée.", EvaluationSerializer(serializer.save()).data,
                                status.HTTP_201_CREATED)
         return api_error("Erreur de validation.", errors=serializer.errors)
+
 
 class EvaluationDetailAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -610,6 +614,8 @@ class EvaluationDetailAPIView(APIView):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         evaluation.delete()
         return api_success("Évaluation supprimée.", None, status.HTTP_204_NO_CONTENT)
+
+
 class EvaluationPublierAPIView(APIView):
     """Publier/dépublier : Admin, Responsable, Formateur (propriétaire)."""
     permission_classes = [IsAuthenticated]
@@ -645,7 +651,6 @@ class EvaluationPublierAPIView(APIView):
 
 
 class EvaluationAccessibiliteAPIView(APIView):
-    """Accessible à tous sauf SuperAdmin."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
@@ -661,7 +666,6 @@ class EvaluationAccessibiliteAPIView(APIView):
             if not apprenant_id:
                 return api_error("Le paramètre 'apprenant' est requis.")
 
-            # ✅ Parent : vérifier que l'apprenant demandé est bien un de ses enfants
             if role == 'Parent':
                 try:
                     parent_obj = ParentModel.objects.get(pk=request.user.pk)
@@ -717,6 +721,7 @@ class EvaluationAccessibiliteAPIView(APIView):
             return api_error("Erreur serveur.", errors={'detail': str(e)},
                              http_status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 # ============================================================================
 # PASSAGES D'ÉVALUATIONS
 # ============================================================================
@@ -735,7 +740,6 @@ class PassageEvaluationDemarrerAPIView(APIView):
             if not apprenant_id or not evaluation_id:
                 return api_error("Les champs 'apprenant' et 'evaluation' sont requis.")
 
-            # Vérifier que l'apprenant correspond à l'utilisateur connecté
             if str(request.user.id) != str(apprenant_id):
                 return api_error("Vous ne pouvez démarrer que votre propre évaluation.",
                                  http_status=status.HTTP_403_FORBIDDEN)
@@ -932,7 +936,6 @@ class PassageEvaluationDetailAPIView(APIView):
         if role == 'Apprenant' and passage.apprenant_id != request.user.id:
             return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         if role == 'Parent':
-            from users.models import Apprenant
             enfants_ids = list(Apprenant.objects.filter(tuteur=request.user).values_list('id', flat=True))
             if passage.apprenant_id not in enfants_ids:
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
@@ -1001,7 +1004,6 @@ class ReponseQuestionDetailAPIView(APIView):
         if role == 'Apprenant' and reponse.passage_evaluation.apprenant_id != request.user.id:
             return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         if role == 'Parent':
-            from users.models import Apprenant
             enfants_ids = list(Apprenant.objects.filter(tuteur=request.user).values_list('id', flat=True))
             if reponse.passage_evaluation.apprenant_id not in enfants_ids:
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
@@ -1159,7 +1161,6 @@ class PassageQuizListCreateAPIView(APIView):
             return err
         serializer = PassageQuizSerializer(data=request.data)
         if serializer.is_valid():
-            # Vérifier que l'apprenant = utilisateur connecté
             if str(serializer.validated_data.get('apprenant', {}).id if hasattr(
                     serializer.validated_data.get('apprenant'), 'id') else '') != str(request.user.id):
                 return api_error("Vous ne pouvez passer que vos propres quiz.",
@@ -1184,7 +1185,6 @@ class PassageQuizDetailAPIView(APIView):
         if role == 'Apprenant' and passage.apprenant_id != request.user.id:
             return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         if role == 'Parent':
-            from users.models import Apprenant
             enfants_ids = list(Apprenant.objects.filter(tuteur=request.user).values_list('id', flat=True))
             if passage.apprenant_id not in enfants_ids:
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
@@ -1263,12 +1263,10 @@ class StatistiquesApprenantAPIView(APIView):
             return err
         role = _get_role(request.user)
 
-        # Vérification d'accès
         if role == 'Apprenant' and str(request.user.id) != str(apprenant_id):
             return api_error("Vous ne pouvez voir que vos propres statistiques.",
                              http_status=status.HTTP_403_FORBIDDEN)
         if role == 'Parent':
-            from users.models import Apprenant
             enfants_ids = list(Apprenant.objects.filter(tuteur=request.user).values_list('id', flat=True))
             if int(apprenant_id) not in enfants_ids:
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
@@ -1413,8 +1411,6 @@ class EvaluationExportAPIView(APIView):
 
         return self._export_detail_csv(evaluation, passages) if detail \
             else self._export_resume_csv(evaluation, passages)
-
-    # --- méthodes d'export (inchangées) ---
 
     def _get_user_info(self, apprenant):
         return {

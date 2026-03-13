@@ -27,8 +27,9 @@ from django.http import FileResponse, Http404
 from django.core.files.storage import default_storage
 from django.conf import settings
 from django.core.files.base import ContentFile
-
+from rest_framework.decorators import action
 from academics.models import Inscription
+from django.db.models import Sum
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from courses.utils import can_create_in_context, filter_queryset_by_role, get_filtered_object, get_user_context
@@ -1456,3 +1457,97 @@ class CoursProgressToggleAPIView(APIView):
             return api_success("Progression mise à jour avec succès", CoursProgressSerializer(progress).data, status.HTTP_200_OK)
         except Exception as e:
             return api_error("Erreur lors de la mise à jour de la progression", errors={'detail': str(e)}, http_status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class CoursIndicateursAPIView(APIView):
+    """
+    GET /api/cours/<id>/indicateurs/?apprenant=<apprenant_id>
+    Retourne les indicateurs du cours pour un apprenant donné,
+    ou les indicateurs globaux (sessions) si apprenant absent.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            cours = get_filtered_object(Cours, pk, request, 'Cours')
+        except Http404:
+            return api_error("Cours introuvable", http_status=status.HTTP_404_NOT_FOUND)
+
+        volume_horaire_heures  = cours.volume_horaire or 0
+        # volume_horaire_heures  = round(volume_horaire_minutes / 60, 2) if volume_horaire_minutes else 0
+
+        apprenant_id = request.query_params.get('apprenant')
+
+        # ── Indicateurs globaux (pas d'apprenant) ─────────────────────────
+        if not apprenant_id:
+            return Response({
+                'success': True,
+                'data': {
+                    'volume_horaire':   volume_horaire_heures,
+                    'heures_realisees': getattr(cours, 'total_heures_realisees', 0) or 0,
+                    'taux_execution':   getattr(cours, 'taux_execution', 0) or 0,
+                    'progression_pct':  0,
+                    'blocs_termines':   0,
+                    'total_blocs':      0,
+                    'source':           'sessions',
+                }
+            })
+
+        apprenant_id = int(apprenant_id)
+
+        # ── 1. Progression blocs ───────────────────────────────────────────
+        total_blocs = BlocContenu.objects.filter(
+            sequence__module__cours=cours,
+            est_visible=True,
+        ).count()
+
+        blocs_termines = BlocProgress.objects.filter(
+            apprenant_id=apprenant_id,
+            bloc__sequence__module__cours=cours,
+            est_termine=True,
+        ).count()
+
+        progression_pct = round(
+            (blocs_termines / total_blocs * 100) if total_blocs > 0 else 0, 1
+        )
+
+        # ── 2. Heures réalisées ────────────────────────────────────────────
+        heures_realisees = 0.0
+        try:
+            from analytics.models import BlocSession
+            total_sec = BlocSession.objects.filter(
+                apprenant_id=apprenant_id,
+                bloc__sequence__module__cours=cours,
+            ).aggregate(total=Sum('duree_secondes'))['total'] or 0
+            heures_realisees = round(total_sec / 3600, 2)
+        except ImportError:
+            try:
+                from analytics.models import BlocAnalyticsSummary
+                total_sec = BlocAnalyticsSummary.objects.filter(
+                    apprenant_id=apprenant_id,
+                    bloc__sequence__module__cours=cours,
+                ).aggregate(total=Sum('duree_totale_sec'))['total'] or 0
+                heures_realisees = round(total_sec / 3600, 2)
+            except ImportError:
+                # Fallback : durée estimée des blocs terminés
+                blocs_ids = BlocProgress.objects.filter(
+                    apprenant_id=apprenant_id,
+                    bloc__sequence__module__cours=cours,
+                    est_termine=True,
+                ).values_list('bloc_id', flat=True)
+                total_minutes = BlocContenu.objects.filter(
+                    id__in=blocs_ids
+                ).aggregate(total=Sum('duree_estimee_minutes'))['total'] or 0
+                heures_realisees = round(total_minutes / 60, 2)
+
+        return Response({
+            'success': True,
+            'data': {
+                'volume_horaire':   volume_horaire_heures,
+                'heures_realisees': heures_realisees,
+                'taux_execution':   progression_pct,   # % blocs terminés
+                'progression_pct':  progression_pct,
+                'blocs_termines':   blocs_termines,
+                'total_blocs':      total_blocs,
+                'source':           'apprenant',
+            }
+        })
