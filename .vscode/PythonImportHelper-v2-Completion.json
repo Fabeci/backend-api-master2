@@ -232,6 +232,22 @@
         "documentation": {}
     },
     {
+        "label": "migrations",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
         "label": "models",
         "importPath": "django.db",
         "description": "django.db",
@@ -489,6 +505,22 @@
     },
     {
         "label": "migrations",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "migrations",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "models",
         "importPath": "django.db",
         "description": "django.db",
         "isExtraImport": true,
@@ -5335,6 +5367,15 @@
         "documentation": {}
     },
     {
+        "label": "Migration",
+        "kind": 6,
+        "importPath": "academics.migrations.0014_domaineetude_departement",
+        "description": "academics.migrations.0014_domaineetude_departement",
+        "peekOfCode": "class Migration(migrations.Migration):\n    dependencies = [\n        ('academics', '0013_remove_classe_groupes'),\n    ]\n    operations = [\n        migrations.AddField(\n            model_name='domaineetude',\n            name='departement',\n            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='domaines_etude', to='academics.departement'),\n        ),",
+        "detail": "academics.migrations.0014_domaineetude_departement",
+        "documentation": {}
+    },
+    {
         "label": "InscriptionInline",
         "kind": 6,
         "importPath": "academics.admin",
@@ -5510,7 +5551,7 @@
         "kind": 6,
         "importPath": "academics.models",
         "description": "academics.models",
-        "peekOfCode": "class DomaineEtude(models.Model):\n    institution = models.ForeignKey(\n        Institution,\n        on_delete=models.CASCADE,\n        related_name=\"domaines_etude\",\n        null=True,\n        blank=True,\n    )\n    nom = models.CharField(max_length=100)\n    description = models.TextField(null=True, blank=True)",
+        "peekOfCode": "class DomaineEtude(models.Model):\n    institution = models.ForeignKey(\n        Institution,\n        on_delete=models.CASCADE,\n        related_name=\"domaines_etude\",\n        null=True,\n        blank=True,\n    )\n    departement = models.ForeignKey(         \n        \"Departement\",",
         "detail": "academics.models",
         "documentation": {}
     },
@@ -5573,7 +5614,7 @@
         "kind": 6,
         "importPath": "academics.serializers",
         "description": "academics.serializers",
-        "peekOfCode": "class DomaineEtudeSerializer(serializers.ModelSerializer):\n    class Meta:\n        model = DomaineEtude\n        fields = '__all__'\nclass MatiereSerializer(serializers.ModelSerializer):\n    institution = serializers.PrimaryKeyRelatedField(read_only=True)\n    class Meta:\n        model = Matiere\n        fields = \"__all__\"\n    def create(self, validated_data):",
+        "peekOfCode": "class DomaineEtudeSerializer(serializers.ModelSerializer):\n    departement_label = serializers.StringRelatedField(\n        source=\"departement.nom\", read_only=True\n    )\n    class Meta:\n        model = DomaineEtude\n        fields = '__all__'\nclass MatiereSerializer(serializers.ModelSerializer):\n    institution = serializers.PrimaryKeyRelatedField(read_only=True)\n    class Meta:",
         "detail": "academics.serializers",
         "documentation": {}
     },
@@ -5618,7 +5659,7 @@
         "kind": 6,
         "importPath": "academics.serializers",
         "description": "academics.serializers",
-        "peekOfCode": "class FiliereSerializer(serializers.ModelSerializer):\n    # Lecture : nom du domaine\n    domaine_etude_label = serializers.StringRelatedField(source=\"domaine_etude\", read_only=True)\n    # Écriture : ID du domaine\n    domaine_etude = serializers.PrimaryKeyRelatedField(queryset=DomaineEtude.objects.all(), write_only=True)\n    # class Meta:\n    #     model = Filiere\n    #     fields = [\n    #         \"id\",\n    #         \"nom\",",
+        "peekOfCode": "class FiliereSerializer(serializers.ModelSerializer):\n    domaine_etude_label = serializers.StringRelatedField(\n        source=\"domaine_etude\", read_only=True\n    )\n    domaine_etude = serializers.PrimaryKeyRelatedField(\n        queryset=DomaineEtude.objects.all()\n    )\n    institution = serializers.PrimaryKeyRelatedField(read_only=True)\n    class Meta:\n        model = Filiere",
         "detail": "academics.serializers",
         "documentation": {}
     },
@@ -5699,7 +5740,7 @@
         "kind": 2,
         "importPath": "academics.utils",
         "description": "academics.utils",
-        "peekOfCode": "def get_role_name(user):\n    \"\"\"Retourne le nom du rôle de l'utilisateur.\"\"\"\n    if hasattr(user, 'role') and user.role:\n        return user.role.name\n    return None\ndef get_parent_enfants_ids(user):\n    \"\"\"Retourne les IDs des enfants d'un parent.\"\"\"\n    from users.models import Apprenant\n    return list(\n        Apprenant.objects.filter(tuteur=user).values_list('id', flat=True)",
+        "peekOfCode": "def get_role_name(user):\n    if hasattr(user, 'role') and user.role:\n        return user.role.name\n    return None\ndef get_parent_enfants_ids(user):\n    from users.models import Apprenant\n    return list(\n        Apprenant.objects.filter(tuteur=user).values_list('id', flat=True)\n    )\ndef get_user_academic_context(request):",
         "detail": "academics.utils",
         "documentation": {}
     },
@@ -5708,7 +5749,7 @@
         "kind": 2,
         "importPath": "academics.utils",
         "description": "academics.utils",
-        "peekOfCode": "def get_parent_enfants_ids(user):\n    \"\"\"Retourne les IDs des enfants d'un parent.\"\"\"\n    from users.models import Apprenant\n    return list(\n        Apprenant.objects.filter(tuteur=user).values_list('id', flat=True)\n    )\ndef get_user_academic_context(request):\n    \"\"\"\n    Extrait le contexte académique de l'utilisateur.\n    Returns:",
+        "peekOfCode": "def get_parent_enfants_ids(user):\n    from users.models import Apprenant\n    return list(\n        Apprenant.objects.filter(tuteur=user).values_list('id', flat=True)\n    )\ndef get_user_academic_context(request):\n    user = request.user\n    ctx = {\n        \"bypass\": False,\n        \"blocked\": False,",
         "detail": "academics.utils",
         "documentation": {}
     },
@@ -5717,7 +5758,7 @@
         "kind": 2,
         "importPath": "academics.utils",
         "description": "academics.utils",
-        "peekOfCode": "def get_user_academic_context(request):\n    \"\"\"\n    Extrait le contexte académique de l'utilisateur.\n    Returns:\n        dict: {\n            'bypass': bool,              # True pour SuperAdmin (Institution seulement)\n            'blocked': bool,             # True pour SuperAdmin sur ressources internes\n            'institution_id': int|None,\n            'role_name': str|None,\n            'user_classe_id': int|None,",
+        "peekOfCode": "def get_user_academic_context(request):\n    user = request.user\n    ctx = {\n        \"bypass\": False,\n        \"blocked\": False,\n        \"institution_id\": None,\n        \"departement_id\": None,\n        \"role_name\": None,\n        \"user_classe_id\": None,\n        \"user_groupe_id\": None,",
         "detail": "academics.utils",
         "documentation": {}
     },
@@ -5726,7 +5767,7 @@
         "kind": 2,
         "importPath": "academics.utils",
         "description": "academics.utils",
-        "peekOfCode": "def filter_academics_queryset(queryset, request, model_name, is_detail=False):\n    \"\"\"\n    Filtre un queryset academics selon le rôle.\n    Args:\n        queryset   : QuerySet Django\n        request    : Request Django\n        model_name : 'Institution', 'Groupe', 'Classe', 'Inscription', etc.\n        is_detail  : True si c'est une vue détail (filtrage plus strict)\n    Returns:\n        QuerySet filtré",
+        "peekOfCode": "def filter_academics_queryset(queryset, request, model_name, is_detail=False):\n    user = request.user\n    ctx = get_user_academic_context(request)\n    # ================================================================\n    # INSTITUTION\n    # ================================================================\n    if model_name == 'Institution':\n        if ctx.get(\"bypass\"):\n            return queryset\n        role_name = ctx.get(\"role_name\")",
         "detail": "academics.utils",
         "documentation": {}
     },
@@ -5735,7 +5776,7 @@
         "kind": 2,
         "importPath": "academics.utils",
         "description": "academics.utils",
-        "peekOfCode": "def get_filtered_academic_object(model_class, pk, request, model_name):\n    \"\"\"\n    Récupère un objet académique filtré par rôle (vue détail).\n    \"\"\"\n    qs = model_class.objects.all()\n    qs = filter_academics_queryset(qs, request, model_name, is_detail=True)\n    return get_object_or_404(qs, pk=pk)\ndef can_modify_academic_resource(user, obj, model_name):\n    \"\"\"\n    Vérifie si l'utilisateur peut modifier une ressource académique.",
+        "peekOfCode": "def get_filtered_academic_object(model_class, pk, request, model_name):\n    qs = model_class.objects.all()\n    qs = filter_academics_queryset(qs, request, model_name, is_detail=True)\n    return get_object_or_404(qs, pk=pk)\ndef can_modify_academic_resource(user, obj, model_name):\n    if getattr(user, 'is_superuser', False):\n        return model_name == 'Institution'\n    role_name = get_role_name(user)\n    if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:\n        if hasattr(obj, 'institution_id'):",
         "detail": "academics.utils",
         "documentation": {}
     },
@@ -5744,7 +5785,7 @@
         "kind": 2,
         "importPath": "academics.utils",
         "description": "academics.utils",
-        "peekOfCode": "def can_modify_academic_resource(user, obj, model_name):\n    \"\"\"\n    Vérifie si l'utilisateur peut modifier une ressource académique.\n    SuperAdmin : peut modifier Institution uniquement\n    Admin/Responsable : peuvent modifier dans leur institution\n    Formateur : peut modifier les groupes où il enseigne\n    Apprenant/Parent : aucune modification\n    \"\"\"\n    if getattr(user, 'is_superuser', False):\n        # SuperAdmin : uniquement Institution",
+        "peekOfCode": "def can_modify_academic_resource(user, obj, model_name):\n    if getattr(user, 'is_superuser', False):\n        return model_name == 'Institution'\n    role_name = get_role_name(user)\n    if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:\n        if hasattr(obj, 'institution_id'):\n            return obj.institution_id == user.institution_id\n        return True\n    if role_name == 'Formateur':\n        if model_name == 'Groupe':",
         "detail": "academics.utils",
         "documentation": {}
     },
@@ -5753,7 +5794,7 @@
         "kind": 2,
         "importPath": "academics.utils",
         "description": "academics.utils",
-        "peekOfCode": "def get_user_groupes_ids(user):\n    \"\"\"Retourne les IDs des groupes où le formateur enseigne.\"\"\"\n    role_name = get_role_name(user)\n    if role_name == 'Formateur':\n        from .models import Groupe\n        return list(Groupe.objects.filter(\n            formateurs=user,\n            institution_id=user.institution_id\n        ).values_list('id', flat=True))\n    return []",
+        "peekOfCode": "def get_user_groupes_ids(user):\n    role_name = get_role_name(user)\n    if role_name == 'Formateur':\n        from .models import Groupe\n        return list(Groupe.objects.filter(\n            formateurs=user,\n            institution_id=user.institution_id\n        ).values_list('id', flat=True))\n    return []\ndef get_user_classe_id(user):",
         "detail": "academics.utils",
         "documentation": {}
     },
@@ -5762,7 +5803,7 @@
         "kind": 2,
         "importPath": "academics.utils",
         "description": "academics.utils",
-        "peekOfCode": "def get_user_classe_id(user):\n    \"\"\"Retourne l'ID de la classe de l'apprenant.\"\"\"\n    role_name = get_role_name(user)\n    if role_name == 'Apprenant':\n        from .models import Inscription\n        inscription = Inscription.objects.filter(\n            apprenant=user,\n            statut=\"actif\"\n        ).select_related('classe').first()\n        if inscription and inscription.classe:",
+        "peekOfCode": "def get_user_classe_id(user):\n    role_name = get_role_name(user)\n    if role_name == 'Apprenant':\n        from .models import Inscription\n        inscription = Inscription.objects.filter(\n            apprenant=user,\n            statut=\"actif\"\n        ).select_related('classe').first()\n        if inscription and inscription.classe:\n            return inscription.classe_id",
         "detail": "academics.utils",
         "documentation": {}
     },
@@ -5825,7 +5866,7 @@
         "kind": 6,
         "importPath": "academics.views",
         "description": "academics.views",
-        "peekOfCode": "class FiliereListCreateAPIView(APIView):\n    \"\"\"Filières : visibles par tous (modèle transversal)\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        qs = Filiere.objects.all()\n        qs = filter_academics_queryset(qs, request, \"Filiere\", is_detail=False)\n        serializer = FiliereSerializer(qs, many=True)\n        return api_success(\"Liste des filières\", serializer.data, status.HTTP_200_OK)\n    def post(self, request):\n        role_name = request.user.role.name if hasattr(request.user, \"role\") and request.user.role else None",
+        "peekOfCode": "class FiliereListCreateAPIView(APIView):\n    \"\"\"Filières : visibles par tous (modèle transversal)\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get(self, request):\n        qs = Filiere.objects.all()\n        qs = filter_academics_queryset(qs, request, \"Filiere\", is_detail=False)\n        serializer = FiliereSerializer(qs, many=True, context={\"request\": request})\n        return api_success(\"Liste des filières\", serializer.data, status.HTTP_200_OK)\n    def post(self, request):\n        role_name = request.user.role.name if hasattr(request.user, \"role\") and request.user.role else None",
         "detail": "academics.views",
         "documentation": {}
     },
@@ -5834,7 +5875,7 @@
         "kind": 6,
         "importPath": "academics.views",
         "description": "academics.views",
-        "peekOfCode": "class FiliereDetailAPIView(APIView):\n    \"\"\"Détail d'une filière\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk):\n        return get_object_or_404(Filiere, pk=pk)\n    def get(self, request, pk):\n        filiere = self.get_object(pk)\n        serializer = FiliereSerializer(filiere)\n        return api_success(\"Filière trouvée\", serializer.data, status.HTTP_200_OK)\n    def put(self, request, pk):",
+        "peekOfCode": "class FiliereDetailAPIView(APIView):\n    \"\"\"Détail d'une filière\"\"\"\n    permission_classes = [permissions.IsAuthenticated]\n    def get_object(self, pk):\n        return get_object_or_404(Filiere, pk=pk)\n    def get(self, request, pk):\n        filiere = self.get_object(pk)\n        serializer = FiliereSerializer(filiere, context={\"request\": request})\n        return api_success(\"Filière trouvée\", serializer.data, status.HTTP_200_OK)\n    def put(self, request, pk):",
         "detail": "academics.views",
         "documentation": {}
     },
@@ -6667,6 +6708,15 @@
         "documentation": {}
     },
     {
+        "label": "Migration",
+        "kind": 6,
+        "importPath": "courses.migrations.0015_cours_departement",
+        "description": "courses.migrations.0015_cours_departement",
+        "peekOfCode": "class Migration(migrations.Migration):\n    dependencies = [\n        ('academics', '0014_domaineetude_departement'),\n        ('courses', '0014_aianalysisrequest_blocgenere_quizgenere_and_more'),\n    ]\n    operations = [\n        migrations.AddField(\n            model_name='cours',\n            name='departement',\n            field=models.ForeignKey(blank=True, help_text='Département auquel ce cours est rattaché', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='cours', to='academics.departement'),",
+        "detail": "courses.migrations.0015_cours_departement",
+        "documentation": {}
+    },
+    {
         "label": "recompute_sequence",
         "kind": 2,
         "importPath": "courses.services.progression",
@@ -7319,7 +7369,7 @@
         "kind": 2,
         "importPath": "courses.utils",
         "description": "courses.utils",
-        "peekOfCode": "def get_user_context(request):\n    user = request.user\n    ctx = {\n        \"bypass\": False,\n        \"institution_id\": None,\n        \"annee_scolaire_id\": None,\n        \"strict\": False,\n        \"role_name\": None,\n    }\n    # SuperUser : bypass complet",
+        "peekOfCode": "def get_user_context(request):\n    user = request.user\n    ctx = {\n        \"bypass\": False,\n        \"institution_id\": None,\n        \"annee_scolaire_id\": None,\n        \"departement_id\": None,   \n        \"strict\": False,\n        \"role_name\": None,\n    }",
         "detail": "courses.utils",
         "documentation": {}
     },
@@ -11450,7 +11500,7 @@
         "kind": 6,
         "importPath": "users.views",
         "description": "users.views",
-        "peekOfCode": "class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):\n    queryset           = Apprenant.objects.all()\n    serializer_class   = ApprenantCrudSerializer\n    permission_classes = [IsStaffOrReadOnly]\n    def get_queryset(self):\n        user      = self.request.user\n        role_name = _role_name(user)\n        inst      = _user_institution(user)\n        if user.is_superuser:\n            return Apprenant.objects.all()",
+        "peekOfCode": "class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):\n    queryset           = Apprenant.objects.all()\n    serializer_class   = ApprenantCrudSerializer\n    permission_classes = [IsAdminOrHigherOrSelf]\n    def get_queryset(self):\n        user      = self.request.user\n        role_name = _role_name(user)\n        inst      = _user_institution(user)\n        if user.is_superuser:\n            return Apprenant.objects.all()",
         "detail": "users.views",
         "documentation": {}
     },

@@ -87,6 +87,17 @@ def _filter_by_institution(qs, user):
         return qs.filter(cours__institution_id=institution_id)
     return qs.none()
 
+def _get_responsable_dept_id(user):
+    """Récupère le département du responsable académique."""
+    dept_id = getattr(user, 'departement_id', None)
+    if dept_id is None:
+        try:
+            from users.models import ResponsableAcademique
+            resp = ResponsableAcademique.objects.get(pk=user.pk)
+            dept_id = resp.departement_id
+        except Exception:
+            dept_id = None
+    return dept_id
 
 def _filter_quiz_by_institution(qs, user):
     institution_id = getattr(user, 'institution_id', None)
@@ -149,8 +160,16 @@ class QuizListCreateAPIView(APIView):
             sequence_id = request.query_params.get('sequence')
             qs = Quiz.objects.select_related('sequence').all()
 
-            if role in ('Admin', 'ResponsableAcademique'):
+            if role == 'Admin':
                 qs = _filter_quiz_by_institution(qs, request.user)
+
+            elif role == 'ResponsableAcademique':
+                institution_id = getattr(request.user, 'institution_id', None)
+                qs = qs.filter(sequence__module__cours__institution_id=institution_id)
+                dept_id = _get_responsable_dept_id(request.user)
+                if dept_id:
+                    qs = qs.filter(sequence__module__cours__departement_id=dept_id)
+
             elif role == 'Formateur':
                 institution_id = getattr(request.user, 'institution_id', None)
                 qs = qs.filter(
@@ -158,9 +177,14 @@ class QuizListCreateAPIView(APIView):
                     sequence__module__cours__enseignant=request.user
                 )
             elif role == 'Apprenant':
-                cours_ids = InscriptionCours.objects.filter(
-                    apprenant=request.user, statut='inscrit'
-                ).values_list('cours_id', flat=True)
+                from django.db.models.functions import Lower
+                cours_ids = (
+                    InscriptionCours.objects
+                    .filter(apprenant=request.user)
+                    .annotate(statut_l=Lower('statut'))
+                    .filter(statut_l__in=['inscrit', 'en_cours', 'en cours', 'encours'])
+                    .values_list('cours_id', flat=True)
+                )
                 qs = qs.filter(sequence__module__cours_id__in=cours_ids)
             else:
                 qs = qs.none()
@@ -262,12 +286,28 @@ class QuestionListCreateAPIView(APIView):
             evaluation_id = request.query_params.get('evaluation')
             qs = Question.objects.prefetch_related('reponses_predefinies').all()
 
-            if role in ('Admin', 'ResponsableAcademique'):
+            if role == 'Admin':
                 institution_id = getattr(request.user, 'institution_id', None)
                 qs = qs.filter(
                     Q(quiz__sequence__institution_id=institution_id) |
                     Q(evaluation__cours__institution_id=institution_id)
                 )
+
+            elif role == 'ResponsableAcademique':
+                institution_id = getattr(request.user, 'institution_id', None)
+                dept_id = _get_responsable_dept_id(request.user)
+                if dept_id:
+                    qs = qs.filter(
+                        Q(quiz__sequence__module__cours__institution_id=institution_id,
+                        quiz__sequence__module__cours__departement_id=dept_id) |
+                        Q(evaluation__cours__institution_id=institution_id,
+                        evaluation__cours__departement_id=dept_id)
+                    )
+                else:
+                    qs = qs.filter(
+                        Q(quiz__sequence__institution_id=institution_id) |
+                        Q(evaluation__cours__institution_id=institution_id)
+                    )
             elif role == 'Formateur':
                 qs = qs.filter(
                     Q(quiz__sequence__module__cours__enseignant=request.user) |
@@ -465,8 +505,27 @@ class EvaluationListCreateAPIView(APIView):
             qs = Evaluation.objects.select_related('cours', 'enseignant').prefetch_related('questions').all()
 
             # --- 3. Filtrage par rôle ---
-            if role in ('Admin', 'ResponsableAcademique'):
+            if role == 'Admin':
                 qs = _filter_by_institution(qs, request.user)
+
+            elif role == 'ResponsableAcademique':
+                institution_id = getattr(request.user, 'institution_id', None)
+                if not institution_id:
+                    qs = qs.none()
+                else:
+                    # Récupérer le département du responsable
+                    dept_id = getattr(request.user, 'departement_id', None)
+                    if dept_id is None:
+                        try:
+                            from users.models import ResponsableAcademique
+                            resp = ResponsableAcademique.objects.get(pk=request.user.pk)
+                            dept_id = resp.departement_id
+                        except Exception:
+                            dept_id = None
+
+                    qs = qs.filter(cours__institution_id=institution_id)
+                    if dept_id:
+                        qs = qs.filter(cours__departement_id=dept_id)
 
             elif role == 'Formateur':
                 institution_id = getattr(request.user, 'institution_id', None)
@@ -479,9 +538,15 @@ class EvaluationListCreateAPIView(APIView):
                     )
 
             elif role == 'Apprenant':
-                cours_ids = InscriptionCours.objects.filter(
-                    apprenant=request.user, statut='inscrit'
-                ).values_list('cours_id', flat=True)
+                from django.db.models.functions import Lower
+                cours_ids = (
+                    InscriptionCours.objects
+                    .filter(apprenant=request.user)
+                    .annotate(statut_l=Lower('statut'))
+                    .filter(statut_l__in=['inscrit', 'en_cours', 'en cours', 'encours'])
+                    .values_list('cours_id', flat=True)
+                )
+                # ✅ Evaluation a un FK direct vers cours
                 qs = qs.filter(cours_id__in=cours_ids, est_publiee=True)
 
             elif role == 'Parent':
@@ -557,6 +622,19 @@ class EvaluationDetailAPIView(APIView):
             institution_id = getattr(request.user, 'institution_id', None)
             if evaluation.cours.institution_id != institution_id:
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+
+            # ✅ Vérification département pour ResponsableAcademique
+            if role == 'ResponsableAcademique':
+                dept_id = getattr(request.user, 'departement_id', None)
+                if dept_id is None:
+                    try:
+                        from users.models import ResponsableAcademique
+                        resp = ResponsableAcademique.objects.get(pk=request.user.pk)
+                        dept_id = resp.departement_id
+                    except Exception:
+                        dept_id = None
+                if dept_id and evaluation.cours.departement_id != dept_id:
+                    return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
 
         elif role == 'Formateur':
             if not _formateur_owns_cours(request.user, evaluation.cours):
@@ -896,9 +974,17 @@ class PassageEvaluationListAPIView(APIView):
 
             qs = PassageEvaluation.objects.select_related('apprenant', 'evaluation').all()
 
-            if role in ('Admin', 'ResponsableAcademique'):
+            if role == 'Admin':
                 institution_id = getattr(request.user, 'institution_id', None)
                 qs = qs.filter(evaluation__cours__institution_id=institution_id)
+
+            elif role == 'ResponsableAcademique':
+                institution_id = getattr(request.user, 'institution_id', None)
+                qs = qs.filter(evaluation__cours__institution_id=institution_id)
+                dept_id = _get_responsable_dept_id(request.user)
+                if dept_id:
+                    qs = qs.filter(evaluation__cours__departement_id=dept_id)
+
             elif role == 'Formateur':
                 qs = qs.filter(evaluation__cours__enseignant=request.user)
             elif role == 'Apprenant':
@@ -1099,9 +1185,16 @@ class EvaluationsACorrigerAPIView(APIView):
             role = _get_role(request.user)
             qs = PassageEvaluation.objects.select_related('apprenant', 'evaluation').filter(statut='soumis')
 
-            if role in ('Admin', 'ResponsableAcademique'):
+            if role == 'Admin':
                 institution_id = getattr(request.user, 'institution_id', None)
                 qs = qs.filter(evaluation__cours__institution_id=institution_id)
+
+            elif role == 'ResponsableAcademique':
+                institution_id = getattr(request.user, 'institution_id', None)
+                qs = qs.filter(evaluation__cours__institution_id=institution_id)
+                dept_id = _get_responsable_dept_id(request.user)
+                if dept_id:
+                    qs = qs.filter(evaluation__cours__departement_id=dept_id)
             elif role == 'Formateur':
                 qs = qs.filter(evaluation__cours__enseignant=request.user)
 
@@ -1133,9 +1226,17 @@ class PassageQuizListCreateAPIView(APIView):
             quiz_id = request.query_params.get('quiz')
             qs = PassageQuiz.objects.select_related('apprenant', 'quiz').all()
 
-            if role in ('Admin', 'ResponsableAcademique'):
+            if role == 'Admin':
                 institution_id = getattr(request.user, 'institution_id', None)
-                qs = qs.filter(quiz__sequence__institution_id=institution_id)
+                qs = qs.filter(quiz__sequence__module__cours__institution_id=institution_id)
+
+            elif role == 'ResponsableAcademique':
+                institution_id = getattr(request.user, 'institution_id', None)
+                qs = qs.filter(quiz__sequence__module__cours__institution_id=institution_id)
+                dept_id = _get_responsable_dept_id(request.user)
+                if dept_id:
+                    qs = qs.filter(quiz__sequence__module__cours__departement_id=dept_id)
+
             elif role == 'Formateur':
                 qs = qs.filter(quiz__sequence__module__cours__enseignant=request.user)
             elif role == 'Apprenant':

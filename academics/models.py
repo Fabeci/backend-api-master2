@@ -325,7 +325,16 @@ class Departement(models.Model):
 
     def save(self, *args, **kwargs):
         self.full_clean()
-        return super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
+
+        # ✅ Synchroniser : mettre à jour departement sur le ResponsableAcademique
+        # Quand on assigne un responsable à ce département,
+        # on met aussi à jour son champ departement
+        from users.models import ResponsableAcademique as RA
+        if self.responsable_academique_id:
+            RA.objects.filter(pk=self.responsable_academique_id).update(
+                departement_id=self.pk
+            )
 
     def __str__(self):
         return self.nom
@@ -335,6 +344,13 @@ class DomaineEtude(models.Model):
     institution = models.ForeignKey(
         Institution,
         on_delete=models.CASCADE,
+        related_name="domaines_etude",
+        null=True,
+        blank=True,
+    )
+    departement = models.ForeignKey(         
+        "Departement",
+        on_delete=models.SET_NULL,
         related_name="domaines_etude",
         null=True,
         blank=True,

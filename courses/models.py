@@ -44,6 +44,31 @@ class Cours(models.Model):
         null=True, blank=True,
         help_text="Année scolaire à laquelle ce cours est rattaché"
     )
+    departement = models.ForeignKey(
+        'academics.Departement',
+        on_delete=models.SET_NULL,
+        related_name="cours",
+        null=True, blank=True,
+        help_text="Département hérité du groupe/classe"
+    )
+    
+    def save(self, *args, **kwargs):
+        # Auto-remplir le département depuis le groupe → classe → filière → domaine
+        if self.groupe and not self.departement_id:
+            self._auto_set_departement()
+        super().save(*args, **kwargs)
+    
+    def _auto_set_departement(self):
+        try:
+            classe = self.groupe.classe
+            if classe:
+                filiere = classe.filieres.exclude(
+                    domaine_etude__departement=None
+                ).select_related('domaine_etude__departement').first()
+                if filiere and filiere.domaine_etude.departement_id:
+                    self.departement_id = filiere.domaine_etude.departement_id
+        except Exception:
+            pass
 
     class Meta:
         verbose_name = "Cours"

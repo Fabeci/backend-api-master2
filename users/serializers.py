@@ -699,6 +699,8 @@ class FormateurCrudSerializer(BaseUserCrudSerializer):
 class ResponsableAcademiqueCrudSerializer(BaseUserCrudSerializer):
     institution = serializers.SerializerMethodField(read_only=True)
     departement = serializers.SerializerMethodField(read_only=True)
+    departement_id_flat = serializers.SerializerMethodField(read_only=True)
+    institution_id_flat = serializers.SerializerMethodField(read_only=True)  # ✅ déclaré
 
     institution_id = serializers.PrimaryKeyRelatedField(
         source="institution",
@@ -714,31 +716,50 @@ class ResponsableAcademiqueCrudSerializer(BaseUserCrudSerializer):
     class Meta(BaseUserCrudSerializer.Meta):
         model = ResponsableAcademique
         fields = BaseUserCrudSerializer.Meta.fields + [
-            "institution", "institution_id",
-            "departement", "departement_id",
+            "institution",          "institution_id",
+            "departement",          "departement_id",
+            "departement_id_flat",
+            "institution_id_flat",
         ]
         read_only_fields = BaseUserCrudSerializer.Meta.read_only_fields + [
-            "institution", "departement"
+            "institution", "departement",
+            "departement_id_flat", "institution_id_flat",
         ]
 
     def get_institution(self, obj):
-        # ✅ Accès direct — pas de serializer externe
         inst = obj.institution
         if not inst:
             return None
         return {"id": inst.id, "nom": inst.nom}
 
     def get_departement(self, obj):
-        # ✅ Accès direct via select_related — contourne tout filtrage
-        dept = obj.departement
-        if not dept:
+        # ✅ Requête fraîche — ignore le cache ORM sur obj.departement
+        fresh = ResponsableAcademique.objects.filter(
+            pk=obj.pk
+        ).values(
+            'departement_id',
+            'departement__nom',
+            'departement__description'
+        ).first()
+
+        if not fresh or not fresh['departement_id']:
             return None
+
         return {
-            "id":          dept.id,
-            "nom":         dept.nom,
-            "description": getattr(dept, "description", None),
+            'id':          fresh['departement_id'],
+            'nom':         fresh['departement__nom'],
+            'description': fresh['departement__description'],
         }
 
+    def get_departement_id_flat(self, obj):
+        # ✅ Requête fraîche
+        return ResponsableAcademique.objects.filter(
+            pk=obj.pk
+        ).values_list('departement_id', flat=True).first()
+
+    def get_institution_id_flat(self, obj):
+        # ✅ Méthode manquante — simple lecture du champ
+        return getattr(obj, 'institution_id', None)        
 class ModifierMotDePasseSerializer(serializers.Serializer):
     current_password = serializers.CharField(write_only=True)
     new_password = serializers.CharField(write_only=True, min_length=8)

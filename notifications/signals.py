@@ -1162,3 +1162,4 @@ try:
 
 except ImportError:
     pass  # PassageQuiz pas encore disponible
+

@@ -406,6 +406,9 @@ class InstitutionSerializer(serializers.ModelSerializer):
     
     
 class DomaineEtudeSerializer(serializers.ModelSerializer):
+    departement_label = serializers.StringRelatedField(
+        source="departement.nom", read_only=True
+    )
     class Meta:
         model = DomaineEtude
         fields = '__all__'
@@ -476,30 +479,29 @@ class DepartementSerializer(serializers.ModelSerializer):
         
 
 class FiliereSerializer(serializers.ModelSerializer):
-    # Lecture : nom du domaine
-    domaine_etude_label = serializers.StringRelatedField(source="domaine_etude", read_only=True)
-
-    # Écriture : ID du domaine
-    domaine_etude = serializers.PrimaryKeyRelatedField(queryset=DomaineEtude.objects.all(), write_only=True)
-
-    # class Meta:
-    #     model = Filiere
-    #     fields = [
-    #         "id",
-    #         "nom",
-    #         "domaine_etude",        # write-only (ID)
-    #         "domaine_etude_label",  # read-only (nom)
-    #         "description",
-    #         "date_creation",
-    #         "statut",
-    #     ]
-    #     read_only_fields = ["id", "date_creation"]
+    domaine_etude_label = serializers.StringRelatedField(
+        source="domaine_etude", read_only=True
+    )
+    domaine_etude = serializers.PrimaryKeyRelatedField(
+        queryset=DomaineEtude.objects.all()
+    )
+    institution = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
-            model = Matiere
-            fields = "__all__"
+        model = Filiere
+        fields = [
+            "id", "nom", "domaine_etude", "domaine_etude_label",
+            "institution", "description", "date_creation", "statut",
+        ]
+        read_only_fields = ["id", "date_creation"]
 
-
+    def create(self, validated_data):
+        request = self.context["request"]
+        user = request.user
+        if not user.is_superuser:
+            validated_data["institution_id"] = user.institution_id
+        return super().create(validated_data)
+    
 class GroupeSerializer(serializers.ModelSerializer):
     enseignants = serializers.PrimaryKeyRelatedField(
         queryset=Formateur.objects.all(),

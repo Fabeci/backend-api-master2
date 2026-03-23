@@ -399,8 +399,7 @@ class FiliereListCreateAPIView(APIView):
     def get(self, request):
         qs = Filiere.objects.all()
         qs = filter_academics_queryset(qs, request, "Filiere", is_detail=False)
-
-        serializer = FiliereSerializer(qs, many=True)
+        serializer = FiliereSerializer(qs, many=True, context={"request": request})
         return api_success("Liste des filières", serializer.data, status.HTTP_200_OK)
 
     def post(self, request):
@@ -411,10 +410,14 @@ class FiliereListCreateAPIView(APIView):
                 http_status=status.HTTP_403_FORBIDDEN
             )
 
-        serializer = FiliereSerializer(data=request.data)
+        serializer = FiliereSerializer(data=request.data, context={"request": request})
         if serializer.is_valid():
             filiere = serializer.save()
-            return api_success("Filière créée avec succès", FiliereSerializer(filiere).data, status.HTTP_201_CREATED)
+            return api_success(
+                "Filière créée avec succès",
+                FiliereSerializer(filiere, context={"request": request}).data,
+                status.HTTP_201_CREATED
+            )
         return api_error("Erreur de validation", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -427,7 +430,7 @@ class FiliereDetailAPIView(APIView):
 
     def get(self, request, pk):
         filiere = self.get_object(pk)
-        serializer = FiliereSerializer(filiere)
+        serializer = FiliereSerializer(filiere, context={"request": request})
         return api_success("Filière trouvée", serializer.data, status.HTTP_200_OK)
 
     def put(self, request, pk):
@@ -437,10 +440,14 @@ class FiliereDetailAPIView(APIView):
         if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
-        serializer = FiliereSerializer(filiere, data=request.data)
+        serializer = FiliereSerializer(filiere, data=request.data, context={"request": request})
         if serializer.is_valid():
-            serializer.save()
-            return api_success("Filière mise à jour", serializer.data, status.HTTP_200_OK)
+            filiere = serializer.save()
+            return api_success(
+                "Filière mise à jour",
+                FiliereSerializer(filiere, context={"request": request}).data,
+                status.HTTP_200_OK
+            )
         return api_error("Erreur de validation", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)
 
     def patch(self, request, pk):
@@ -450,10 +457,14 @@ class FiliereDetailAPIView(APIView):
         if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
-        serializer = FiliereSerializer(filiere, data=request.data, partial=True)
+        serializer = FiliereSerializer(filiere, data=request.data, partial=True, context={"request": request})
         if serializer.is_valid():
-            serializer.save()
-            return api_success("Filière mise à jour partiellement", serializer.data, status.HTTP_200_OK)
+            filiere = serializer.save()
+            return api_success(
+                "Filière mise à jour partiellement",
+                FiliereSerializer(filiere, context={"request": request}).data,
+                status.HTTP_200_OK
+            )
         return api_error("Erreur de validation", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
@@ -465,7 +476,6 @@ class FiliereDetailAPIView(APIView):
 
         filiere.delete()
         return api_success("Filière supprimée", data=None, http_status=status.HTTP_204_NO_CONTENT)
-
 
 # ============================================================================
 # DÉPARTEMENT

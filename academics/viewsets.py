@@ -78,6 +78,11 @@ class DomaineEtudeViewSet(BaseModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         is_detail = self.action in ("retrieve", "update", "partial_update", "destroy")
+    
+        departement_id = self.request.query_params.get("departement")
+        if departement_id:
+            qs = qs.filter(departement_id=departement_id)
+    
         return filter_academics_queryset(qs, self.request, "DomaineEtude", is_detail=is_detail)
 
     def create(self, request, *args, **kwargs):
@@ -187,9 +192,6 @@ class MatiereViewSet(BaseModelViewSet):
 
         if not ok:
             return err
-        # Auto-assigner l'institution
-        if not request.user.is_superuser and hasattr(request.user, 'institution_id'):
-            request.data._mutable = True if hasattr(request.data, '_mutable') else None
             # On injecte via le serializer context plutôt
         return super().create(request, *args, **kwargs)
 

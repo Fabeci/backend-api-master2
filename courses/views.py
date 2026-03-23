@@ -531,19 +531,20 @@ class SequenceBlocsAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, sequence_id):
-        """Récupère les blocs de contenu d'une séquence"""
         try:
-            context = get_user_context(request)
+            # ✅ Vérifier que la séquence est accessible via filter_queryset_by_role
+            seq_qs = filter_queryset_by_role(
+                Sequence.objects.all(), request, 'Sequence'
+            )
+            sequence = get_object_or_404(seq_qs, pk=sequence_id)
 
-            # ✅ #2 FIX : filtre conditionnel sur la séquence
-            sequence_qs = Sequence.objects.all()
-            sequence_qs = _apply_context_filter(sequence_qs, context)
-            sequence = get_object_or_404(sequence_qs, pk=sequence_id)
+            blocs = BlocContenu.objects.filter(
+                sequence=sequence
+            ).order_by('ordre')
 
-            blocs = BlocContenu.objects.filter(sequence=sequence).order_by('ordre')
             serializer = BlocContenuSerializer(blocs, many=True)
             return api_success(
-                f"Blocs de contenu de la séquence '{sequence}' récupérés avec succès",
+                f"Blocs de contenu récupérés avec succès",
                 serializer.data,
                 status.HTTP_200_OK
             )
@@ -553,7 +554,6 @@ class SequenceBlocsAPIView(APIView):
                 errors={'detail': str(e)},
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
 
 class SequenceRessourcesAPIView(APIView):
     """Liste les ressources d'une séquence"""
@@ -592,41 +592,30 @@ class BlocContenuListCreateAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        """Récupère les blocs de contenu filtrés — avec debug temporaire"""
         try:
-            context = get_user_context(request)
-            blocs = BlocContenu.objects.select_related('sequence').all()
+            qs = BlocContenu.objects.select_related('sequence').all()
 
             sequence_id = request.query_params.get('sequence')
-
-            print(f"\n[BLOCS DEBUG] =============================")
-            print(f"[BLOCS DEBUG] user={request.user} (pk={request.user.pk})")
-            print(f"[BLOCS DEBUG] sequence_id={sequence_id}")
-            print(f"[BLOCS DEBUG] context={context}")
-            print(f"[BLOCS DEBUG] blocs total avant tout filtre: {blocs.count()}")
-
             if sequence_id:
-                blocs = blocs.filter(sequence_id=sequence_id)
+                qs = qs.filter(sequence_id=sequence_id)
 
-            print(f"[BLOCS DEBUG] après filter(sequence_id={sequence_id}): {blocs.count()}")
+            # ✅ Utiliser filter_queryset_by_role au lieu de _apply_sequence_context_filter
+            qs = filter_queryset_by_role(qs, request, 'BlocContenu')
 
-            has_institution = blocs.filter(sequence__institution_id__isnull=False).exists()
-            has_annee = blocs.filter(sequence__annee_scolaire_id__isnull=False).exists()
-            print(f"[BLOCS DEBUG] has_institution={has_institution}, has_annee={has_annee}")
+            qs = qs.order_by('sequence', 'ordre')
+            serializer = BlocContenuSerializer(qs, many=True)
 
-            blocs = _apply_sequence_context_filter(blocs, context)
-
-            print(f"[BLOCS DEBUG] après _apply_sequence_context_filter: {blocs.count()}")
-            print(f"[BLOCS DEBUG] =============================\n")
-
-            blocs = blocs.order_by('sequence', 'ordre')
-            serializer = BlocContenuSerializer(blocs, many=True)
-
-            return api_success("Liste des blocs de contenu récupérée avec succès", serializer.data, status.HTTP_200_OK)
+            return api_success(
+                "Liste des blocs de contenu récupérée avec succès",
+                serializer.data,
+                status.HTTP_200_OK
+            )
         except Exception as e:
-            print(f"[BLOCS DEBUG] EXCEPTION: {e}")
-            return api_error("Erreur lors de la récupération des blocs", errors={'detail': str(e)}, http_status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+            return api_error(
+                "Erreur lors de la récupération des blocs",
+                errors={'detail': str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     def post(self, request):
         serializer = BlocContenuCreateSerializer(data=request.data)
         if serializer.is_valid():
