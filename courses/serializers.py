@@ -37,7 +37,7 @@ class CoursSerializer(serializers.ModelSerializer):
     institution_nom = serializers.CharField(source="institution.nom", read_only=True)
     annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
 
-    # Stats calculées (properties)
+    # Stats calculées (properties) 
     total_minutes_realises = serializers.IntegerField(read_only=True)
     total_heures_realisees = serializers.FloatField(read_only=True)
     taux_execution = serializers.FloatField(read_only=True)
