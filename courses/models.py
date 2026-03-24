@@ -5,6 +5,7 @@ from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from academics.models import Groupe, Matiere, Institution, AnneeScolaire
 from users.models import Apprenant, Formateur
+from django.utils import timezone
 
 
 # ============================================================================
@@ -52,8 +53,34 @@ class Cours(models.Model):
         help_text="Département hérité du groupe/classe"
     )
     
+    @property
+    def statut_calcule(self) -> str:
+        """
+        Calcule le statut en fonction des dates.
+        Priorité : date_debut / date_fin > statut manuel.
+        """
+        today = timezone.localdate()
+
+        if self.date_debut and self.date_fin:
+            if today < self.date_debut:
+                return "planifie"
+            elif self.date_debut <= today <= self.date_fin:
+                return "en_cours"
+            else:
+                return "termine"
+
+        if self.date_debut and not self.date_fin:
+            return "en_cours" if today >= self.date_debut else "planifie"
+
+        if self.date_fin and not self.date_debut:
+            return "termine" if today > self.date_fin else "en_cours"
+
+        # Aucune date → conserver le statut manuel existant
+        return self.statut or "planifie"
+    
     def save(self, *args, **kwargs):
-        # Auto-remplir le département depuis le groupe → classe → filière → domaine
+        if self.date_debut or self.date_fin:
+            self.statut = self.statut_calcule
         if self.groupe and not self.departement_id:
             self._auto_set_departement()
         super().save(*args, **kwargs)

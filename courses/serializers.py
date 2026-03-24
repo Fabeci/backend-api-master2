@@ -41,6 +41,7 @@ class CoursSerializer(serializers.ModelSerializer):
     total_minutes_realises = serializers.IntegerField(read_only=True)
     total_heures_realisees = serializers.FloatField(read_only=True)
     taux_execution = serializers.FloatField(read_only=True)
+    statut_calcule = serializers.ReadOnlyField()
 
     class Meta:
         model = Cours
@@ -61,6 +62,7 @@ class CoursSerializer(serializers.ModelSerializer):
             "date_debut",
             "date_fin",
             "statut",
+            "statut_calcule",
             "total_minutes_realises",
             "total_heures_realisees",
             "taux_execution",

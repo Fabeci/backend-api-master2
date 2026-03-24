@@ -1,6 +1,7 @@
 # courses/signals.py
 
 from django.db.models.signals import post_save
+from django.db.models.signals import pre_save
 from django.dispatch import receiver
 from .models import Cours, InscriptionCours
 
@@ -92,3 +93,9 @@ def inscrire_apprenant_aux_cours_de_la_classe(sender, instance, created, **kwarg
         ],
         ignore_conflicts=True
     )
+    
+@receiver(pre_save, sender=Cours)
+def auto_statut_cours(sender, instance, **kwargs):
+    """Recalcule le statut si les dates ont changé."""
+    if instance.date_debut or instance.date_fin:
+        instance.statut = instance.statut_calcule
