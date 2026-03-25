@@ -488,6 +488,22 @@ class HistoriqueActivite(models.Model):
         ('telechargement_ressource', 'Téléchargement de ressource'),
         ('participation_session', 'Participation à une session'),
         ('autre', 'Autre activité'),
+        ('consultation_bloc',      'Consultation de bloc'),
+        ('completion_cours',       'Cours complété à 100%'),
+        ('reprise_cours',          'Reprise de cours (smart nav)'),
+        ('telechargement_fichier', 'Téléchargement de fichier'),
+        ('ouverture_lien',         'Ouverture de lien externe'),
+        ('recherche_contenu',      'Recherche dans le contenu'),
+        ('connexion_reussie',      'Connexion réussie'),
+        ('connexion_echouee',      'Tentative de connexion échouée'),
+        ('consultation_dashboard', 'Consultation du tableau de bord'),
+        ('consultation_profil',    'Consultation du profil'),
+        ('consultation_fiche_cours','Consultation fiche cours'),
+        ('inscription_cours',       'Inscription à un cours'),
+        ('consultation_evaluation', 'Consultation d\'une évaluation'),
+        ('soumission_quiz',         'Soumission d\'un quiz'),
+        ('modification_profil',    'Modification du profil'),
+        ('changement_mot_de_passe','Changement de mot de passe'),
     ]
     
     apprenant = models.ForeignKey(

@@ -31,15 +31,12 @@ from .serializers import (
 from .models import Admin, Parent, Apprenant, Formateur, ResponsableAcademique
 
 
-# =============================================================================
-# Helpers réponse unifiée
-# =============================================================================
-
 def api_success(message: str, data=None, http_status=status.HTTP_200_OK):
     return Response(
         {"success": True, "status": http_status, "message": message, "data": data},
         status=http_status,
     )
+
 
 def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST):
     payload = {"success": False, "status": http_status, "message": message}
@@ -48,23 +45,46 @@ def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST
     return Response(payload, status=http_status)
 
 
-# =============================================================================
-# Helpers internes
-# =============================================================================
-
 def _user_institution(user):
     return getattr(user, "institution", None)
 
-def _user_annee_active(user):
-    return getattr(user, "annee_scolaire_active", None)
 
 def _role_name(user):
     return getattr(getattr(user, "role", None), "name", None)
 
 
-# =============================================================================
-# Auth & Onboarding
-# =============================================================================
+def _request_annee_scolaire_id(request):
+    annee_obj = getattr(request, "annee_scolaire", None)
+    if annee_obj is not None:
+        annee_id = getattr(annee_obj, "id", None)
+        if annee_id:
+            return annee_id
+
+    annee_id = getattr(request, "annee_scolaire_id", None)
+    if annee_id:
+        return annee_id
+
+    header_val = request.headers.get("x-annee-scolaire-id") or request.META.get("HTTP_X_ANNEE_SCOLAIRE_ID")
+    if header_val:
+        try:
+            return int(header_val)
+        except (TypeError, ValueError):
+            pass
+
+    return getattr(request.user, "annee_scolaire_active_id", None)
+
+
+def _filter_by_annee_if_possible(qs, annee_scolaire_id):
+    if not annee_scolaire_id:
+        return qs
+
+    model = qs.model
+    if hasattr(model, "annee_scolaire_id"):
+        return qs.filter(annee_scolaire_id=annee_scolaire_id)
+    if hasattr(model, "annee_scolaire_active_id"):
+        return qs.filter(annee_scolaire_active_id=annee_scolaire_id)
+    return qs
+
 
 class RegisterAPIView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -104,10 +124,9 @@ class UserLoginAPIView(APIView):
         serializer = UserLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user  = serializer.validated_data["user"]
+        user = serializer.validated_data["user"]
         token = serializer.validated_data["token"]
 
-        # ✅ Photo retournée dès le login avec URL absolue
         photo_url = None
         if getattr(user, "photo", None):
             try:
@@ -115,33 +134,32 @@ class UserLoginAPIView(APIView):
             except Exception:
                 photo_url = None
 
-        # Récupérer institution complète
         institution = getattr(user, "institution", None)
         departement = getattr(user, "departement", None)
         pays = getattr(user, "pays_residence", None)
         annee = getattr(user, "annee_scolaire_active", None)
-        
+
         return api_success(
             "Authentification réussie.",
             data={
                 "token": token,
                 "user": {
-                    "id":                       user.id,
-                    "email":                    user.email,
-                    "nom":                      user.nom,
-                    "prenom":                   user.prenom,
-                    "telephone":                user.telephone,
-                    "photo":                    photo_url,          # ✅
-                    "role":                     getattr(user.role, "name", None),
-                    "is_staff":                 user.is_staff,
-                    "is_superuser":             user.is_superuser,
-                    "institution_id":           getattr(user, "institution_id", None),
-                    "institution":              {"id": institution.id, "nom": institution.nom} if institution else None,
+                    "id": user.id,
+                    "email": user.email,
+                    "nom": user.nom,
+                    "prenom": user.prenom,
+                    "telephone": user.telephone,
+                    "photo": photo_url,
+                    "role": getattr(user.role, "name", None),
+                    "is_staff": user.is_staff,
+                    "is_superuser": user.is_superuser,
+                    "institution_id": getattr(user, "institution_id", None),
+                    "institution": {"id": institution.id, "nom": institution.nom} if institution else None,
                     "annee_scolaire_active_id": getattr(user, "annee_scolaire_active_id", None),
-                    "annee_scolaire_active":    {"id": annee.id, "libelle": str(annee)} if annee else None,
-                    "pays_residence":           {"id": pays.id, "nom": pays.nom, "code": pays.code} if pays else None,
-                    "departement":              {"id": departement.id, "nom": departement.nom} if departement else None,
-        },
+                    "annee_scolaire_active": {"id": annee.id, "libelle": str(annee)} if annee else None,
+                    "pays_residence": {"id": pays.id, "nom": pays.nom, "code": pays.code} if pays else None,
+                    "departement": {"id": departement.id, "nom": departement.nom} if departement else None,
+                },
             },
             http_status=status.HTTP_200_OK,
         )
@@ -154,10 +172,6 @@ class LogoutAPIView(APIView):
         Token.objects.filter(user=request.user).delete()
         return api_success("Déconnexion réussie. Le token a été invalidé.")
 
-
-# =============================================================================
-# Permissions personnalisées
-# =============================================================================
 
 class IsStaffOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -174,33 +188,24 @@ class IsAdminOrHigherOrSelf(permissions.BasePermission):
             return True
 
         role_name = request.user.role.name if request.user.role else None
-        if role_name in ['Admin', 'Responsable']:
+        if role_name in ['Admin', 'Responsable', 'ResponsableAcademique', 'Responsable Académique']:
             return True
 
-        # ✅ Lecture autorisée pour TOUS les utilisateurs authentifiés
         if request.method in permissions.SAFE_METHODS:
             return True
 
-        # ✅ Écriture autorisée uniquement sur son propre profil
         pk = view.kwargs.get('pk')
         if pk is not None and str(pk) == str(request.user.pk):
             return True
         return False
-    
-# =========================
-# Helpers internes (évite les 500 AttributeError)
-# =========================
 
-
-# ─── Mixin partagé : upload_photo + change_password ──────────────────────────
 
 class ProfileActionsMixin:
-
     def _check_self_or_admin(self, request, pk):
         user = request.user
         if user.is_superuser:
             return
-        if _role_name(user) in ['Admin', 'Responsable']:
+        if _role_name(user) in ['Admin', 'Responsable', 'ResponsableAcademique', 'Responsable Académique']:
             return
         if str(pk) != str(user.pk):
             raise PermissionDenied("Vous ne pouvez modifier que votre propre profil.")
@@ -210,8 +215,6 @@ class ProfileActionsMixin:
         methods=['patch'],
         url_path='upload-photo',
         permission_classes=[permissions.IsAuthenticated],
-        # ✅ NE PAS mettre parser_classes=None — ça écrase avec None et casse get_parsers()
-        # DRF utilise automatiquement MultiPartParser + JSONParser par défaut
     )
     def upload_photo(self, request, pk=None):
         self._check_self_or_admin(request, pk)
@@ -261,192 +264,155 @@ class ProfileActionsMixin:
 
         return api_success("Mot de passe modifié avec succès.")
 
-# =============================================================================
-# CRUD ViewSets
-# =============================================================================
 
 class AdminViewSet(ProfileActionsMixin, BaseModelViewSet):
-    queryset           = Admin.objects.all()
-    serializer_class   = AdminCrudSerializer
+    queryset = Admin.objects.all()
+    serializer_class = AdminCrudSerializer
     permission_classes = [IsAdminOrHigher]
 
     def get_queryset(self):
         user = self.request.user
+        annee_scolaire_id = _request_annee_scolaire_id(self.request)
+
         if user.is_superuser:
-            return Admin.objects.all()
+            return _filter_by_annee_if_possible(Admin.objects.all(), annee_scolaire_id)
+
         inst = _user_institution(user)
         if inst:
-            return Admin.objects.filter(institution=inst)
-        return Admin.objects.none()
+            return _filter_by_annee_if_possible(Admin.objects.filter(institution=inst), annee_scolaire_id)
 
-    def perform_create(self, serializer):
-        user = self.request.user
-        inst = _user_institution(user)
-        if not user.is_superuser and inst:
-            serializer.save(institution=inst)
-        else:
-            serializer.save()
+        return Admin.objects.none()
 
 
 class ParentViewSet(ProfileActionsMixin, BaseModelViewSet):
-    queryset           = Parent.objects.all()
-    serializer_class   = ParentCrudSerializer
-    permission_classes = [IsAdminOrHigherOrSelf]  # ✅ au lieu de IsAdminOrHigher
+    queryset = Parent.objects.all()
+    serializer_class = ParentCrudSerializer
+    permission_classes = [IsAdminOrHigherOrSelf]
 
     def get_queryset(self):
-        user      = self.request.user
+        user = self.request.user
         role_name = _role_name(user)
-        inst      = _user_institution(user)
+        inst = _user_institution(user)
+        annee_scolaire_id = _request_annee_scolaire_id(self.request)
 
         if user.is_superuser:
-            return Parent.objects.all()
+            return _filter_by_annee_if_possible(Parent.objects.all(), annee_scolaire_id)
 
-        # ✅ Parent peut voir/modifier son profil
         if role_name == "Parent":
-            return Parent.objects.filter(pk=user.pk)
+            return _filter_by_annee_if_possible(Parent.objects.filter(pk=user.pk), annee_scolaire_id)
 
-        # ✅ Admin / Responsable : parents de leur institution
-        if role_name in ["Admin", "ResponsableAcademique"]:
-            return Parent.objects.filter(institution=inst) if inst else Parent.objects.none()
+        if role_name in ["Admin", "Responsable", "ResponsableAcademique", "Responsable Académique"]:
+            qs = Parent.objects.filter(institution=inst) if inst else Parent.objects.none()
+            return _filter_by_annee_if_possible(qs, annee_scolaire_id)
 
         return Parent.objects.none()
 
+
 class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):
-    queryset           = Apprenant.objects.all()
-    serializer_class   = ApprenantCrudSerializer
+    queryset = Apprenant.objects.all()
+    serializer_class = ApprenantCrudSerializer
     permission_classes = [IsStaffOrReadOnly]
 
     def get_queryset(self):
-        user      = self.request.user
+        user = self.request.user
         role_name = _role_name(user)
-        inst      = _user_institution(user)
+        inst = _user_institution(user)
+        annee_scolaire_id = _request_annee_scolaire_id(self.request)
 
         if user.is_superuser:
-            return Apprenant.objects.all()
+            return _filter_by_annee_if_possible(Apprenant.objects.all(), annee_scolaire_id)
 
-        if role_name in ["Admin", "ResponsableAcademique"]:
-            return Apprenant.objects.filter(institution=inst) if inst else Apprenant.objects.none()
+        if role_name in ["Admin", "Responsable", "ResponsableAcademique", "Responsable Académique"]:
+            qs = Apprenant.objects.filter(institution=inst) if inst else Apprenant.objects.none()
+            return _filter_by_annee_if_possible(qs, annee_scolaire_id)
 
         if role_name == "Formateur":
             if not inst:
                 return Apprenant.objects.none()
+
             from courses.models import InscriptionCours, Cours
-            cours_ids = Cours.objects.filter(
-                enseignant=user, institution=inst
-            ).values_list("id", flat=True)
-            apprenant_ids = InscriptionCours.objects.filter(
-                cours_id__in=cours_ids
-            ).values_list("apprenant_id", flat=True).distinct()
-            return Apprenant.objects.filter(id__in=apprenant_ids)
+
+            cours_qs = Cours.objects.filter(enseignant=user, institution=inst)
+            cours_qs = _filter_by_annee_if_possible(cours_qs, annee_scolaire_id)
+            cours_ids = cours_qs.values_list("id", flat=True)
+
+            inscriptions_qs = InscriptionCours.objects.filter(cours_id__in=cours_ids)
+            inscriptions_qs = _filter_by_annee_if_possible(inscriptions_qs, annee_scolaire_id)
+
+            apprenant_ids = inscriptions_qs.values_list("apprenant_id", flat=True).distinct()
+            qs = Apprenant.objects.filter(id__in=apprenant_ids)
+            return _filter_by_annee_if_possible(qs, annee_scolaire_id)
 
         if role_name == "Parent":
-            return Apprenant.objects.filter(tuteur=user)
+            return _filter_by_annee_if_possible(Apprenant.objects.filter(tuteur=user), annee_scolaire_id)
 
         if role_name == "Apprenant":
             groupe_id = getattr(user, 'groupe_id', None)
             if groupe_id:
-                return Apprenant.objects.filter(groupe_id=groupe_id)
-            return Apprenant.objects.filter(pk=user.pk)
+                return _filter_by_annee_if_possible(Apprenant.objects.filter(groupe_id=groupe_id), annee_scolaire_id)
+            return _filter_by_annee_if_possible(Apprenant.objects.filter(pk=user.pk), annee_scolaire_id)
 
         return Apprenant.objects.none()
 
-    def perform_create(self, serializer):
-        user = self.request.user
-        inst = _user_institution(user)
-        if not user.is_superuser and inst:
-            serializer.save(institution=inst)
-        else:
-            serializer.save()
 
 class FormateurViewSet(ProfileActionsMixin, BaseModelViewSet):
-    queryset           = Formateur.objects.all()
-    serializer_class   = FormateurCrudSerializer
+    queryset = Formateur.objects.all()
+    serializer_class = FormateurCrudSerializer
     permission_classes = [IsAdminOrHigherOrSelf]
 
     def get_queryset(self):
-        user      = self.request.user
+        user = self.request.user
         role_name = _role_name(user)
-        inst      = _user_institution(user)
+        inst = _user_institution(user)
+        annee_scolaire_id = _request_annee_scolaire_id(self.request)
 
         if user.is_superuser:
-            return Formateur.objects.all()
+            return _filter_by_annee_if_possible(Formateur.objects.all(), annee_scolaire_id)
 
-
-
-        # ✅ Un formateur peut voir et modifier son propre profil
         if role_name == "Formateur":
-            return Formateur.objects.filter(pk=user.pk)
-        inst = _user_institution(user)
-        role_name = _role_name(user)
+            return _filter_by_annee_if_possible(Formateur.objects.filter(pk=user.pk), annee_scolaire_id)
 
-        # ✅ Admin / Responsable / Formateur : limité à leur institution
-        if role_name in ['Admin', 'Responsable', 'Formateur']:
-            if inst:
-                return Formateur.objects.filter(institution=inst)
-            return Formateur.objects.none()
+        if role_name in ['Admin', 'Responsable', 'ResponsableAcademique', 'Responsable Académique', 'Formateur']:
+            qs = Formateur.objects.filter(institution=inst) if inst else Formateur.objects.none()
+            return _filter_by_annee_if_possible(qs, annee_scolaire_id)
 
-        # ✅ Apprenant (et autres rôles authentifiés) :
-        # Lecture seule autorisée → on expose les formateurs de leur institution
-        # pour permettre l'affichage de la fiche enseignant dans les cours.
         if inst:
-            return Formateur.objects.filter(institution=inst)
+            return _filter_by_annee_if_possible(Formateur.objects.filter(institution=inst), annee_scolaire_id)
 
-        # Aucune institution → aucun résultat
         return Formateur.objects.none()
-
-    def perform_create(self, serializer):
-        user = self.request.user
-        inst = _user_institution(user)
-        if not user.is_superuser and inst:
-            kwargs = {"institution": inst}
-            annee = _user_annee_active(user)
-            if annee:
-                kwargs["annee_scolaire_active"] = annee
-            serializer.save(**kwargs)
-        else:
-            serializer.save()
 
 
 class ResponsableAcademiqueViewSet(ProfileActionsMixin, BaseModelViewSet):
-    queryset           = ResponsableAcademique.objects.all()
-    serializer_class   = ResponsableAcademiqueCrudSerializer
-
-    # ✅ RA peut modifier son profil (self), Admin/SuperUser gardent le contrôle
-    permission_classes = [IsAdminOrHigherOrSelf]   # ← au lieu de IsAdminOrHigher
+    queryset = ResponsableAcademique.objects.all()
+    serializer_class = ResponsableAcademiqueCrudSerializer
+    permission_classes = [IsAdminOrHigherOrSelf]
 
     def get_queryset(self):
-        user      = self.request.user
+        user = self.request.user
         role_name = _role_name(user)
+        annee_scolaire_id = _request_annee_scolaire_id(self.request)
 
         if user.is_superuser:
-            return ResponsableAcademique.objects.select_related(
+            qs = ResponsableAcademique.objects.select_related(
                 'institution', 'departement', 'pays_residence', 'role'
             ).all()
+            return _filter_by_annee_if_possible(qs, annee_scolaire_id)
 
         if role_name in ["Responsable", "ResponsableAcademique", "Responsable Académique"]:
-            return ResponsableAcademique.objects.select_related(
+            qs = ResponsableAcademique.objects.select_related(
                 'institution', 'departement', 'pays_residence', 'role'
             ).filter(pk=user.pk)
+            return _filter_by_annee_if_possible(qs, annee_scolaire_id)
 
         if role_name in ["Admin", "ResponsableAcademique"]:
             inst = _user_institution(user)
-            return ResponsableAcademique.objects.select_related(
+            qs = ResponsableAcademique.objects.select_related(
                 'institution', 'departement', 'pays_residence', 'role'
             ).filter(institution=inst) if inst else ResponsableAcademique.objects.none()
+            return _filter_by_annee_if_possible(qs, annee_scolaire_id)
 
         return ResponsableAcademique.objects.none()
 
-    def perform_create(self, serializer):
-        user = self.request.user
-        inst = _user_institution(user)
-        if not user.is_superuser and inst:
-            kwargs = {'institution': inst}
-            annee = _user_annee_active(user)
-            if annee:
-                kwargs['annee_scolaire_active'] = annee
-            serializer.save(**kwargs)
-        else:
-            serializer.save()
 
 class ChangePasswordAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -467,9 +433,9 @@ class ChangePasswordAPIView(APIView):
             "Mot de passe modifié avec succès. Veuillez vous reconnecter.",
             data=None,
             http_status=status.HTTP_200_OK,
-
         )
-        
+
+
 class PasswordResetAPIView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -481,13 +447,11 @@ class PasswordResetAPIView(APIView):
         try:
             user = User.objects.get(email__iexact=email, is_active=True)
         except User.DoesNotExist:
-            # ✅ Ne pas révéler si l'email existe ou non (sécurité)
             return api_success("Si cet email existe, un lien a été envoyé.")
 
-        uid   = urlsafe_base64_encode(force_bytes(user.pk))
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
 
-        # ✅ URL frontend : adapte selon ton domaine
         reset_url = f"{settings.FRONTEND_URL}/authentication/reset-password?token={token}&uid={uid}"
 
         send_mail(
@@ -511,9 +475,8 @@ class PasswordResetConfirmAPIView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, uidb64=None, token=None):
-        # Accepte depuis l'URL OU depuis le body (frontend envoie dans le body)
-        uid_raw      = uidb64   or request.data.get('uid', '')
-        token_raw    = token    or request.data.get('token', '')
+        uid_raw = uidb64 or request.data.get('uid', '')
+        token_raw = token or request.data.get('token', '')
         new_password = request.data.get('new_password', '').strip()
 
         if not uid_raw or not token_raw:
@@ -524,7 +487,7 @@ class PasswordResetConfirmAPIView(APIView):
             return api_error("Le mot de passe doit contenir au moins 8 caractères.")
 
         try:
-            uid  = force_str(urlsafe_base64_decode(uid_raw))
+            uid = force_str(urlsafe_base64_decode(uid_raw))
             user = User.objects.get(pk=uid)
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             return api_error("Lien invalide ou expiré.", http_status=status.HTTP_400_BAD_REQUEST)
@@ -534,8 +497,6 @@ class PasswordResetConfirmAPIView(APIView):
 
         user.set_password(new_password)
         user.save(update_fields=['password'])
-
-        # ✅ Invalider tous les tokens DRF existants
         Token.objects.filter(user=user).delete()
 
         return api_success("Mot de passe réinitialisé avec succès. Vous pouvez vous connecter.")

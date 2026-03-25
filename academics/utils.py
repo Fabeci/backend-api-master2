@@ -4,12 +4,11 @@ Utilitaires de filtrage pour l'application academics.
 
 RÈGLES DE FILTRAGE PAR RÔLE :
 
-1. SuperAdmin   : Voit UNIQUEMENT les institutions et peut gérer les admins
-                  → Bloqué sur toutes les ressources internes (AnneeScolaire, Classe, etc.)
-2. Admin        : Voit tout dans son institution
-3. Responsable  : Voit tout dans son institution
+1. SuperAdmin   : Voit UNIQUEMENT les institutions
+2. Admin        : Voit tout dans son institution, filtrable par année
+3. Responsable  : Voit tout dans son institution, filtrable par année
 4. Formateur    :
-   - Liste   : Voit tout dans son institution (pour avoir une vue d'ensemble)
+   - Liste   : Voit tout dans son institution, filtrable par année
    - Détail  : Voit uniquement les groupes/classes où il enseigne
 5. Apprenant    :
    - Liste   : Voit tout dans son institution (pour explorer)
@@ -21,33 +20,61 @@ from django.shortcuts import get_object_or_404
 
 
 def get_role_name(user):
-    """Retourne le nom du rôle de l'utilisateur."""
     if hasattr(user, 'role') and user.role:
         return user.role.name
     return None
 
 
 def get_parent_enfants_ids(user):
-    """Retourne les IDs des enfants d'un parent."""
     from users.models import Apprenant
     return list(
         Apprenant.objects.filter(tuteur=user).values_list('id', flat=True)
     )
 
 
+def _to_int(v):
+    if v is None:
+        return None
+    if isinstance(v, int):
+        return v
+    try:
+        return int(str(v).strip())
+    except (ValueError, TypeError):
+        return None
+
+
+def _apply_annee_filter(qs, annee_scolaire_id):
+    """
+    Applique le filtre annee_scolaire_id uniquement si le modèle
+    possède ce champ et si une valeur est fournie.
+    """
+    if not annee_scolaire_id:
+        return qs
+    field_names = {f.name for f in qs.model._meta.get_fields()}
+    if "annee_scolaire" in field_names:
+        return qs.filter(annee_scolaire_id=annee_scolaire_id)
+    return qs
+
+
 def get_user_academic_context(request):
     """
     Extrait le contexte académique de l'utilisateur.
 
+    Priorité pour annee_scolaire_id :
+      1. Header X-Annee-Scolaire-ID  (sélecteur front)
+      2. Query param annee_scolaire_id
+      3. Attribut utilisateur (annee_scolaire_active_id)
+
     Returns:
         dict: {
-            'bypass': bool,              # True pour SuperAdmin (Institution seulement)
-            'blocked': bool,             # True pour SuperAdmin sur ressources internes
+            'bypass': bool,
+            'blocked': bool,
             'institution_id': int|None,
+            'annee_scolaire_id': int|None,
             'role_name': str|None,
             'user_classe_id': int|None,
             'user_groupe_id': int|None,
-            'enfants_ids': list,         # Pour Parent
+            'enfants_ids': list,
         }
     """
     user = request.user
@@ -56,6 +83,7 @@ def get_user_academic_context(request):
         "bypass": False,
         "blocked": False,
         "institution_id": None,
+        "annee_scolaire_id": None,
         "role_name": None,
         "user_classe_id": None,
         "user_groupe_id": None,
@@ -64,19 +92,31 @@ def get_user_academic_context(request):
 
     # SuperAdmin : bypass pour Institution uniquement, bloqué ailleurs
     if getattr(user, "is_superuser", False):
-        ctx["bypass"] = True   # géré au cas par cas dans filter_academics_queryset
+        ctx["bypass"] = True
         return ctx
 
     role_name = get_role_name(user)
     ctx["role_name"] = role_name
     ctx["institution_id"] = getattr(user, "institution_id", None)
 
-    # Parent : récupérer les enfants
+    # ── Résolution de l'année scolaire ────────────────────────────────────
+    # Priorité : header > query param > attribut profil
+    annee_header = request.headers.get("X-Annee-Scolaire-ID")
+    annee_param  = request.query_params.get("annee_scolaire_id")
+    annee_profil = getattr(user, "annee_scolaire_active_id", None)
+
+    ctx["annee_scolaire_id"] = (
+        _to_int(annee_header)
+        or _to_int(annee_param)
+        or _to_int(annee_profil)
+    )
+
+    # Parent : récupérer les enfants (pas de filtre année sur le contexte parent)
     if role_name == 'Parent':
         ctx["enfants_ids"] = get_parent_enfants_ids(user)
         return ctx
 
-    # Apprenant : récupérer sa classe/groupe
+    # Apprenant : récupérer sa classe/groupe depuis l'inscription active
     if role_name == 'Apprenant':
         from .models import Inscription
         inscription = Inscription.objects.filter(
@@ -86,7 +126,11 @@ def get_user_academic_context(request):
 
         if inscription and inscription.classe:
             ctx["user_classe_id"] = inscription.classe_id
-            premier_groupe = inscription.classe.groupes.first()
+            # Filtrer le groupe par année si une année est sélectionnée
+            groupes_qs = inscription.classe.groupes
+            if ctx["annee_scolaire_id"]:
+                groupes_qs = groupes_qs.filter(annee_scolaire_id=ctx["annee_scolaire_id"])
+            premier_groupe = groupes_qs.first()
             if premier_groupe:
                 ctx["user_groupe_id"] = premier_groupe.id
 
@@ -99,31 +143,21 @@ def get_user_academic_context(request):
 
 def filter_academics_queryset(queryset, request, model_name, is_detail=False):
     """
-    Filtre un queryset academics selon le rôle.
-
-    Args:
-        queryset   : QuerySet Django
-        request    : Request Django
-        model_name : 'Institution', 'Groupe', 'Classe', 'Inscription', etc.
-        is_detail  : True si c'est une vue détail (filtrage plus strict)
-
-    Returns:
-        QuerySet filtré
+    Filtre un queryset academics selon le rôle et l'année scolaire sélectionnée.
     """
     user = request.user
     ctx = get_user_academic_context(request)
 
-    # ====================================================================
-    # 1. INSTITUTION → SuperAdmin voit tout, les autres voient la leur
-    # ====================================================================
+    annee_scolaire_id = ctx.get("annee_scolaire_id")
+
+    # ── INSTITUTION ──────────────────────────────────────────────────────
     if model_name == 'Institution':
         if ctx.get("bypass"):
-            return queryset  # SuperAdmin : toutes les institutions
+            return queryset
         role_name = ctx.get("role_name")
         institution_id = ctx.get("institution_id")
 
         if role_name == 'Parent':
-            # Parent voit l'institution de ses enfants
             enfants_ids = ctx.get("enfants_ids", [])
             if not enfants_ids:
                 return queryset.none()
@@ -137,57 +171,53 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
             return queryset.filter(id=institution_id)
         return queryset.none()
 
-    # ====================================================================
-    # 2. SuperAdmin BLOQUÉ sur toutes les ressources internes
-    # ====================================================================
+    # ── SuperAdmin BLOQUÉ sur ressources internes ────────────────────────
     if ctx.get("bypass"):
         return queryset.none()
 
     role_name = ctx.get("role_name")
     institution_id = ctx.get("institution_id")
 
-    # ====================================================================
-    # 3. PARENT : lecture seule sur les données de ses enfants
-    # ====================================================================
+    # ── PARENT ───────────────────────────────────────────────────────────
     if role_name == 'Parent':
         return _filter_for_parent(queryset, model_name, ctx)
 
-    # ====================================================================
-    # 4. Sans institution → rien
-    # ====================================================================
+    # ── Sans institution → rien ──────────────────────────────────────────
     if not institution_id and model_name not in ['DomaineEtude', 'Matiere', 'Specialite']:
         return queryset.none()
 
-    # ====================================================================
-    # GROUPE
-    # ====================================================================
+    # ── GROUPE ───────────────────────────────────────────────────────────
     if model_name == 'Groupe':
-
         if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:
-            return queryset.filter(institution_id=institution_id)
+            qs = queryset.filter(institution_id=institution_id)
+            # ✅ Filtre par année scolaire si sélectionnée
+            qs = _apply_annee_filter(qs, annee_scolaire_id)
+            return qs
 
         if role_name == 'Formateur':
             if is_detail:
-                return queryset.filter(
-                    institution_id=institution_id,
-                    formateurs=user
-                )
-            return queryset.filter(institution_id=institution_id)
+                qs = queryset.filter(institution_id=institution_id, formateurs=user)
+            else:
+                qs = queryset.filter(institution_id=institution_id)
+            qs = _apply_annee_filter(qs, annee_scolaire_id)
+            return qs
 
         if role_name == 'Apprenant':
             if is_detail:
                 if ctx.get("user_groupe_id"):
                     return queryset.filter(id=ctx["user_groupe_id"])
                 return queryset.none()
+            qs = queryset.filter(institution_id=institution_id)
+            qs = _apply_annee_filter(qs, annee_scolaire_id)
+            return qs
 
-            return queryset.filter(institution_id=institution_id)
-
-    # ====================================================================
-    # CLASSE
-    # ====================================================================
+    # ── CLASSE ───────────────────────────────────────────────────────────
     if model_name == 'Classe':
         if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:
-            return queryset.filter(institution_id=institution_id)
+            qs = queryset.filter(institution_id=institution_id)
+            # ✅ Filtre par année scolaire si sélectionnée
+            qs = _apply_annee_filter(qs, annee_scolaire_id)
+            return qs
 
         if role_name == 'Formateur':
             if is_detail:
@@ -196,42 +226,40 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
                     institution_id=institution_id,
                     formateurs=user
                 ).values_list('id', flat=True)
-                return queryset.filter(groupes__id__in=groupes_ids)
-            return queryset.filter(institution_id=institution_id)
+                qs = queryset.filter(groupes__id__in=groupes_ids)
+            else:
+                qs = queryset.filter(institution_id=institution_id)
+            qs = _apply_annee_filter(qs, annee_scolaire_id)
+            return qs
 
         if role_name == 'Apprenant':
             if is_detail:
                 if ctx.get("user_classe_id"):
                     return queryset.filter(id=ctx["user_classe_id"])
                 return queryset.none()
-            return queryset.filter(institution_id=institution_id)
+            qs = queryset.filter(institution_id=institution_id)
+            qs = _apply_annee_filter(qs, annee_scolaire_id)
+            return qs
 
-    # ====================================================================
-    # DEPARTEMENT
-    # ====================================================================
+    # ── DEPARTEMENT ──────────────────────────────────────────────────────
     if model_name == 'Departement':
-
         if role_name in ['Admin', 'Responsable', 'Formateur', 'ResponsableAcademique']:
             return queryset.filter(institution_id=institution_id)
         return queryset.none()
 
-    # ====================================================================
-    # FILIERE
-    # ====================================================================
+    # ── FILIERE ──────────────────────────────────────────────────────────
     if model_name == 'Filiere':
-
         if role_name in ['Admin', 'Responsable', 'Formateur', 'Apprenant', 'ResponsableAcademique']:
-
             return queryset.all()
         return queryset.none()
 
-    # ====================================================================
-    # INSCRIPTION
-    # ====================================================================
+    # ── INSCRIPTION ──────────────────────────────────────────────────────
     if model_name == 'Inscription':
-
         if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:
-            return queryset.filter(institution_id=institution_id)
+            qs = queryset.filter(institution_id=institution_id)
+            # ✅ Filtre par année scolaire si sélectionnée
+            qs = _apply_annee_filter(qs, annee_scolaire_id)
+            return qs
 
         if role_name == 'Formateur':
             from .models import Groupe
@@ -239,27 +267,34 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
                 institution_id=institution_id,
                 formateurs=user
             ).values_list('id', flat=True)
-            return queryset.filter(
+            qs = queryset.filter(
                 institution_id=institution_id,
                 classe__groupes__id__in=groupes_ids
             )
+            qs = _apply_annee_filter(qs, annee_scolaire_id)
+            return qs
 
         if role_name == 'Apprenant':
             return queryset.filter(apprenant=user)
 
-    # ====================================================================
-    # MODÈLES GLOBAUX (filtrage par institution)
-    # ====================================================================
-    if model_name in ["DomaineEtude", "Filiere", "Matiere", "Specialite", "AnneeScolaire"]:
+    # ── MODÈLES GLOBAUX (DomaineEtude, Matiere, Specialite, AnneeScolaire) ─
+    if model_name in ["DomaineEtude", "Matiere", "Specialite"]:
+        # Référentiels stables — pas de filtre par année
         if role_name in ["Admin", "Responsable", "Formateur", "Apprenant", "ResponsableAcademique"]:
             return queryset.filter(institution_id=institution_id)
         return queryset.none()
 
-    # ====================================================================
-    # Par défaut : filtrer par institution si le champ existe
-    # ====================================================================
+    if model_name == "AnneeScolaire":
+        # La liste des années n'est PAS filtrée par année — c'est le sélecteur lui-même
+        if role_name in ["Admin", "Responsable", "Formateur", "Apprenant", "ResponsableAcademique"]:
+            return queryset.filter(institution_id=institution_id)
+        return queryset.none()
+
+    # ── Fallback : filtrer par institution si le champ existe ────────────
     if hasattr(queryset.model, 'institution'):
-        return queryset.filter(institution_id=institution_id)
+        qs = queryset.filter(institution_id=institution_id)
+        qs = _apply_annee_filter(qs, annee_scolaire_id)
+        return qs
 
     return queryset.all()
 
@@ -303,7 +338,6 @@ def _filter_for_parent(queryset, model_name, ctx):
         ).values_list('institution_id', flat=True).distinct()
         return queryset.filter(id__in=inst_ids)
 
-    # Pour les autres modèles : filtre générique par institution de l'enfant
     if hasattr(queryset.model, 'institution'):
         from users.models import Apprenant
         inst_ids = Apprenant.objects.filter(
@@ -315,29 +349,16 @@ def _filter_for_parent(queryset, model_name, ctx):
 
 
 def get_filtered_academic_object(model_class, pk, request, model_name):
-    """
-    Récupère un objet académique filtré par rôle (vue détail).
-    """
     qs = model_class.objects.all()
     qs = filter_academics_queryset(qs, request, model_name, is_detail=True)
     return get_object_or_404(qs, pk=pk)
 
 
 def can_modify_academic_resource(user, obj, model_name):
-    """
-    Vérifie si l'utilisateur peut modifier une ressource académique.
-    
-    SuperAdmin : peut modifier Institution uniquement
-    Admin/Responsable : peuvent modifier dans leur institution
-    Formateur : peut modifier les groupes où il enseigne
-    Apprenant/Parent : aucune modification
-    """
     if getattr(user, 'is_superuser', False):
-        # SuperAdmin : uniquement Institution
         return model_name == 'Institution'
 
     role_name = get_role_name(user)
-
 
     if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:
         if hasattr(obj, 'institution_id'):
@@ -349,12 +370,10 @@ def can_modify_academic_resource(user, obj, model_name):
             return obj.formateurs.filter(id=user.id).exists()
         return False
 
-    # Apprenant et Parent : aucune modification
     return False
 
 
 def get_user_groupes_ids(user):
-    """Retourne les IDs des groupes où le formateur enseigne."""
     role_name = get_role_name(user)
     if role_name == 'Formateur':
         from .models import Groupe
@@ -366,7 +385,6 @@ def get_user_groupes_ids(user):
 
 
 def get_user_classe_id(user):
-    """Retourne l'ID de la classe de l'apprenant."""
     role_name = get_role_name(user)
     if role_name == 'Apprenant':
         from .models import Inscription

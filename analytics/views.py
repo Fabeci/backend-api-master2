@@ -28,13 +28,37 @@ from rest_framework import status, permissions
 
 from courses.models import BlocContenu, Sequence
 
-# from .models import Module, Cours
 from .models import (
     BlocAnalytics, BlocAnalyticsSummary,
     SequenceAnalyticsSummary, ModuleAnalyticsSummary,
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HELPERS — rôle & blocage SuperAdmin
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _get_role(user):
+    if hasattr(user, 'role') and user.role:
+        return user.role.name
+    return None
+
+
+def _block_super_admin(user):
+    """Retourne une Response 403 si SuperAdmin, sinon None."""
+    if getattr(user, 'is_superuser', False):
+        return Response(
+            {'error': 'Les SuperAdmins ne gèrent pas les ressources internes.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return None
+
+
+def _user_display(user):
+    """Retourne une représentation lisible de l'utilisateur (email ou pk)."""
+    return getattr(user, 'email', None) or str(getattr(user, 'pk', '?'))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -61,16 +85,30 @@ def _get_apprenant(request, apprenant_id=None):
     if not user or not user.is_authenticated:
         return None
 
+    # ✅ SuperAdmin : pas d'apprenant
+    if getattr(user, 'is_superuser', False):
+        return None
+
     # Chemins 1-4 : attributs directs sur user
     for attr in ('apprenant', 'profil', 'apprenant_profil', 'apprenant_account'):
         obj = getattr(user, attr, None)
         if obj is not None:
             return obj
 
-    # Chemin 5 : requête inverse générique
+    # Chemin 5 : multi-table inheritance — l'user EST un Apprenant
     try:
         from users.models import Apprenant
-        return Apprenant.objects.filter(user=user).first()
+        if isinstance(user, Apprenant):
+            return user
+    except Exception:
+        pass
+
+    # Chemin 6 : requête inverse générique (pour user lié par FK)
+    try:
+        from users.models import Apprenant
+        obj = Apprenant.objects.filter(pk=user.pk).first()
+        if obj:
+            return obj
     except Exception:
         pass
 
@@ -236,6 +274,11 @@ class AnalyticsDebugView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        # ✅ SuperAdmin bloqué
+        err = _block_super_admin(request.user)
+        if err:
+            return err
+
         user = request.user
         apprenant = _get_apprenant(request)
 
@@ -246,21 +289,24 @@ class AnalyticsDebugView(APIView):
 
         try:
             from users.models import Apprenant
-            qs = Apprenant.objects.filter(user=user)
-            chemins['Apprenant.objects.filter(user=user)'] = (
+            # ✅ Correction BUG : multi-table inheritance — filter par pk
+            qs = Apprenant.objects.filter(pk=user.pk)
+            chemins['Apprenant.objects.filter(pk=user.pk)'] = (
                 f'{qs.count()} résultat(s) — premier: {repr(qs.first())}'
             )
             total = Apprenant.objects.count()
         except Exception as e:
-            chemins['Apprenant.objects.filter(user=user)'] = f'ERREUR: {e}'
+            chemins['Apprenant.objects.filter(pk=user.pk)'] = f'ERREUR: {e}'
             total = 'erreur'
 
         return Response({
             'user': {
                 'pk':               user.pk,
-                'username':         user.username,
+                # ✅ email utilisé à la place de username (USERNAME_FIELD = 'email')
+                'email':            getattr(user, 'email', None),
                 'is_authenticated': user.is_authenticated,
                 'class':            type(user).__name__,
+                'role':             _get_role(user),
             },
             '⚠️ apprenant_resolu': repr(apprenant),
             'chemins_testes':       chemins,
@@ -288,13 +334,19 @@ class BlocAnalyticsOpenView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, bloc_id):
+        # ✅ SuperAdmin bloqué
+        err = _block_super_admin(request.user)
+        if err:
+            return err
+
         apprenant = _get_apprenant(request, request.data.get('apprenant_id'))
 
         if not apprenant:
             logger.warning(
                 '[analytics/open] 403 apprenant introuvable — user=%s pk=%s — '
                 'voir GET /api/analytics/debug/',
-                getattr(request.user, 'username', '?'),
+                # ✅ email à la place de username
+                _user_display(request.user),
                 getattr(request.user, 'pk', '?'),
             )
             return Response(
@@ -324,10 +376,18 @@ class BlocAnalyticsCloseView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def patch(self, request, session_id):
+        # ✅ SuperAdmin bloqué
+        err = _block_super_admin(request.user)
+        if err:
+            return err
+
         apprenant = _get_apprenant(request, request.data.get('apprenant_id'))
 
         if not apprenant:
-            logger.warning('[analytics/close] 403 apprenant introuvable — user=%s', request.user)
+            logger.warning(
+                '[analytics/close] 403 apprenant introuvable — user=%s',
+                _user_display(request.user),
+            )
             return Response(
                 {'error': 'Apprenant introuvable — voir GET /api/analytics/debug/'},
                 status=status.HTTP_403_FORBIDDEN,
@@ -375,6 +435,11 @@ class BulkAnalyticsSummaryView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        # ✅ SuperAdmin bloqué
+        err = _block_super_admin(request.user)
+        if err:
+            return err
+
         apprenant = _get_apprenant(request, request.data.get('apprenant_id'))
 
         if not apprenant:
