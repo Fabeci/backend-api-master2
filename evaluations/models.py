@@ -222,7 +222,7 @@ class Question(models.Model):
     # Contenu de la question
     enonce_texte = models.TextField()
     fichier_enonce = models.FileField(
-        upload_to='questions/enonces/%Y/%m/',
+        upload_to='uploads/questions/enonces/%Y/%m/',
         blank=True,
         null=True,
         validators=[FileExtensionValidator(
@@ -335,7 +335,7 @@ class Question(models.Model):
         try:
             parent = self.quiz or self.evaluation
             return f"[{self.get_type_question_display()}] {self.enonce_texte[:50]}... ({parent})"
-        except:
+        except Exception:
             return f"Question {self.id if self.id else 'nouvelle'}"
 
     @property
@@ -609,7 +609,7 @@ class ReponseQuestion(models.Model):
     
     # Pour les questions nécessitant un fichier
     fichier_reponse = models.FileField(
-        upload_to='questions/reponses/%Y/%m/',
+        upload_to='uploads/questions/reponses/%Y/%m/',
         blank=True,
         null=True,
         validators=[FileExtensionValidator(

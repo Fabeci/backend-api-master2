@@ -1,0 +1,23 @@
+{% extends "admin/index.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'admin/dashboard/css/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-links" style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+  <h3 style="margin-top: 0; color: #2c3e50;">Dashboards personnalisés</h3>
+  <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+    <a href="{% url 'dashboard-superadmin' %}" class="button" style="background: #9b59b6; color: white;">SuperAdmin Dashboard</a>
+    <a href="{% url 'dashboard-admin' %}" class="button" style="background: #3498db; color: white;">Admin Dashboard</a>
+    <a href="{% url 'dashboard-formateur' %}" class="button" style="background: #2ecc71; color: white;">Formateur Dashboard</a>
+    <a href="{% url 'dashboard-parent' %}" class="button" style="background: #f39c12; color: white;">Parent Dashboard</a>
+    <a href="{% url 'dashboard-responsable' %}" class="button" style="background: #1abc9c; color: white;">Responsable Dashboard</a>
+    <a href="{% url 'dashboard-apprenant' %}" class="button" style="background: #e74c3c; color: white;">Apprenant Dashboard</a>
+  </div>
+</div>
+
+{{ block.super }}
+{% endblock %}

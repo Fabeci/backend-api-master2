@@ -1121,40 +1121,38 @@ try:
     @receiver(post_save, sender=PassageQuiz)
     def on_passage_quiz_saved(sender, instance, created: bool, **kwargs):
 
-        if instance.statut == 'soumis':
+        if instance.termine and created:
             formateur = instance.quiz.cours.enseignant if hasattr(instance.quiz, 'cours') else None
-            if not formateur:
-                return
-
-            groupe = f"quiz_soumis:{instance.quiz.pk}"
-            existing = Notification.objects.filter(
-                groupe_deduplication=groupe,
-                is_read=False,
-                recipient=formateur,
-            ).first()
-
-            if existing:
-                existing.nb_evenements_groupes += 1
-                existing.message = f"{existing.nb_evenements_groupes} quiz soumis pour « {instance.quiz.titre} »."
-                existing.save(update_fields=['nb_evenements_groupes', 'message'])
-            else:
-                _notifier(
+            if formateur:
+                groupe = f"quiz_soumis:{instance.quiz.pk}"
+                existing = Notification.objects.filter(
+                    groupe_deduplication=groupe,
+                    is_read=False,
                     recipient=formateur,
-                    type_notif=TypeNotification.EVALUATION_SOUMISE,
-                    titre="Quiz soumis",
-                    message=f"{instance.apprenant.prenom} {instance.apprenant.nom} a soumis le quiz « {instance.quiz.titre} ».",
-                    priorite=PrioriteNotification.BASSE,
-                    entity_type=EntityType.QUIZ,
-                    entity_id=instance.quiz.pk,
-                    groupe_dedup=groupe,
-                )
+                ).first()
 
-        if instance.statut == 'corrige' and instance.score is not None:
+                if existing:
+                    existing.nb_evenements_groupes += 1
+                    existing.message = f"{existing.nb_evenements_groupes} quiz soumis pour « {instance.quiz.titre} »."
+                    existing.save(update_fields=['nb_evenements_groupes', 'message'])
+                else:
+                    _notifier(
+                        recipient=formateur,
+                        type_notif=TypeNotification.EVALUATION_SOUMISE,
+                        titre="Quiz soumis",
+                        message=f"{instance.apprenant.prenom} {instance.apprenant.nom} a soumis le quiz « {instance.quiz.titre} ».",
+                        priorite=PrioriteNotification.BASSE,
+                        entity_type=EntityType.QUIZ,
+                        entity_id=instance.quiz.pk,
+                        groupe_dedup=groupe,
+                    )
+
+        if instance.score is not None:
             _notifier(
                 recipient=instance.apprenant,
                 type_notif=TypeNotification.EVALUATION_CORRIGEE,
                 titre="Résultat de quiz disponible",
-                message=f"Votre quiz « {instance.quiz.titre} » a été noté : {instance.score}/{instance.quiz.total_points}.",
+                message=f"Votre quiz « {instance.quiz.titre} » a été noté : {instance.score} points.",
                 priorite=PrioriteNotification.MOYENNE,
                 entity_type=EntityType.QUIZ,
                 entity_id=instance.quiz.pk,

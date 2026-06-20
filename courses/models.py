@@ -298,13 +298,13 @@ class BlocContenu(models.Model):
     video_url = models.URLField(blank=True, null=True, verbose_name="URL de la vidéo")
     audio_url = models.URLField(blank=True, null=True, verbose_name="URL de l'audio")
     image = models.ImageField(
-        upload_to="blocs_contenu/images/",
+        upload_to="uploads/blocs/images/",
         blank=True,
         null=True,
         verbose_name="Image"
     )
     fichier = models.FileField(
-        upload_to="blocs_contenu/fichiers/",
+        upload_to="uploads/blocs/fichiers/",
         blank=True,
         null=True,
         verbose_name="Fichier"
@@ -385,7 +385,7 @@ class RessourceSequence(models.Model):
     titre = models.CharField(max_length=255, verbose_name="Titre de la ressource")
     description = models.TextField(blank=True, null=True, verbose_name="Description")
     fichier = models.FileField(
-        upload_to="ressources_sequences/",
+        upload_to="uploads/ressources_sequences/",
         verbose_name="Fichier"
     )
     type_ressource = models.CharField(

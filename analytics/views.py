@@ -19,6 +19,7 @@
 # ============================================================================
 
 import logging
+import threading
 from django.utils import timezone
 from django.db.models import Sum, Count, Max, Min, Q
 from django.shortcuts import get_object_or_404
@@ -28,10 +29,10 @@ from rest_framework import status, permissions
 
 from courses.models import BlocContenu, Sequence
 
-# from .models import Module, Cours
 from .models import (
     BlocAnalytics, BlocAnalyticsSummary,
     SequenceAnalyticsSummary, ModuleAnalyticsSummary,
+    AIAnalysisRequest, ContenuGenere, QuizGenereClaude,
 )
 
 logger = logging.getLogger(__name__)
@@ -410,9 +411,495 @@ class BulkAnalyticsSummaryView(APIView):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# VUES STUB — Recommandations & Contenu généré
-# Retournent 200 pour ne pas casser le frontend.
-# À compléter quand les modèles existent.
+# HELPERS IA
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _run_in_thread(ai_request_id: int):
+    """Lance le traitement Claude dans un thread."""
+    def _worker():
+        try:
+            req = AIAnalysisRequest.objects.get(pk=ai_request_id)
+            from .services.ai_claude_service import traiter_demande_ai
+            traiter_demande_ai(req)
+            _creer_contenu_genere(req)
+        except Exception as e:
+            logger.error('[ai] Erreur thread : %s', e)
+    threading.Thread(target=_worker, daemon=True).start()
+
+
+def _creer_contenu_genere(ai_request):
+    """Crée un ContenuGenere ou QuizGenereClaude après succès Claude."""
+    from .models import ContenuGenere, QuizGenereClaude
+    if ai_request.status != 'success':
+        return
+
+    try:
+        import json
+        data = json.loads(ai_request.gpt_response or '{}')
+    except Exception:
+        return
+
+    if ai_request.trigger in ('temps_long', 'multi_reouverture'):
+        ContenuGenere.objects.create(
+            ai_request=ai_request,
+            apprenant=ai_request.apprenant,
+            type_contenu='bloc_simplifie' if ai_request.trigger == 'temps_long' else 'bloc_alternatif',
+            titre=data.get('titre', 'Explication simplifiée'),
+            contenu_html=data.get('contenu_html', ''),
+            contenu_json=data,
+            bloc_source=ai_request.bloc,
+            concepts_cibles=data.get('concepts_cibles', []),
+        )
+    elif ai_request.trigger in ('sequence_complexe',):
+        ContenuGenere.objects.create(
+            ai_request=ai_request,
+            apprenant=ai_request.apprenant,
+            type_contenu='sequence_adaptative',
+            titre=data.get('titre', 'Séquence adaptative'),
+            description=data.get('description', ''),
+            contenu_json=data,
+            sequence_source=ai_request.sequence,
+            concepts_cibles=data.get('etapes', []),
+            niveau_difficulte=data.get('sequence_niveau', 'intermediaire'),
+        )
+    elif ai_request.trigger == 'module_difficile':
+        ContenuGenere.objects.create(
+            ai_request=ai_request,
+            apprenant=ai_request.apprenant,
+            type_contenu='module_revision',
+            titre=data.get('titre', 'Module de révision'),
+            description=data.get('resume', ''),
+            contenu_json=data,
+            module_source=ai_request.module,
+            concepts_cibles=data.get('competences_cibles', []),
+            niveau_difficulte=data.get('sequence_niveau', 'intermediaire'),
+        )
+    elif ai_request.trigger == 'quiz_rate':
+        QuizGenereClaude.objects.create(
+            ai_request=ai_request,
+            apprenant=ai_request.apprenant,
+            quiz_source=ai_request.quiz,
+            titre=data.get('titre', 'Quiz de remédiation'),
+            consigne=data.get('consigne', ''),
+            questions=data.get('questions', []),
+            concepts_rates=data.get('concepts_rates', []),
+        )
+
+
+def _recently_generated(apprenant, trigger: str, hours: int = 2, **filters) -> bool:
+    """True si une génération identique récente existe."""
+    from datetime import timedelta
+    cutoff = timezone.now() - timedelta(hours=hours)
+    qs = AIAnalysisRequest.objects.filter(
+        apprenant=apprenant, trigger=trigger,
+        status__in=['pending', 'success'],
+        created_at__gte=cutoff,
+        **filters,
+    )
+    return qs.exists()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HELPERS SÉRIALISATION
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _dt(v):
+    return v.isoformat() if v else None
+
+
+def _contenu_genere_dict(c):
+    return {
+        'id': c.pk,
+        'type_contenu': c.type_contenu,
+        'titre': c.titre,
+        'description': c.description,
+        'contenu_html': c.contenu_html,
+        'contenu_json': c.contenu_json,
+        'bloc_source_id': c.bloc_source_id,
+        'sequence_source_id': c.sequence_source_id,
+        'module_source_id': c.module_source_id,
+        'quiz_source_id': c.quiz_source_id,
+        'concepts_cibles': c.concepts_cibles,
+        'niveau_difficulte': c.niveau_difficulte,
+        'a_ete_consulte': c.a_ete_consulte,
+        'a_aide': c.a_aide,
+        'created_at': _dt(c.created_at),
+    }
+
+
+def _quiz_genere_dict(q):
+    return {
+        'id': q.pk,
+        'quiz_source_id': q.quiz_source_id,
+        'titre': q.titre,
+        'consigne': q.consigne,
+        'questions': q.questions,
+        'concepts_rates': q.concepts_rates,
+        'score_remediation': q.score_remediation,
+        'remediation_reussie': q.remediation_reussie,
+        'a_ete_consulte': q.a_ete_consulte,
+        'created_at': _dt(q.created_at),
+    }
+
+
+def _get_bloc_texte(bloc) -> str:
+    """Extrait le texte brut d'un BlocContenu."""
+    if not bloc:
+        return ''
+    import re
+    parts = []
+    for field in ('contenu_html', 'contenu_texte', 'contenu_markdown', 'code_source'):
+        val = getattr(bloc, field, None)
+        if val:
+            clean = re.sub(r'<[^>]+>', ' ', str(val))
+            parts.append(clean.strip())
+    return '\n'.join(parts)[:3000]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# POST /api/ai/generate-content/ — Génération IA à la demande
+# ══════════════════════════════════════════════════════════════════════════════
+
+import threading
+
+class AIGenerateContentView(APIView):
+    """
+    POST /api/analytics/ai/generate-content/
+
+    Body :
+    {
+      "trigger": "temps_long" | "multi_reouverture" | "quiz_rate"
+              | "sequence_complexe" | "module_difficile",
+      "apprenant_id": 42,             // optionnel, déduit du token
+
+      // Pour temps_long / multi_reouverture :
+      "bloc_id": 15,
+      "duree_passee_sec": 720,
+      "duree_estimee_sec": 300,
+      "scroll_max_pct": 45,
+      "nb_ouvertures": 3,
+
+      // Pour quiz_rate :
+      "quiz_id": 8,
+      "score_obtenu": 35,
+      "nb_tentatives": 2,
+      "questions_ratees": [{"question": "...", "bonne_reponse": "..."}]
+
+      // Pour sequence_complexe :
+      "sequence_id": 5,
+
+      // Pour module_difficile :
+      "module_id": 3,
+    }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        apprenant = _get_apprenant(request, request.data.get('apprenant_id'))
+        if not apprenant:
+            return Response({'error': 'Apprenant introuvable'}, status=403)
+
+        trigger = request.data.get('trigger')
+        valid_triggers = ('temps_long', 'multi_reouverture', 'quiz_rate',
+                        'sequence_complexe', 'module_difficile')
+        if trigger not in valid_triggers:
+            return Response({'error': f'Trigger invalide'}, status=400)
+
+        # ── Bloc triggers ──────────────────────────────────────────────
+        if trigger in ('temps_long', 'multi_reouverture'):
+            bloc_id = request.data.get('bloc_id')
+            if not bloc_id:
+                return Response({'error': 'bloc_id requis'}, status=400)
+            try:
+                bloc = BlocContenu.objects.select_related(
+                    'sequence__module__cours'
+                ).get(pk=bloc_id)
+            except BlocContenu.DoesNotExist:
+                return Response({'error': f'Bloc {bloc_id} introuvable'}, status=404)
+
+            if _recently_generated(apprenant, trigger, bloc_id=bloc_id):
+                return Response({
+                    'request_id': None,
+                    'status': 'skipped',
+                    'message': 'Génération récente déjà faite.',
+                }, status=200)
+
+            duree_passee_sec = int(request.data.get('duree_passee_sec', 0))
+            duree_estimee_sec = int(request.data.get('duree_estimee_sec', 0)) or (
+                getattr(bloc, 'duree_estimee_minutes', 0) or 0
+            ) * 60 or 300
+
+            seq = getattr(bloc, 'sequence', None)
+            mod = getattr(seq, 'module', None) if seq else None
+            crs = getattr(mod, 'cours', None) if mod else None
+
+            context = {
+                'bloc_titre': bloc.titre,
+                'bloc_contenu': _get_bloc_texte(bloc),
+                'duree_estimee_min': round(duree_estimee_sec / 60, 1),
+                'duree_passee_min': round(duree_passee_sec / 60, 1),
+                'ratio_pct': round((duree_passee_sec / duree_estimee_sec) * 100) if duree_estimee_sec else 0,
+                'nb_ouvertures': int(request.data.get('nb_ouvertures', 1)),
+                'scroll_max_pct': int(request.data.get('scroll_max_pct', 0)),
+                'cours_titre': crs.titre if crs else '',
+                'sequence_titre': seq.titre if seq else '',
+            }
+
+            ai_req = AIAnalysisRequest.objects.create(
+                apprenant=apprenant,
+                bloc=bloc,
+                sequence=seq,
+                module=mod,
+                cours=crs,
+                trigger=trigger,
+                prompt_context=context,
+            )
+
+        # ── Quiz rate ────────────────────────────────────────────────
+        elif trigger == 'quiz_rate':
+            quiz_id = request.data.get('quiz_id')
+            if not quiz_id:
+                return Response({'error': 'quiz_id requis'}, status=400)
+            try:
+                from evaluations.models import Quiz
+                quiz = Quiz.objects.select_related(
+                    'sequence__module__cours'
+                ).get(pk=quiz_id)
+            except Exception:
+                return Response({'error': f'Quiz {quiz_id} introuvable'}, status=404)
+
+            if _recently_generated(apprenant, trigger, quiz_id=quiz_id, hours=4):
+                return Response({
+                    'request_id': None,
+                    'status': 'skipped',
+                    'message': 'Quiz de remédiation déjà généré.',
+                }, status=200)
+
+            seq = getattr(quiz, 'sequence', None)
+            mod = getattr(seq, 'module', None) if seq else None
+            crs = getattr(mod, 'cours', None) if mod else None
+
+            context = {
+                'quiz_titre': quiz.titre,
+                'quiz_description': getattr(quiz, 'description', '') or '',
+                'score_obtenu': int(request.data.get('score_obtenu', 0)),
+                'nb_tentatives': int(request.data.get('nb_tentatives', 1)),
+                'questions_ratees': request.data.get('questions_ratees', []),
+                'cours_titre': crs.titre if crs else '',
+                'sequence_titre': seq.titre if seq else '',
+            }
+
+            ai_req = AIAnalysisRequest.objects.create(
+                apprenant=apprenant,
+                quiz=quiz,
+                sequence=seq,
+                module=mod,
+                cours=crs,
+                trigger=trigger,
+                prompt_context=context,
+            )
+
+        # ── Sequence complexe ──────────────────────────────────────────
+        elif trigger == 'sequence_complexe':
+            sequence_id = request.data.get('sequence_id')
+            if not sequence_id:
+                return Response({'error': 'sequence_id requis'}, status=400)
+            try:
+                seq = Sequence.objects.select_related(
+                    'module__cours'
+                ).get(pk=sequence_id)
+            except Sequence.DoesNotExist:
+                return Response({'error': f'Séquence {sequence_id} introuvable'}, status=404)
+
+            if _recently_generated(apprenant, trigger, sequence_id=sequence_id):
+                return Response({
+                    'request_id': None,
+                    'status': 'skipped',
+                    'message': 'Séquence déjà générée.',
+                }, status=200)
+
+            mod = getattr(seq, 'module', None)
+            crs = getattr(mod, 'cours', None) if mod else None
+            summary = SequenceAnalyticsSummary.objects.filter(
+                apprenant=apprenant, sequence=seq
+            ).first()
+
+            context = {
+                'sequence_titre': seq.titre,
+                'sequence_contenu': seq.titre,
+                'module_titre': mod.titre if mod else '',
+                'cours_titre': crs.titre if crs else '',
+                'ratio_temps_pct': summary.ratio_temps_pct if summary else 0,
+                'score_moyen': summary.score_moyen_quiz if summary else 0,
+                'concepts_difficiles': [],
+            }
+
+            ai_req = AIAnalysisRequest.objects.create(
+                apprenant=apprenant,
+                sequence=seq,
+                module=mod,
+                cours=crs,
+                trigger=trigger,
+                prompt_context=context,
+            )
+
+        # ── Module difficile ─────────────────────────────────────────
+        elif trigger == 'module_difficile':
+            module_id = request.data.get('module_id')
+            if not module_id:
+                return Response({'error': 'module_id requis'}, status=400)
+            try:
+                from courses.models import Module
+                mod = Module.objects.select_related('cours').get(pk=module_id)
+            except Exception:
+                return Response({'error': f'Module {module_id} introuvable'}, status=404)
+
+            if _recently_generated(apprenant, trigger, module_id=module_id):
+                return Response({
+                    'request_id': None,
+                    'status': 'skipped',
+                    'message': 'Module déjà généré.',
+                }, status=200)
+
+            crs = getattr(mod, 'cours', None)
+            summary = ModuleAnalyticsSummary.objects.filter(
+                apprenant=apprenant, module=mod
+            ).first()
+
+            context = {
+                'module_titre': mod.titre,
+                'module_description': getattr(mod, 'description', '') or '',
+                'cours_titre': crs.titre if crs else '',
+                'score_moyen': summary.score_moyen_quiz if summary else 0,
+                'temps_total_min': round((summary.duree_totale_sec or 0) / 60, 1) if summary else 0,
+                'ratio_temps_pct': summary.ratio_temps_pct if summary else 0,
+                'concepts_rates': [],
+                'prerequis': getattr(mod, 'description', '') or '',
+            }
+
+            ai_req = AIAnalysisRequest.objects.create(
+                apprenant=apprenant,
+                module=mod,
+                cours=crs,
+                trigger=trigger,
+                prompt_context=context,
+            )
+
+        _run_in_thread(ai_req.pk)
+        logger.info('[ai] trigger=%s apprenant=%s request_id=%s', trigger, apprenant.pk, ai_req.pk)
+
+        return Response({
+            'request_id': ai_req.pk,
+            'status': 'pending',
+            'message': 'Génération en cours...',
+        }, status=202)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GET /api/ai/suggestions/<appr_id>/ — Récupère suggestions IA
+# ══════════════════════════════════════════════════════════════════════════════
+
+class AISuggestionsView(APIView):
+    """
+    GET /api/analytics/ai/suggestions/<int:apprenant_id>/
+    Optionnel : ?type=bloc_simplifie | quiz_remediation
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, apprenant_id):
+        apprenant = _get_apprenant(request, apprenant_id)
+        if not apprenant:
+            return Response({'error': 'Apprenant introuvable'}, status=403)
+
+        type_filter = request.query_params.get('type')
+
+        contenus_qs = ContenuGenere.objects.filter(apprenant=apprenant)
+        if type_filter:
+            contenus_qs = contenus_qs.filter(type_contenu=type_filter)
+
+        quizs_qs = QuizGenereClaude.objects.filter(apprenant=apprenant)
+
+        pending = AIAnalysisRequest.objects.filter(
+            apprenant=apprenant, status='pending'
+        ).count()
+
+        return Response({
+            'contenus': [_contenu_genere_dict(c) for c in contenus_qs],
+            'quizs': [_quiz_genere_dict(q) for q in quizs_qs],
+            'pending_count': pending,
+        })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PATCH /contenu/<pk>/consulte/ — Marque contenu comme consulté
+# ══════════════════════════════════════════════════════════════════════════════
+
+class ContenuGenereConsulteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        apprenant = _get_apprenant(request)
+        contenu = get_object_or_404(ContenuGenere, pk=pk, apprenant=apprenant)
+        contenu.marquer_consulte()
+        return Response({'status': 'ok'})
+
+
+class ContenuGenereFeedbackView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        apprenant = _get_apprenant(request)
+        contenu = get_object_or_404(ContenuGenere, pk=pk, apprenant=apprenant)
+        a_aide = request.data.get('a_aide')
+        if a_aide is None:
+            return Response({'error': 'a_aide requis'}, status=400)
+        contenu.soumettre_feedback(bool(a_aide))
+        return Response({'status': 'ok'})
+
+
+class ContenuGenereDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        apprenant = _get_apprenant(request)
+        contenu = get_object_or_404(ContenuGenere, pk=pk, apprenant=apprenant)
+        return Response(_contenu_genere_dict(contenu))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PATCH /quiz-genere/<pk>/consulte/
+# POST  /quiz-genere/<pk>/score/
+# ══════════════════════════════════════════════════════════════════════════════
+
+class QuizGenereClaudeConsulteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        apprenant = _get_apprenant(request)
+        quiz = get_object_or_404(QuizGenereClaude, pk=pk, apprenant=apprenant)
+        quiz.marquer_consulte()
+        return Response({'status': 'ok'})
+
+
+class QuizGenereClaudeScoreView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        apprenant = _get_apprenant(request)
+        quiz = get_object_or_404(QuizGenereClaude, pk=pk, apprenant=apprenant)
+        score = request.data.get('score')
+        if score is None:
+            return Response({'error': 'score requis (0-100)'}, status=400)
+        quiz.soumettre_score(int(score))
+        return Response({
+            'status': 'ok',
+            'remediation_reussie': quiz.remediation_reussie,
+            'score': quiz.score_remediation,
+        })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STUB — Recommandations (à implémenter plus tard)
 # ══════════════════════════════════════════════════════════════════════════════
 
 class RecommandationsListView(APIView):
@@ -426,21 +913,6 @@ class RecommandationVueView(APIView):
         return Response({'status': 'ok'})
 
 class RecommandationSuivieView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-    def patch(self, request, pk):
-        return Response({'status': 'ok'})
-
-class ContenuGenereDetailView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-    def get(self, request, pk):
-        return Response({'error': 'non implémenté'}, status=404)
-
-class ContenuGenereConsulteView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-    def patch(self, request, pk):
-        return Response({'status': 'ok'})
-
-class ContenuGenereFeedbackView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def patch(self, request, pk):
         return Response({'status': 'ok'})

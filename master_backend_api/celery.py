@@ -17,9 +17,9 @@ app.autodiscover_tasks()
 # Ceci doit être APRÈS autodiscover_tasks()
 try:
     from . import tasks  # noqa: F401
-    print("✅ Module tasks importé avec succès")
+    print("[OK] Module tasks importe avec succes")
 except ImportError as e:
-    print(f"❌ Erreur import tasks: {e}")
+    print(f"[ERREUR] Import tasks: {e}")
 
 # Tâches planifiées
 app.conf.beat_schedule = {

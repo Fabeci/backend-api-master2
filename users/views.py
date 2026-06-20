@@ -1,4 +1,5 @@
 # users/views.py
+import logging
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
@@ -11,7 +12,15 @@ from rest_framework import status, permissions
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.throttling import AnonRateThrottle
 from django.contrib.auth.hashers import check_password
+
+logger = logging.getLogger(__name__)
+
+
+class LoginRateThrottle(AnonRateThrottle):
+    """5 tentatives par minute par IP sur le login."""
+    scope = 'login'
 
 from users.permissions import IsAdminOrHigher
 from users.utils import BaseModelViewSet
@@ -109,6 +118,7 @@ class ResendCodeAPIView(APIView):
 
 class UserLoginAPIView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         serializer = UserLoginSerializer(data=request.data)
@@ -277,17 +287,18 @@ class ProfileActionsMixin:
 # =============================================================================
 
 class AdminViewSet(ProfileActionsMixin, BaseModelViewSet):
-    queryset           = Admin.objects.all()
+    queryset           = Admin.objects.select_related('institution', 'role', 'pays_residence').all()
     serializer_class   = AdminCrudSerializer
     permission_classes = [IsAdminOrHigher]
 
     def get_queryset(self):
         user = self.request.user
+        qs = Admin.objects.select_related('institution', 'role', 'pays_residence')
         if user.is_superuser:
-            return Admin.objects.all()
+            return qs.all()
         inst = _user_institution(user)
         if inst:
-            return Admin.objects.filter(institution=inst)
+            return qs.filter(institution=inst)
         return Admin.objects.none()
 
     def perform_create(self, serializer):
@@ -300,31 +311,26 @@ class AdminViewSet(ProfileActionsMixin, BaseModelViewSet):
 
 
 class ParentViewSet(ProfileActionsMixin, BaseModelViewSet):
-    queryset           = Parent.objects.all()
+    queryset           = Parent.objects.select_related('institution', 'role', 'pays_residence').all()
     serializer_class   = ParentCrudSerializer
-    permission_classes = [IsAdminOrHigherOrSelf]  # ✅ au lieu de IsAdminOrHigher
+    permission_classes = [IsAdminOrHigherOrSelf]
 
     def get_queryset(self):
         user      = self.request.user
         role_name = _role_name(user)
         inst      = _user_institution(user)
+        qs_base   = Parent.objects.select_related('institution', 'role', 'pays_residence')
 
         if user.is_superuser:
-            return Parent.objects.all()
+            return qs_base.all()
 
         if role_name == "Parent":
             return Parent.objects.filter(pk=user.pk)
 
         if role_name == "Admin":
-            return Parent.objects.filter(institution=inst) if inst else Parent.objects.none()
+            return qs_base.filter(institution=inst) if inst else Parent.objects.none()
 
-        # ✅ Responsable : parents dont au moins un enfant est dans son département
         if role_name in ["ResponsableAcademique", "Responsable", "Responsable Académique"]:
-            from users.models import ResponsableAcademique as RA
-            fresh = RA.objects.filter(pk=user.pk).values('departement_id', 'institution_id').first()
-            dept_id = fresh['departement_id'] if fresh else None
-            inst_id = fresh['institution_id'] if fresh else getattr(user, 'institution_id', None)
-
             dept_id, inst_id = _get_responsable_context(user)
 
             if not inst_id:
@@ -355,9 +361,13 @@ class ParentViewSet(ProfileActionsMixin, BaseModelViewSet):
 
         return Parent.objects.none()
 class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):
-    queryset           = Apprenant.objects.all()
+    queryset           = Apprenant.objects.select_related('institution', 'role', 'groupe', 'tuteur', 'pays_residence', 'annee_scolaire_active').all()
     serializer_class   = ApprenantCrudSerializer
     permission_classes = [IsAdminOrHigherOrSelf]
+
+    _qs_base = staticmethod(lambda: Apprenant.objects.select_related(
+        'institution', 'role', 'groupe', 'tuteur', 'pays_residence', 'annee_scolaire_active'
+    ))
 
     def get_queryset(self):
         user      = self.request.user
@@ -365,10 +375,10 @@ class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):
         inst      = _user_institution(user)
 
         if user.is_superuser:
-            return Apprenant.objects.all()
+            return self._qs_base().all()
 
         if role_name == "Admin":
-            return Apprenant.objects.filter(institution=inst) if inst else Apprenant.objects.none()
+            return self._qs_base().filter(institution=inst) if inst else Apprenant.objects.none()
 
         # ✅ Responsable : apprenants dont le groupe appartient à son département
         if role_name in ["ResponsableAcademique", "Responsable", "Responsable Académique"]:
@@ -448,9 +458,13 @@ class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):
             serializer.save()
 
 class FormateurViewSet(ProfileActionsMixin, BaseModelViewSet):
-    queryset           = Formateur.objects.all()
+    queryset           = Formateur.objects.select_related('role', 'pays_residence', 'annee_scolaire_active').prefetch_related('institutions', 'specialites', 'groupes').all()
     serializer_class   = FormateurCrudSerializer
     permission_classes = [IsAdminOrHigherOrSelf]
+
+    _qs_base = staticmethod(lambda: Formateur.objects.select_related(
+        'role', 'pays_residence', 'annee_scolaire_active'
+    ).prefetch_related('institutions', 'specialites', 'groupes'))
 
     def get_queryset(self):
         user      = self.request.user
@@ -458,13 +472,13 @@ class FormateurViewSet(ProfileActionsMixin, BaseModelViewSet):
         inst      = _user_institution(user)
 
         if user.is_superuser:
-            return Formateur.objects.all()
+            return self._qs_base().all()
 
         if role_name == "Formateur":
-            return Formateur.objects.filter(pk=user.pk)
+            return self._qs_base().filter(pk=user.pk)
 
         if role_name == "Admin":
-            return Formateur.objects.filter(institutions=inst) if inst else Formateur.objects.none()
+            return self._qs_base().filter(institutions=inst) if inst else Formateur.objects.none()
 
         # ✅ Responsable : formateurs assignés aux groupes de son département
         if role_name in ["ResponsableAcademique", "Responsable", "Responsable Académique"]:

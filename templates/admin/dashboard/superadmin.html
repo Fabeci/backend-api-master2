@@ -1,0 +1,82 @@
+{% extends "admin/dashboard/base.html" %}
+{% block dashboard_content %}
+
+<h2 class="section-title">Vue d'ensemble du système</h2>
+
+<div class="kpi-cards">
+  <div class="kpi-card">
+    <h3>Utilisateurs</h3>
+    <div class="value">{{ total_users }}</div>
+    <div class="subtitle">{{ total_apprenants }} apprenants, {{ total_formateurs }} formateurs</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Institutions</h3>
+    <div class="value">{{ total_institutions }}</div>
+    <div class="subtitle">{{ nb_annees }} années scolaires, {{ nb_classes }} classes</div>
+  </div>
+  <div class="kpi-card success">
+    <h3>Complétion moyenne</h3>
+    <div class="value">{{ avg_completion }}%</div>
+    <div class="subtitle">Sur {{ total_courses }} cours</div>
+  </div>
+  <div class="kpi-card danger">
+    <h3>Utilisateurs inactifs</h3>
+    <div class="value">{{ inactive_users }}</div>
+    <div class="subtitle">Comptes non activés</div>
+  </div>
+  <div class="kpi-card warning">
+    <h3>Plans en retard</h3>
+    <div class="value">{{ overdue_plans }}</div>
+    <div class="subtitle">Actions requises</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Nouveaux (30j)</h3>
+    <div class="value">{{ new_users_30d }}</div>
+    <div class="subtitle">Utilisateurs inscrits</div>
+  </div>
+</div>
+
+<h2 class="section-title">Top 5 institutions</h2>
+<table class="table-styled">
+  <thead>
+    <tr>
+      <th>Institution</th>
+      <th>Apprenants</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for inst in top_institutions %}
+    <tr>
+      <td>{{ inst.nom }}</td>
+      <td>{{ inst.nb_apprenants }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="2">Aucune institution</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2 class="section-title">Activité récente (7j)</h2>
+<div class="kpi-cards">
+  <div class="kpi-card">
+    <h3>Connexions</h3>
+    <div class="value">{{ recent_logins }}</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Feedbacks</h3>
+    <div class="value">{{ recent_feedbacks }}</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Forums actifs</h3>
+    <div class="value">{{ recent_forums }}</div>
+  </div>
+</div>
+
+<div class="quick-actions">
+  <a href="{% url 'admin:users_user_changelist' %}" class="btn-custom btn-primary">Gérer les utilisateurs</a>
+  <a href="{% url 'admin:academics_institution_changelist' %}" class="btn-custom">Institutions</a>
+  <a href="{% url 'admin:courses_cours_changelist' %}" class="btn-custom">Cours</a>
+  <a href="{% url 'admin:index' %}" class="btn-custom">Interface admin complète</a>
+</div>
+
+{% endblock %}

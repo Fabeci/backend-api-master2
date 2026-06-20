@@ -16,16 +16,18 @@ from .models import (
 # ============================================================================
 
 class ReponseSerializer(serializers.ModelSerializer):
-    """Serializer pour les réponses prédéfinies (choix de QCM)"""
+    """Serializer complet — réservé aux formateurs/admins (expose est_correcte)."""
     class Meta:
         model = Reponse
-        fields = [
-            'id', 
-            'texte', 
-            'question', 
-            'est_correcte', 
-            'ordre'
-        ]
+        fields = ['id', 'texte', 'question', 'est_correcte', 'ordre']
+        read_only_fields = ['id']
+
+
+class ReponseApprenantSerializer(serializers.ModelSerializer):
+    """Serializer apprenant — n'expose JAMAIS est_correcte."""
+    class Meta:
+        model = Reponse
+        fields = ['id', 'texte', 'question', 'ordre']
         read_only_fields = ['id']
 
 
@@ -61,6 +63,11 @@ class QuestionSerializer(serializers.ModelSerializer):
             'est_qcm'
         ]
         read_only_fields = ['id', 'necessite_correction_manuelle', 'est_qcm']
+
+
+class QuestionApprenantSerializer(QuestionSerializer):
+    """Serializer question pour les apprenants : est_correcte masquée au niveau ORM."""
+    reponses_predefinies = ReponseApprenantSerializer(many=True, read_only=True)
 
 
 class QuestionCreateSerializer(serializers.ModelSerializer):
@@ -202,9 +209,9 @@ class PassageQuizSerializer(serializers.ModelSerializer):
     def get_apprenant_nom(self, obj):
         try:
             return f"{obj.apprenant.prenom} {obj.apprenant.nom}"
-        except:
+        except Exception:
             return str(obj.apprenant)
-    
+
     def get_pourcentage(self, obj):
         total_points = sum(q.points for q in obj.quiz.questions.all())
         if total_points == 0:
@@ -254,7 +261,7 @@ class EvaluationSerializer(serializers.ModelSerializer):
     def get_enseignant_nom(self, obj):
         try:
             return f"{obj.enseignant.prenom} {obj.enseignant.nom}"
-        except:
+        except Exception:
             return str(obj.enseignant)
 
     def get_est_accessible(self, obj):
@@ -340,7 +347,7 @@ class EvaluationDetailSerializer(serializers.ModelSerializer):
     def get_enseignant_nom(self, obj):
         try:
             return f"{obj.enseignant.prenom} {obj.enseignant.nom}"
-        except:
+        except Exception:
             return str(obj.enseignant)
     
     def get_est_accessible(self, obj):
@@ -511,9 +518,9 @@ class PassageEvaluationSerializer(serializers.ModelSerializer):
     def get_apprenant_nom(self, obj):
         try:
             return f"{obj.apprenant.prenom} {obj.apprenant.nom}"
-        except:
+        except Exception:
             return str(obj.apprenant)
-    
+
     def get_pourcentage(self, obj):
         return obj.pourcentage()
     

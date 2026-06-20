@@ -1,11 +1,14 @@
-# courses/models_analytics.py
+# analytics/models.py
 # ============================================================================
-# ANALYTICS — Capture complète des interactions apprenant
-# Modèles : BlocAnalytics (sessions brutes) + résumés agrégés
+# ANALYTICS — Capture des interactions + Contenus générés par IA
 # ============================================================================
 from django.db import models
 from django.utils import timezone
 
+
+# ============================================================================
+# PARTIE 1 : ANALYTICS (interactions apprenant)
+# ============================================================================
 
 class BlocAnalytics(models.Model):
     """
@@ -162,3 +165,194 @@ class ModuleAnalyticsSummary(models.Model):
 
     class Meta:
         unique_together = ('apprenant', 'module')
+
+
+# ============================================================================
+# PARTIE 2 : REQUÊTES IA
+# ============================================================================
+
+class AIAnalysisRequest(models.Model):
+    """
+    Historique de toutes les requêtes envoyées à Claude.
+    Sert à éviter les doublons, auditer les coûts et déboguer.
+    """
+    TRIGGER_CHOICES = [
+        ('temps_long',           'Temps passé trop long sur un bloc'),
+        ('multi_reouverture',    'Bloc rouvert plusieurs fois'),
+        ('quiz_rate',           'Quiz raté ou score faible'),
+        ('sequence_complexe',    'Séquence trop complexe'),
+        ('module_difficile',   'Module difficile (score bas)'),
+        ('cours_abandonne',      'Cours abandonné (ratio < 30%)'),
+    ]
+
+    STATUS_CHOICES = [
+        ('pending',  'En attente'),
+        ('success', 'Succès'),
+        ('error',   'Erreur'),
+        ('skipped', 'Ignoré (doublon récent)'),
+    ]
+
+    apprenant = models.ForeignKey('users.Apprenant', on_delete=models.CASCADE, related_name='ai_requests')
+    bloc     = models.ForeignKey('courses.BlocContenu', on_delete=models.SET_NULL, null=True, blank=True)
+    sequence = models.ForeignKey('courses.Sequence', on_delete=models.SET_NULL, null=True, blank=True)
+    module   = models.ForeignKey('courses.Module', on_delete=models.SET_NULL, null=True, blank=True)
+    cours    = models.ForeignKey('courses.Cours', on_delete=models.SET_NULL, null=True, blank=True)
+    quiz     = models.ForeignKey('evaluations.Quiz', on_delete=models.SET_NULL, null=True, blank=True)
+
+    trigger = models.CharField(max_length=30, choices=TRIGGER_CHOICES)
+    status  = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+
+    prompt_context = models.JSONField(default=dict, blank=True)
+    gpt_response  = models.TextField(blank=True)
+    error_message = models.TextField(blank=True)
+
+    tokens_used   = models.PositiveIntegerField(default=0)
+    created_at   = models.DateTimeField(default=timezone.now)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Requête IA'
+        verbose_name_plural = 'Requêtes IA'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['apprenant', 'bloc', 'trigger']),
+            models.Index(fields=['apprenant', 'quiz', 'trigger']),
+        ]
+
+    def __str__(self):
+        return f'[{self.trigger}] {self.apprenant} — {self.status}'
+
+
+# ============================================================================
+# PARTIE 3 : CONTENUS GÉNÉRÉS PAR IA
+# ============================================================================
+
+class ContenuGenere(models.Model):
+    """
+    Contenu adaptatif généré par Claude.
+    Peut être : bloc simplifié, séquence adaptative, module de révision.
+    """
+    TYPE_CHOICES = [
+        ('bloc_simplifie',       'Bloc simplifié'),
+        ('bloc_alternatif',       'Approche alternative'),
+        ('sequence_adaptative',  'Séquence adaptative'),
+        ('module_revision',      'Module de révision'),
+        ('quiz_remediation',    'Quiz de remédiation'),
+    ]
+
+    ai_request = models.ForeignKey(AIAnalysisRequest, on_delete=models.CASCADE, related_name='contenu_genere')
+    apprenant  = models.ForeignKey('users.Apprenant', on_delete=models.CASCADE, related_name='contenus_genere')
+
+    type_contenu   = models.CharField(max_length=30, choices=TYPE_CHOICES)
+    titre         = models.CharField(max_length=300)
+    description   = models.TextField(blank=True)
+
+    contenu_html   = models.TextField(blank=True, help_text='HTML pour affichage direct')
+    contenu_json  = models.JSONField(default=dict, blank=True, help_text='Données structurées')
+
+    bloc_source    = models.ForeignKey(
+        'courses.BlocContenu', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='contenus_generes'
+    )
+    sequence_source = models.ForeignKey(
+        'courses.Sequence', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='contenus_generes'
+    )
+    module_source = models.ForeignKey(
+        'courses.Module', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='contenus_generes'
+    )
+    quiz_source   = models.ForeignKey(
+        'evaluations.Quiz', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='contenus_generes'
+    )
+
+    concepts_cibles = models.JSONField(default=list, blank=True)
+    niveau_difficulte = models.CharField(
+        max_length=20,
+        choices=[
+            ('debutant', 'Débutant'),
+            ('intermediaire', 'Intermédiaire'),
+            ('avance', 'Avancé'),
+        ],
+        blank=True, null=True
+    )
+
+    a_ete_consulte = models.BooleanField(default=False)
+    consulte_le     = models.DateTimeField(null=True, blank=True)
+    a_aide         = models.BooleanField(null=True, blank=True)
+    feedback_le    = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Contenu généré'
+        verbose_name_plural = 'Contenus générés'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.get_type_contenu_display()} — {self.apprenant}'
+
+    def marquer_consulte(self):
+        if not self.a_ete_consulte:
+            self.a_ete_consulte = True
+            self.consulte_le = timezone.now()
+            self.save(update_fields=['a_ete_consulte', 'consulte_le'])
+
+    def soumettre_feedback(self, a_aide: bool):
+        self.a_aide = a_aide
+        self.feedback_le = timezone.now()
+        self.save(update_fields=['a_aide', 'feedback_le'])
+
+
+class QuizGenereClaude(models.Model):
+    """
+    Quiz de remédiation généré par Claude.
+    """
+    ai_request = models.OneToOneField(
+        AIAnalysisRequest, on_delete=models.CASCADE,
+        related_name='quiz_genere'
+    )
+    apprenant  = models.ForeignKey(
+        'users.Apprenant', on_delete=models.CASCADE,
+        related_name='quiz_generes_claude'
+    )
+    quiz_source = models.ForeignKey(
+        'evaluations.Quiz', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='quiz_generes_claude'
+    )
+
+    titre        = models.CharField(max_length=300)
+    consigne     = models.TextField(blank=True)
+    questions   = models.JSONField(default=list)
+
+    concepts_rates = models.JSONField(default=list, blank=True)
+
+    score_remediation    = models.SmallIntegerField(null=True, blank=True)
+    passe_le           = models.DateTimeField(null=True, blank=True)
+    remediation_reussie = models.BooleanField(null=True, blank=True)
+
+    a_ete_consulte = models.BooleanField(default=False)
+    consulte_le   = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Quiz généré (Claude)'
+        verbose_name_plural = 'Quiz générés (Claude)'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Quiz — {self.apprenant} → {self.quiz_source}'
+
+    def marquer_consulte(self):
+        if not self.a_ete_consulte:
+            self.a_ete_consulte = True
+            self.consulte_le = timezone.now()
+            self.save(update_fields=['a_ete_consulte', 'consulte_le'])
+
+    def soumettre_score(self, score: int):
+        self.score_remediation = score
+        self.passe_le = timezone.now()
+        self.remediation_reussie = score >= 60
+        self.save(update_fields=['score_remediation', 'passe_le', 'remediation_reussie'])

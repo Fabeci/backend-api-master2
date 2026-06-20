@@ -1,21 +1,24 @@
 # courses/views.py
-# ✅ CORRECTIONS :
-# #1 BlocContenuListCreateAPIView — filtre institution/annee_scolaire conditionnel
-# #2 SequenceBlocsAPIView — filtre conditionnel sur la séquence
-# #3 SequenceRessourcesAPIView — filtre conditionnel sur la séquence
-# #4 BlocContenuDetailAPIView — filtre conditionnel sur get_object
-# #5 RessourceSequenceListCreateAPIView — filtre conditionnel
-# #6 RessourceSequenceDetailAPIView — filtre conditionnel
-# #7 RessourceTelechargementAPIView — filtre conditionnel
-#
-# RÈGLE APPLIQUÉE PARTOUT :
-#   On n'applique filter(X=val) QUE si au moins un objet dans le QS courant
-#   possède ce champ renseigné. Sinon on suppose que le backend a déjà filtré
-#   par séquence/cours et on laisse passer.
-#   Cela évite que les séquences/blocs sans institution_id soient silencieusement exclus.
-
+import logging
 import os
 import uuid
+
+logger = logging.getLogger(__name__)
+
+
+def _int_param(request, name):
+    """Retourne (valeur_entière, None) ou (None, Response_erreur) pour un query param entier."""
+    raw = request.query_params.get(name)
+    if raw is None:
+        return None, None
+    try:
+        return int(raw), None
+    except (ValueError, TypeError):
+        from users.views import api_error
+        return None, api_error(
+            f"Le paramètre '{name}' doit être un entier.",
+            http_status=400,
+        )
 
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
@@ -310,7 +313,7 @@ class ModuleListCreateAPIView(APIView):
                             "Vous ne pouvez pas créer de module dans ce cours",
                             http_status=status.HTTP_403_FORBIDDEN
                         )
-                except:
+                except Exception:
                     return api_error("Cours non trouvé ou accès refusé", http_status=status.HTTP_404_NOT_FOUND)
 
             obj = serializer.save()
@@ -418,7 +421,7 @@ class SequenceListCreateAPIView(APIView):
                             "Vous ne pouvez pas créer de séquence dans ce module",
                             http_status=status.HTTP_403_FORBIDDEN
                         )
-                except:
+                except Exception:
                     return api_error("Module non trouvé ou accès refusé", http_status=status.HTTP_404_NOT_FOUND)
 
             obj = serializer.save()
@@ -595,11 +598,12 @@ class BlocContenuListCreateAPIView(APIView):
         try:
             qs = BlocContenu.objects.select_related('sequence').all()
 
-            sequence_id = request.query_params.get('sequence')
+            sequence_id, err = _int_param(request, 'sequence')
+            if err:
+                return err
             if sequence_id:
                 qs = qs.filter(sequence_id=sequence_id)
 
-            # ✅ Utiliser filter_queryset_by_role au lieu de _apply_sequence_context_filter
             qs = filter_queryset_by_role(qs, request, 'BlocContenu')
 
             qs = qs.order_by('sequence', 'ordre')
@@ -790,7 +794,9 @@ class RessourceSequenceListCreateAPIView(APIView):
             context = get_user_context(request)
             ressources = RessourceSequence.objects.select_related('sequence', 'ajoute_par').all()
 
-            sequence_id = request.query_params.get('sequence')
+            sequence_id, err = _int_param(request, 'sequence')
+            if err:
+                return err
             if sequence_id:
                 ressources = ressources.filter(sequence_id=sequence_id)
 
@@ -1242,7 +1248,9 @@ class BlocProgressListAPIView(APIView):
             if hasattr(request.user, "apprenant"):
                 qs = BlocProgress.objects.filter(apprenant=request.user.apprenant)
             else:
-                apprenant_id = request.query_params.get("apprenant")
+                apprenant_id, err = _int_param(request, 'apprenant')
+                if err:
+                    return err
                 qs = BlocProgress.objects.filter(apprenant_id=apprenant_id) if apprenant_id else BlocProgress.objects.all()
 
             qs = qs.select_related("apprenant", "bloc").order_by("-updated_at")

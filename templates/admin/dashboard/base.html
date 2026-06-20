@@ -1,0 +1,25 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}Dashboard | Administration SOMAPRO{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'admin/dashboard/css/dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h1>
+      Dashboard 
+      {% if profile %}
+        <span class="profile-badge profile-{{ profile }}">{{ profile|title }}</span>
+      {% endif %}
+    </h1>
+    <p>Bienvenue, {{ user_profile.nom }} {{ user_profile.prenom }}. Voici un aperçu de votre activité.</p>
+  </div>
+
+  {% block dashboard_content %}{% endblock %}
+</div>
+{% endblock %}

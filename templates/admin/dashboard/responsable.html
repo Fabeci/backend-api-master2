@@ -1,0 +1,61 @@
+{% extends "admin/dashboard/base.html" %}
+{% block dashboard_content %}
+
+{% if not responsable %}
+<div class="alert-custom alert-warning">Profil responsable non trouvé.</div>
+{% else %}
+
+<h2 class="section-title">Tableau de bord - {{ responsable.prenom }} {{ responsable.nom }}</h2>
+<p>Départements: {% for dep in departements %}{{ dep.nom }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+
+<div class="kpi-cards">
+  <div class="kpi-card">
+    <h3>Cours du département</h3>
+    <div class="value">{{ nb_courses }}</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Formateurs</h3>
+    <div class="value">{{ nb_formateurs }}</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Apprenants</h3>
+    <div class="value">{{ nb_apprenants }}</div>
+  </div>
+  <div class="kpi-card success">
+    <h3>Complétion moyenne</h3>
+    <div class="value">{{ avg_completion }}%</div>
+  </div>
+  <div class="kpi-card warning">
+    <h3>Note moyenne</h3>
+    <div class="value">{{ avg_notes }}/20</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Évaluations</h3>
+    <div class="value">{{ nb_evaluations }}</div>
+    <div class="subtitle">{{ nb_quizzes }} quizzes</div>
+  </div>
+  <div class="kpi-card success">
+    <h3>Taux de réussite</h3>
+    <div class="value">{{ taux_reussite }}%</div>
+    <div class="subtitle">(notes ≥ 10)</div>
+  </div>
+  <div class="kpi-card danger">
+    <h3>Progrès faibles</h3>
+    <div class="value">{{ low_completion }}</div>
+    <div class="subtitle">complétion < 50%</div>
+  </div>
+  <div class="kpi-card warning">
+    <h3>Apprenants inactifs</h3>
+    <div class="value">{{ inactive_learners }}</div>
+  </div>
+</div>
+
+<div class="quick-actions">
+  <a href="{% url 'admin:courses_cours_changelist' %}" class="btn-custom btn-primary">Cours</a>
+  <a href="{% url 'admin:users_formateur_changelist' %}" class="btn-custom">Formateurs</a>
+  <a href="{% url 'admin:progress_progressionapprenant_changelist' %}" class="btn-custom">Progressions</a>
+  <a href="{% url 'admin:academics_departement_changelist' %}" class="btn-custom">Départements</a>
+</div>
+
+{% endif %}
+{% endblock %}

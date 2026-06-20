@@ -1,0 +1,95 @@
+{% extends "admin/dashboard/base.html" %}
+{% block dashboard_content %}
+
+{% if not apprenant %}
+<div class="alert-custom alert-warning">Profil apprenant non trouvé.</div>
+{% else %}
+
+<h2 class="section-title">Mon espace - {{ apprenant.prenom }} {{ apprenant.nom }}</h2>
+
+<div class="kpi-cards">
+  <div class="kpi-card">
+    <h3>Cours inscrits</h3>
+    <div class="value">{{ nb_courses }}</div>
+  </div>
+  <div class="kpi-card success">
+    <h3>Complétion globale</h3>
+    <div class="value">{{ avg_completion }}%</div>
+  </div>
+  <div class="kpi-card warning">
+    <h3>Moyenne générale</h3>
+    <div class="value">{{ avg_note }}/20</div>
+  </div>
+  <div class="kpi-card danger">
+    <h3>Notifications</h3>
+    <div class="value">{{ unread_notifications }}</div>
+    <div class="subtitle">non lues</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Plans d'action</h3>
+    <div class="value">{{ nb_plans }}</div>
+    <div class="subtitle">{{ plans_completed }} terminés</div>
+  </div>
+  <div class="kpi-card success">
+    <h3>Streak</h3>
+    <div class="value">{{ streak }} jours</div>
+  </div>
+</div>
+
+<h2 class="section-title">Activité récente</h2>
+<table class="table-styled">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Type</th>
+      <th>Description</th>
+      <th>Durée</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for activity in recent_activities %}
+    <tr>
+      <td>{{ activity.date_activite|date:"d/m/Y H:i" }}</td>
+      <td>{{ activity.get_type_activite_display }}</td>
+      <td>{{ activity.description|truncatewords:10 }}</td>
+      <td>{{ activity.duree_minutes }} min</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4">Aucune activité récente</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2 class="section-title">Plans d'action en cours</h2>
+<table class="table-styled">
+  <thead>
+    <tr>
+      <th>Titre</th>
+      <th>Cours</th>
+      <th>Priorité</th>
+      <th>Statut</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for plan in plans %}
+    <tr>
+      <td>{{ plan.titre }}</td>
+      <td>{{ plan.cours.titre }}</td>
+      <td>{{ plan.get_priorite_display }}</td>
+      <td>{{ plan.get_statut_display }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4">Aucun plan d'action</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="quick-actions">
+  <a href="{% url 'admin:progress_progressionapprenant_changelist' %}" class="btn-custom btn-primary">Voir mes progressions</a>
+  <a href="{% url 'admin:notifications_notification_changelist' %}" class="btn-custom">Notifications</a>
+   <a href="{% url 'admin:index' %}" class="btn-custom">Conversations</a>
+  <a href="{% url 'admin:courses_cours_changelist' %}" class="btn-custom">Cours disponibles</a>
+</div>
+
+{% endif %}
+{% endblock %}

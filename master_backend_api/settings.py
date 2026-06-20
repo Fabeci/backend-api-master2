@@ -23,15 +23,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-$s4b+_ug=(xi0ul0(8u-^-8pxn@z=t08y@-e&5_3g#1tam2wl6'
-# SECRET_KEY = config('DJANGO_SECRET_KEY')
-# DEBUG = config('DEBUG', default=False, cast=bool)
+SECRET_KEY = config('DJANGO_SECRET_KEY')
+DEBUG = config('DEBUG', default=False, cast=bool)
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost:4200', 'localhost', 'somaproapi.gconnectapp.com', 'www.somaproapi.gconnectapp.com']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost:4200', 'localhost', 'somaproapi.gconnectapp.com', 'www.somaproapi.gconnectapp.com', 'testserver']
 
 
 # Application definition
@@ -146,18 +142,30 @@ AUTHENTICATION_BACKENDS = (
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        # 'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
     ],
     'EXCEPTION_HANDLER': 'users.utils.custom_exception_handler',
+    # Pagination globale — évite les réponses de taille infinie
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    # Throttling global — protège contre les abus
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '200/hour',
+        'user': '2000/hour',
+        'login': '5/minute',   # scope utilisé sur UserLoginAPIView
+    },
 }
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'fabricedjerabe01@gmail.com'
-EMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 
 FRONTEND_BASE_URL = 'http://localhost:4200'
 ACCOUNT_EMAIL_REQUIRED = True
@@ -181,10 +189,17 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Africa/Dakar'
 
-# CELERY_BROKER_URL = 'django-db+sqlite:///db.sqlite3'
 DB_PATH = BASE_DIR / 'db.sqlite3'
-CELERY_BROKER_URL = f'sqla+sqlite:///{DB_PATH}'
-CELERY_RESULT_BACKEND = 'db+sqlite:///db.sqlite3'
+
+# Broker : Redis en production, SQLite en développement local uniquement
+# Pour passer en Redis : pip install redis  et définir REDIS_URL dans .env
+_REDIS_URL = config('REDIS_URL', default='')
+if _REDIS_URL:
+    CELERY_BROKER_URL = _REDIS_URL
+    CELERY_RESULT_BACKEND = _REDIS_URL
+else:
+    CELERY_BROKER_URL = f'sqla+sqlite:///{DB_PATH}'
+    CELERY_RESULT_BACKEND = 'db+sqlite:///db.sqlite3'
 
 CELERY_TASK_ALWAYS_EAGER = False  # False = tâches asynchrones
 CELERY_TASK_EAGER_PROPAGATES = True
@@ -203,10 +218,43 @@ CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 # ========================================
 # ANTHROPIC API (Claude AI)
 # ========================================
-# À mettre dans un fichier .env pour plus de sécurité
-# ANTHROPIC_API_KEY = 'votre_cle_api_anthropic'
+# ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
+# Modèle : claude-sonnet-4-20250514 (défaut) ou claude-opus-4
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
+ANTHROPIC_MAX_TOKENS = 4000
 
 USE_AI_MOCK = True
+
+# ========================================
+# SEUILS ADAPTATIFS (Détection des triggers)
+# ========================================
+AI_TRIGGERS = {
+    'temps_long': {
+        'ratio_temps_min': 1.5,     # 150% du temps estimé
+        'min_duree_sec': 300,        # min 5 min passées
+    },
+    'multi_reouverture': {
+        'max_ouvertures': 3,         # max 3 ouvertures
+        'ratio_temps_min': 1.2,      # ou 120% du temps
+    },
+    'quiz_rate': {
+        'score_max': 50,            # score ≤ 50% = raté
+        'tentatives_min': 2,        # ≥ 2 tentatives
+    },
+    'sequence_complexe': {
+        'ratio_temps_min': 1.4,     # 140% du temps séquence
+        'scroll_max_pct': 50,       # scroll < 50%
+    },
+    'module_difficile': {
+        'score_moyen_max': 45,      # score moyen ≤ 45%
+        'ratio_temps_min': 1.3,     # +130% temps
+    },
+    'cours_abandonne': {
+        'ratio_completion_max': 0.3, # completion < 30%
+        'jours_inactivite': 14,       # 14 jours inactif
+    },
+}
+
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
@@ -233,6 +281,20 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ========================================
+# CACHE
+# ========================================
+# En développement : cache mémoire local
+# En production : remplacer par Redis (pip install django-redis)
+#   CACHES = {'default': {'BACKEND': 'django_redis.cache.RedisCache',
+#                          'LOCATION': config('REDIS_URL'), ...}}
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'lms-default-cache',
+    }
+}
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:4200",  # Origine de votre application Angular

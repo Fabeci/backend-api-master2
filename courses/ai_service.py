@@ -1,17 +1,7 @@
 # courses/ai_service.py
 # ============================================================================
-# SERVICE IA — Intégration ChatGPT pour la génération de contenu adaptatif
-#
-# Installation :
-#   pip install openai
-#
-# Configuration dans settings.py :
-#   OPENAI_API_KEY = env('OPENAI_API_KEY')   # ou os.environ.get(...)
-#   OPENAI_MODEL   = 'gpt-4o'                # ou 'gpt-4-turbo', 'gpt-3.5-turbo'
-#   OPENAI_MAX_TOKENS = 2000
-#
-# Dans .env :
-#   OPENAI_API_KEY=sk-proj-...
+# SERVICE IA — Proxy vers analytics (Claude)
+# Le vrai service est dans analytics/services/ai_claude_service.py
 # ============================================================================
 
 import json

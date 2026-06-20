@@ -1,8 +1,9 @@
 # evaluations/views.py
-# Permissions ajoutées par rôle sur chaque endpoint.
-# Seules les méthodes get/post/put/delete sont modifiées — la logique métier est inchangée.
+import logging
 
 from rest_framework.views import APIView
+
+logger = logging.getLogger(__name__)
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -22,7 +23,8 @@ from .models import (
 )
 from .serializers import (
     EvaluationAccessibiliteSerializer, QuizSerializer, QuizDetailSerializer,
-    QuestionSerializer, QuestionCreateSerializer, ReponseSerializer,
+    QuestionSerializer, QuestionApprenantSerializer, QuestionCreateSerializer,
+    ReponseSerializer,
     EvaluationSerializer, EvaluationDetailSerializer,
     PassageEvaluationSerializer, PassageEvaluationDetailSerializer,
     PassageEvaluationCreateSerializer, ReponseQuestionSerializer,
@@ -329,10 +331,9 @@ class QuestionListCreateAPIView(APIView):
             elif evaluation_id:
                 qs = qs.filter(evaluation_id=evaluation_id)
 
-            data = QuestionSerializer(qs, many=True).data
-
-            if role == 'Apprenant':
-                data = _mask_correct_answers(data)
+            # Choix du serializer selon le rôle : est_correcte jamais envoyé à un apprenant
+            serializer_class = QuestionApprenantSerializer if role == 'Apprenant' else QuestionSerializer
+            data = serializer_class(qs, many=True).data
 
             return api_success("Liste des questions récupérée.", data)
         except Exception as e:
@@ -852,11 +853,9 @@ class PassageEvaluationDemarrerAPIView(APIView):
             return api_success("Évaluation démarrée.",
                                PassageEvaluationDetailSerializer(passage).data,
                                status.HTTP_201_CREATED)
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return api_error("Erreur serveur.", errors={'detail': str(e)},
-                             http_status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            logger.exception("Erreur demarrage evaluation")
+            return api_error("Erreur serveur.", http_status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class PassageEvaluationReprendreAPIView(APIView):
