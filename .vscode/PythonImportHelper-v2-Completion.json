@@ -48,6 +48,22 @@
         "documentation": {}
     },
     {
+        "label": "migrations",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "django.db",
+        "description": "django.db",
+        "isExtraImport": true,
+        "detail": "django.db",
+        "documentation": {}
+    },
+    {
         "label": "models",
         "importPath": "django.db",
         "description": "django.db",
@@ -1113,6 +1129,14 @@
         "documentation": {}
     },
     {
+        "label": "Institution",
+        "importPath": "academics.models",
+        "description": "academics.models",
+        "isExtraImport": true,
+        "detail": "academics.models",
+        "documentation": {}
+    },
+    {
         "label": "Groupe",
         "importPath": "academics.models",
         "description": "academics.models",
@@ -1793,6 +1817,30 @@
         "documentation": {}
     },
     {
+        "label": "RetrieveUpdateDestroyAPIView",
+        "importPath": "rest_framework.generics",
+        "description": "rest_framework.generics",
+        "isExtraImport": true,
+        "detail": "rest_framework.generics",
+        "documentation": {}
+    },
+    {
+        "label": "ListAPIView",
+        "importPath": "rest_framework.generics",
+        "description": "rest_framework.generics",
+        "isExtraImport": true,
+        "detail": "rest_framework.generics",
+        "documentation": {}
+    },
+    {
+        "label": "get_object_or_404",
+        "importPath": "rest_framework.generics",
+        "description": "rest_framework.generics",
+        "isExtraImport": true,
+        "detail": "rest_framework.generics",
+        "documentation": {}
+    },
+    {
         "label": "Cours",
         "importPath": "courses.models",
         "description": "courses.models",
@@ -1878,14 +1926,6 @@
         "description": "rest_framework.permissions",
         "isExtraImport": true,
         "detail": "rest_framework.permissions",
-        "documentation": {}
-    },
-    {
-        "label": "get_object_or_404",
-        "importPath": "rest_framework.generics",
-        "description": "rest_framework.generics",
-        "isExtraImport": true,
-        "detail": "rest_framework.generics",
         "documentation": {}
     },
     {
@@ -2416,6 +2456,15 @@
         "documentation": {}
     },
     {
+        "label": "Migration",
+        "kind": 6,
+        "importPath": "academics.migrations.0004_rename_telephone_institution_telephone_1_and_more",
+        "description": "academics.migrations.0004_rename_telephone_institution_telephone_1_and_more",
+        "peekOfCode": "class Migration(migrations.Migration):\n    dependencies = [\n        ('academics', '0003_anneescolaire_description_classe_date_creation_and_more'),\n    ]\n    operations = [\n        migrations.RenameField(\n            model_name='institution',\n            old_name='telephone',\n            new_name='telephone_1',\n        ),",
+        "detail": "academics.migrations.0004_rename_telephone_institution_telephone_1_and_more",
+        "documentation": {}
+    },
+    {
         "label": "AcademicsConfig",
         "kind": 6,
         "importPath": "academics.apps",
@@ -2519,7 +2568,7 @@
         "kind": 6,
         "importPath": "academics.serializers",
         "description": "academics.serializers",
-        "peekOfCode": "class InstitutionSerializer(serializers.ModelSerializer):\n    administrateur = AdminSerializer(write_only=True)  # Champ pour les détails de l'Admin\n    class Meta:\n        model = Institution\n        fields = ['nom', 'pays', 'adresse', 'telephone', 'email', 'logo', 'description', 'statut', 'type_institution', \n                  'nombre_etudiants', 'site_web', 'accreditations', 'administrateur']\n    def create(self, validated_data):\n        admin_data = validated_data.pop('administrateur')\n        # Création de l'Institution\n        institution = Institution.objects.create(**validated_data)",
+        "peekOfCode": "class InstitutionSerializer(serializers.ModelSerializer):\n    administrateur = AdminSerializer(write_only=True)\n    class Meta:\n        model = Institution\n        fields = [\n            'nom', 'pays', 'adresse', 'telephone_1', 'telephone_2', 'email',\n            'logo', 'description', 'statut', 'type_institution',\n            'nombre_etudiants', 'site_web', 'accreditations', 'administrateur'\n        ]\n    def create(self, validated_data):",
         "detail": "academics.serializers",
         "documentation": {}
     },
@@ -2600,7 +2649,7 @@
         "kind": 5,
         "importPath": "academics.urls",
         "description": "academics.urls",
-        "peekOfCode": "router = DefaultRouter()\nrouter.register(r'domaines-etudes', DomaineEtudeViewSet, basename='domaine')\nrouter.register(r'matieres', MatiereViewSet, basename='matiere')\nrouter.register(r'specialites', SpecialiteViewSet, basename='specialite')\nrouter.register(r'annees-scolaires', AnneeScolaireViewSet, basename='annees-scolaires')\nurlpatterns = [\n    path('', include(router.urls)),\n    path('institutions/create/', InstitutionCreateAPIView.as_view(), name='institution-create'),\n    path('filieres/', FiliereListCreateAPIView.as_view(), name='filiere-list-create'),\n    path('filieres/<int:pk>/', FiliereDetailAPIView.as_view(), name='filiere-detail'),",
+        "peekOfCode": "router = DefaultRouter()\nrouter.register(r'domaines-etudes', DomaineEtudeViewSet, basename='domaine')\nrouter.register(r'matieres', MatiereViewSet, basename='matiere')\nrouter.register(r'specialites', SpecialiteViewSet, basename='specialite')\nrouter.register(r'annees-scolaires', AnneeScolaireViewSet, basename='annees-scolaires')\nurlpatterns = [\n    path('', include(router.urls)),\n    path('institutions/create/', InstitutionCreateAPIView.as_view(), name='institution-create'),\n    path('institutions/', InstitutionListAPIView.as_view(), name='institution-list'),\n    path('institutions/<int:pk>/', InstitutionDetailAPIView.as_view(), name='institution-detail'),",
         "detail": "academics.urls",
         "documentation": {}
     },
@@ -2609,7 +2658,7 @@
         "kind": 5,
         "importPath": "academics.urls",
         "description": "academics.urls",
-        "peekOfCode": "urlpatterns = [\n    path('', include(router.urls)),\n    path('institutions/create/', InstitutionCreateAPIView.as_view(), name='institution-create'),\n    path('filieres/', FiliereListCreateAPIView.as_view(), name='filiere-list-create'),\n    path('filieres/<int:pk>/', FiliereDetailAPIView.as_view(), name='filiere-detail'),\n    path('groupes/', GroupeListCreateAPIView.as_view(), name='groupe-list-create'),\n    path('groupes/<int:pk>/', GroupeDetailAPIView.as_view(), name='groupe-detail'),\n    path('classes/', ClasseListCreateAPIView.as_view(), name='classe-list-create'),\n    path('classes/<int:pk>/', ClasseDetailAPIView.as_view(), name='classe-detail'),\n    path('api/inscriptions/', InscriptionListCreateAPIView.as_view(), name='inscription-list-create'),",
+        "peekOfCode": "urlpatterns = [\n    path('', include(router.urls)),\n    path('institutions/create/', InstitutionCreateAPIView.as_view(), name='institution-create'),\n    path('institutions/', InstitutionListAPIView.as_view(), name='institution-list'),\n    path('institutions/<int:pk>/', InstitutionDetailAPIView.as_view(), name='institution-detail'),\n    path('filieres/', FiliereListCreateAPIView.as_view(), name='filiere-list-create'),\n    path('filieres/<int:pk>/', FiliereDetailAPIView.as_view(), name='filiere-detail'),\n    path('groupes/', GroupeListCreateAPIView.as_view(), name='groupe-list-create'),\n    path('groupes/<int:pk>/', GroupeDetailAPIView.as_view(), name='groupe-detail'),\n    path('classes/', ClasseListCreateAPIView.as_view(), name='classe-list-create'),",
         "detail": "academics.urls",
         "documentation": {}
     },
@@ -2618,7 +2667,25 @@
         "kind": 6,
         "importPath": "academics.views",
         "description": "academics.views",
-        "peekOfCode": "class InstitutionCreateAPIView(APIView):\n    def post(self, request, *args, **kwargs):\n        serializer = InstitutionSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(serializer.data, status=status.HTTP_201_CREATED)\n        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)\nclass DomaineEtudeViewSet(viewsets.ModelViewSet):\n    queryset = DomaineEtude.objects.all()\n    serializer_class = DomaineEtudeSerializer",
+        "peekOfCode": "class InstitutionCreateAPIView(APIView):\n    def post(self, request, *args, **kwargs):\n        serializer = InstitutionSerializer(data=request.data)\n        if serializer.is_valid():\n            serializer.save()\n            return Response(serializer.data, status=status.HTTP_201_CREATED)\n        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)\nclass InstitutionListAPIView(ListAPIView):\n    queryset = Institution.objects.all()\n    serializer_class = InstitutionSerializer",
+        "detail": "academics.views",
+        "documentation": {}
+    },
+    {
+        "label": "InstitutionListAPIView",
+        "kind": 6,
+        "importPath": "academics.views",
+        "description": "academics.views",
+        "peekOfCode": "class InstitutionListAPIView(ListAPIView):\n    queryset = Institution.objects.all()\n    serializer_class = InstitutionSerializer\nclass InstitutionDetailAPIView(RetrieveUpdateDestroyAPIView):\n    queryset = Institution.objects.all()\n    serializer_class = InstitutionSerializer\nclass DomaineEtudeViewSet(viewsets.ModelViewSet):\n    queryset = DomaineEtude.objects.all()\n    serializer_class = DomaineEtudeSerializer\nclass MatiereViewSet(viewsets.ModelViewSet):",
+        "detail": "academics.views",
+        "documentation": {}
+    },
+    {
+        "label": "InstitutionDetailAPIView",
+        "kind": 6,
+        "importPath": "academics.views",
+        "description": "academics.views",
+        "peekOfCode": "class InstitutionDetailAPIView(RetrieveUpdateDestroyAPIView):\n    queryset = Institution.objects.all()\n    serializer_class = InstitutionSerializer\nclass DomaineEtudeViewSet(viewsets.ModelViewSet):\n    queryset = DomaineEtude.objects.all()\n    serializer_class = DomaineEtudeSerializer\nclass MatiereViewSet(viewsets.ModelViewSet):\n    queryset = Matiere.objects.all()\n    serializer_class = MatiereSerializer\nclass SpecialiteViewSet(viewsets.ModelViewSet):",
         "detail": "academics.views",
         "documentation": {}
     },

@@ -4,6 +4,9 @@ from rest_framework.response import Response
 from rest_framework import viewsets, status
 from academics.models import AnneeScolaire, Classe, DomaineEtude, Filiere, Groupe, Inscription, Matiere, Specialite
 from academics.serializers import AnneeScolaireSerializer, ClasseSerializer, FiliereSerializer, GroupeSerializer, InscriptionSerializer, InstitutionSerializer, DomaineEtudeSerializer, MatiereSerializer, SpecialiteSerializer
+from rest_framework.generics import RetrieveUpdateDestroyAPIView
+from rest_framework.generics import ListAPIView
+from academics.models import Institution
 
 # Create your views here.
 class InstitutionCreateAPIView(APIView):
@@ -14,6 +17,13 @@ class InstitutionCreateAPIView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+class InstitutionListAPIView(ListAPIView):
+    queryset = Institution.objects.all()
+    serializer_class = InstitutionSerializer
+    
+class InstitutionDetailAPIView(RetrieveUpdateDestroyAPIView):
+    queryset = Institution.objects.all()
+    serializer_class = InstitutionSerializer
 
 class DomaineEtudeViewSet(viewsets.ModelViewSet):
     queryset = DomaineEtude.objects.all()

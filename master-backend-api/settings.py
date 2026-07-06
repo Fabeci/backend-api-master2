@@ -143,8 +143,7 @@ EMAIL_HOST_USER = 'fabricedjerabe01@gmail.com'
 EMAIL_HOST_PASSWORD = 'vvqddykvdinibuog'
 
 FRONTEND_BASE_URL = 'http://localhost:4200'
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'  # Vérification obligatoire
 ACCOUNT_LOGOUT_ON_GET = True  # Se déconnecter immédiatement sur demande

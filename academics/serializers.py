@@ -5,27 +5,33 @@ from users.serializers import AdminSerializer
 
 
 class InstitutionSerializer(serializers.ModelSerializer):
-    administrateur = AdminSerializer(write_only=True)  # Champ pour les détails de l'Admin
+    administrateur = AdminSerializer(write_only=True)
 
     class Meta:
         model = Institution
-        fields = ['nom', 'pays', 'adresse', 'telephone', 'email', 'logo', 'description', 'statut', 'type_institution', 
-                  'nombre_etudiants', 'site_web', 'accreditations', 'administrateur']
+        fields = [
+            'nom', 'pays', 'adresse', 'telephone_1', 'telephone_2', 'email',
+            'logo', 'description', 'statut', 'type_institution',
+            'nombre_etudiants', 'site_web', 'accreditations', 'administrateur'
+        ]
 
     def create(self, validated_data):
         admin_data = validated_data.pop('administrateur')
-        
-        # Création de l'Institution
+
+        # Créer l'institution
         institution = Institution.objects.create(**validated_data)
-        
-        # Création de l'Admin associé à cette Institution
+
+        # Associer l'institution à l'administrateur
         admin_data['institution'] = institution
-        admin_data['is_admin'] = True  # On marque cet utilisateur comme admin
+
+        # Supprimer is_admin s’il venait du frontend ou du serializer par erreur
+        admin_data.pop('is_admin', None)
+
+        # Créer l'administrateur
         admin = Admin.objects.create(**admin_data)
 
         return institution
-    
-    
+
 class DomaineEtudeSerializer(serializers.ModelSerializer):
     class Meta:
         model = DomaineEtude

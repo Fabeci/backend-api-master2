@@ -1,5 +1,5 @@
 from django.urls import include, path
-from .views import AnneeScolaireViewSet, ClasseDetailAPIView, ClasseListCreateAPIView, DomaineEtudeViewSet, FiliereDetailAPIView, FiliereListCreateAPIView, GroupeDetailAPIView, GroupeListCreateAPIView, InscriptionDetailAPIView, InscriptionListCreateAPIView, InstitutionCreateAPIView, MatiereViewSet, SpecialiteViewSet
+from .views import AnneeScolaireViewSet, ClasseDetailAPIView, ClasseListCreateAPIView, DomaineEtudeViewSet, FiliereDetailAPIView, FiliereListCreateAPIView, GroupeDetailAPIView, GroupeListCreateAPIView, InscriptionDetailAPIView, InscriptionListCreateAPIView, InstitutionCreateAPIView, InstitutionDetailAPIView, InstitutionListAPIView, MatiereViewSet, SpecialiteViewSet
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
@@ -11,7 +11,9 @@ router.register(r'annees-scolaires', AnneeScolaireViewSet, basename='annees-scol
 urlpatterns = [
     path('', include(router.urls)),
     path('institutions/create/', InstitutionCreateAPIView.as_view(), name='institution-create'),
-    
+    path('institutions/', InstitutionListAPIView.as_view(), name='institution-list'),
+    path('institutions/<int:pk>/', InstitutionDetailAPIView.as_view(), name='institution-detail'),
+
     path('filieres/', FiliereListCreateAPIView.as_view(), name='filiere-list-create'),
     path('filieres/<int:pk>/', FiliereDetailAPIView.as_view(), name='filiere-detail'),
     
