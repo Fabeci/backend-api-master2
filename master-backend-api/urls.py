@@ -25,6 +25,6 @@ urlpatterns = [
     path('api/', include('courses.urls')),
     path('api/', include('collaborations.urls')),
     path('api/', include('evaluations.urls')),
-    # path('api/', include('notifications.urls')),
+    path('api/', include('notifications.urls')),
     path('api/', include('resources.urls')),
 ]
