@@ -2,7 +2,7 @@
 
 from django.utils import timezone
 from django.db.models import Count, Q
-from rest_framework import viewsets, status, permissions
+from rest_framework import mixins, viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -20,17 +20,18 @@ from .serializers import (
 # NOTIFICATION VIEWSET
 # ============================================================================
 
-class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
+class NotificationViewSet(mixins.DestroyModelMixin, viewsets.ReadOnlyModelViewSet):
     """
     Centre de notifications de l'utilisateur connecté.
 
-    GET  /notifications/                  → liste (allégée)
-    GET  /notifications/{id}/             → détail complet
-    GET  /notifications/non_lues/         → non lues uniquement
-    GET  /notifications/compteur/         → { total, non_lues, par_priorite }
-    POST /notifications/marquer_lues/     → marquer une liste (ou toutes) comme lues
-    POST /notifications/{id}/marquer_lue/ → marquer une seule comme lue
-    DELETE /notifications/supprimer_lues/ → supprimer toutes les notifs lues
+    GET    /notifications/                  → liste (allégée)
+    GET    /notifications/{id}/             → détail complet
+    GET    /notifications/non_lues/         → non lues uniquement
+    GET    /notifications/compteur/         → { total, non_lues, par_priorite }
+    POST   /notifications/marquer_lues/     → marquer une liste (ou toutes) comme lues
+    POST   /notifications/{id}/marquer_lue/ → marquer une seule comme lue
+    DELETE /notifications/{id}/             → supprimer une notification
+    DELETE /notifications/supprimer_lues/   → supprimer toutes les notifs lues
     """
 
     permission_classes = [permissions.IsAuthenticated]

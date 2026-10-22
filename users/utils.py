@@ -31,24 +31,112 @@ def send_verification_email(user):
     )
     
     
+_STATUS_CODES = {
+    400: "VALIDATION_ERROR",
+    401: "NOT_AUTHENTICATED",
+    403: "PERMISSION_DENIED",
+    404: "NOT_FOUND",
+    405: "METHOD_NOT_ALLOWED",
+    409: "CONFLICT",
+    429: "THROTTLED",
+}
+
+
+def _flatten_field_errors(data) -> dict:
+    """Normalise les erreurs (serializer.errors / DRF) en {champ: [messages]}."""
+    out = {}
+    if isinstance(data, dict):
+        for key, val in data.items():
+            if key in ("detail", "status", "message", "success", "code", "errors"):
+                continue
+            msgs = []
+            if isinstance(val, (list, tuple)):
+                for item in val:
+                    if isinstance(item, dict):
+                        for sub in item.values():
+                            msgs.extend(str(v) for v in (sub if isinstance(sub, list) else [sub]))
+                    else:
+                        msgs.append(str(item))
+            elif isinstance(val, dict):
+                for sub in val.values():
+                    msgs.extend(str(v) for v in (sub if isinstance(sub, list) else [sub]))
+            else:
+                msgs.append(str(val))
+            cleaned = [m for m in msgs if m]
+            if cleaned:
+                out[str(key)] = cleaned
+    return out
+
+
 def custom_exception_handler(exc, context):
     """
-    Gestionnaire personnalisé pour les exceptions.
+    Gestionnaire d'exceptions normalisé SOMAPRO.
+
+    Réponse uniforme :
+        { success:false, status, code, message, errors:{champ:[messages]}, detail? }
+    `message` exploite le détail DRF ou la 1re erreur de champ (jamais un texte
+    générique quand une information précise est disponible).
     """
+    from django.db.utils import IntegrityError as DjangoIntegrityError
+
     response = exception_handler(exc, context)
+
+    # Intégrité non gérée par DRF (unicité, FK…) → 409 plutôt que 500
+    if response is None and isinstance(exc, DjangoIntegrityError):
+        return Response(
+            {
+                "success": False,
+                "status": status.HTTP_409_CONFLICT,
+                "code": "CONFLICT",
+                "message": "Cette opération entre en conflit avec des données existantes.",
+                "errors": {},
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
     if isinstance(exc, NotAuthenticated):
         return Response(
             {
+                "success": False,
                 "status": status.HTTP_401_UNAUTHORIZED,
-                "message": "Les informations d'authentification n'ont pas été fournies."
+                "code": "NOT_AUTHENTICATED",
+                "message": "Vous devez être connecté pour effectuer cette action.",
+                "errors": {},
             },
-            status=status.HTTP_401_UNAUTHORIZED
+            status=status.HTTP_401_UNAUTHORIZED,
         )
-    if response is not None:
-        response.data['status'] = response.status_code
-        response.data['message'] = response.data.get('detail', 'Une erreur s’est produite.')
-        response.data.pop('detail', None)
 
+    if response is None:
+        # 500 / erreur non gérée : laissée à Django (jamais exposer de détails).
+        return None
+
+    data = response.data
+    code = _STATUS_CODES.get(response.status_code, "ERROR")
+    field_errors = _flatten_field_errors(data)
+    detail = data.get("detail") if isinstance(data, dict) else None
+
+    if detail:
+        message = str(detail)
+    elif field_errors:
+        first_field, msgs = next(iter(field_errors.items()))
+        label = "Champ" if first_field == "non_field_errors" else first_field
+        message = f"{label} : {msgs[0]}" if msgs else "Erreur de validation."
+    elif response.status_code >= 500:
+        message = "Une erreur interne est survenue. Veuillez réessayer plus tard."
+    else:
+        message = "La requête a échoué."
+
+    payload = {
+        "success": False,
+        "status": response.status_code,
+        "code": code,
+        "message": message,
+        "errors": field_errors,
+    }
+    if detail:
+        payload["detail"] = str(detail)
+
+    response.data = payload
     return response
 
 

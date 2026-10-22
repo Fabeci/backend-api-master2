@@ -24,7 +24,7 @@ def _is_super_admin(user):
 
 
 
-def _check_write_permission(user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique')):
+def _check_write_permission(user, allowed_roles=('Admin',)):
     """
     Retourne (True, None) si autorisé, ou (False, Response 403) sinon.
     SuperAdmin est bloqué sur les ressources internes.
@@ -87,7 +87,7 @@ class DomaineEtudeViewSet(BaseModelViewSet):
 
     def create(self, request, *args, **kwargs):
 
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
 
         if not ok:
             return err
@@ -95,7 +95,7 @@ class DomaineEtudeViewSet(BaseModelViewSet):
 
     def update(self, request, *args, **kwargs):
 
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
 
         if not ok:
             return err
@@ -103,7 +103,7 @@ class DomaineEtudeViewSet(BaseModelViewSet):
 
     def partial_update(self, request, *args, **kwargs):
 
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
 
         if not ok:
             return err
@@ -188,7 +188,7 @@ class MatiereViewSet(BaseModelViewSet):
 
     def create(self, request, *args, **kwargs):
 
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
 
         if not ok:
             return err
@@ -197,7 +197,7 @@ class MatiereViewSet(BaseModelViewSet):
 
     def update(self, request, *args, **kwargs):
 
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
 
         if not ok:
             return err
@@ -205,7 +205,7 @@ class MatiereViewSet(BaseModelViewSet):
 
     def partial_update(self, request, *args, **kwargs):
 
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
 
         if not ok:
             return err
@@ -273,15 +273,15 @@ class SpecialiteViewSet(BaseModelViewSet):
 
     def create(self, request, *args, **kwargs):
 
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
         return err if not ok else super().create(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
         return err if not ok else super().update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
 
         return err if not ok else super().partial_update(request, *args, **kwargs)
 

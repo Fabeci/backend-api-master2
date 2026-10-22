@@ -19,8 +19,12 @@ schema_view = get_schema_view(
       contact=openapi.Contact(email="contact@tonapi.local"),
       license=openapi.License(name="BSD License"),
    ),
-   public=True,
-   permission_classes=[permissions.AllowAny],
+   # ✅ SÉCURITÉ : la doc n'est publique qu'en développement. En production,
+   # elle n'est accessible qu'aux comptes staff (IsAdminUser).
+   public=settings.DEBUG,
+   permission_classes=[
+       permissions.AllowAny if settings.DEBUG else permissions.IsAdminUser
+   ],
 )
 
 urlpatterns = [
@@ -41,6 +45,8 @@ urlpatterns = [
     path('api/v1/', include('notifications.urls')),
     path('api/v1/', include('resources.urls')),
     path('api/v1/', include('analytics.urls')),
+    path('api/v1/', include('parametres.urls')),
+    path('api/v1/', include('gamification.urls')),
 ]
 
 # ✅ Servir les fichiers media EN DÉVELOPPEMENT

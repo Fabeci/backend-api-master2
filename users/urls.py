@@ -18,6 +18,10 @@ from .views import (
 )
 
 
+from core.rbac_api import RolesListView, RolePermissionsView, RoleFeaturesView
+from .search_views import GlobalSearchAPIView
+
+
 router = DefaultRouter()
 
 router.register(r'admins', AdminViewSet, basename='admins')
@@ -43,6 +47,14 @@ urlpatterns = [
     # ✅ Route alternative avec uid/token dans l'URL (optionnel)
     path('password-reset/confirm/<str:uidb64>/<str:token>/', PasswordResetConfirmAPIView.as_view(), name='password_reset_confirm_url'),
 
+
+    # ── Recherche globale ────────────────────────────────────────────────────
+    path('search/', GlobalSearchAPIView.as_view(), name='global-search'),
+
+    # ── RBAC : rôles & permissions ───────────────────────────────────────────
+    path('rbac/roles/', RolesListView.as_view(), name='rbac-roles'),
+    path('rbac/roles/<str:role>/permissions/', RolePermissionsView.as_view(), name='rbac-role-permissions'),
+    path('rbac/roles/<str:role>/features/', RoleFeaturesView.as_view(), name='rbac-role-features'),
 
     path('', include(router.urls)),
 ]

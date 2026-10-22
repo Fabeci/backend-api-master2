@@ -14,6 +14,11 @@ from django.utils import timezone
 
 class Cours(models.Model):
     titre = models.CharField(max_length=255, null=True, blank=True)
+    image = models.URLField(
+        max_length=500, null=True, blank=True,
+        verbose_name="Image du cours",
+        help_text="URL de l'image de couverture (téléversée depuis les ressources)",
+    )
     groupe = models.ForeignKey(Groupe, on_delete=models.CASCADE, related_name="cours")
     enseignant = models.ForeignKey(Formateur, on_delete=models.CASCADE, related_name="cours_enseignes")
     matiere = models.ForeignKey(Matiere, on_delete=models.CASCADE, related_name="cours")
@@ -26,8 +31,13 @@ class Cours(models.Model):
             ("en_cours", "En cours"),
             ("termine", "Terminé"),
             ("planifie", "Planifié"),
+            ("annule", "Annulé"),
         ],
         default="planifie",
+    )
+    statut_force = models.BooleanField(
+        default=False,
+        help_text="Statut fixé manuellement (terminé/annulé) : ne pas recalculer d'après les dates",
     )
 
     # Nouveaux champs pour rattachement
@@ -58,7 +68,11 @@ class Cours(models.Model):
         """
         Calcule le statut en fonction des dates.
         Priorité : date_debut / date_fin > statut manuel.
+        Exception : si le statut a été fixé manuellement (statut_force), on le respecte.
         """
+        if getattr(self, "statut_force", False):
+            return self.statut or "planifie"
+
         today = timezone.localdate()
 
         if self.date_debut and self.date_fin:
@@ -113,30 +127,90 @@ class Cours(models.Model):
 
     @property
     def total_minutes_realises(self):
-        """Calcule le total des minutes de sessions réalisées"""
-        return sum(s.duree_minutes or 0 for s in self.sessions.all())
+        """Minutes de séances effectivement réalisées par le formateur (statut='realisee')."""
+        # ✅ Utilise le cache de prefetch_related('sessions') quand disponible
+        # (évite une requête par cours dans les listes).
+        return sum(
+            (s.duree_minutes or 0)
+            for s in self.sessions.all()
+            if s.statut == "realisee"
+        )
 
     @property
     def total_heures_realisees(self):
-        """Convertit les minutes en heures"""
+        """Heures réalisées (enseignement dispensé)."""
         return round(self.total_minutes_realises / 60, 2)
 
     @property
     def taux_execution(self):
-        """Pourcentage d'exécution par rapport au volume horaire prévu"""
+        """% du volume horaire prévu effectivement dispensé.
+        volume_horaire est en heures ; total_minutes_realises est en minutes.
+        """
         if not self.volume_horaire:
             return 0.0
-        return round((self.total_minutes_realises / self.volume_horaire) * 100, 2)
+        volume_minutes = self.volume_horaire * 60
+        return round((self.total_minutes_realises / volume_minutes) * 100, 2)
+
+    # ── Indicateurs enseignement (pour l'API) ─────────────────────────────────
+
+    def indicateurs_enseignement(self):
+        """Retourne le bloc enseignement complet pour l'API /indicateurs/."""
+        volume_h      = self.volume_horaire or 0
+        realise_h     = self.total_heures_realisees
+        restant_h     = round(max(0, volume_h - realise_h), 2)
+        taux          = self.taux_execution
+        seances_qs    = self.sessions.all()
+        nb_total      = seances_qs.count()
+        nb_realisees  = seances_qs.filter(statut="realisee").count()
+        nb_planifiees = seances_qs.filter(statut="planifiee").count()
+        nb_annulees   = seances_qs.filter(statut="annulee").count()
+        return {
+            "volume_prevu_h":      volume_h,
+            "volume_realise_h":    realise_h,
+            "volume_restant_h":    restant_h,
+            "taux_execution_pct":  taux,
+            "nb_seances_total":    nb_total,
+            "nb_seances_realisees": nb_realisees,
+            "nb_seances_planifiees": nb_planifiees,
+            "nb_seances_annulees": nb_annulees,
+        }
 
 
 # ============================================================================
 # MODULES
 # ============================================================================
 
+
+# ── Publication progressive (Module / Séquence / Bloc) ───────────────────────
+ETAT_PUBLICATION_CHOICES = [
+    ("brouillon", "Brouillon"),
+    ("programme", "Programmé"),
+    ("publie",    "Publié"),
+    ("depublie",  "Dépublié"),
+]
+
 class Module(models.Model):
     titre = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
     cours = models.ForeignKey(Cours, on_delete=models.CASCADE, related_name="modules")
+    ordre = models.PositiveIntegerField(default=0, verbose_name="Ordre d'affichage")
+    duree_estimee = models.PositiveIntegerField(
+        default=0, null=True, blank=True,
+        help_text="Durée estimée en minutes"
+    )
+
+    # ── Publication progressive ───────────────────────────────────────────
+    etat_publication = models.CharField(
+        max_length=20, choices=ETAT_PUBLICATION_CHOICES, default="publie",
+        verbose_name="État de publication",
+        help_text="brouillon / programmé / publié / dépublié (défaut : publié pour compatibilité)",
+    )
+    date_publication_programmee = models.DateTimeField(
+        null=True, blank=True, verbose_name="Publication programmée le",
+    )
+    date_publication_effective = models.DateTimeField(
+        null=True, blank=True, verbose_name="Publié effectivement le",
+    )
 
     # Rattachement automatique via le cours
     institution = models.ForeignKey(
@@ -176,6 +250,8 @@ class Module(models.Model):
 
 class Sequence(models.Model):
     titre = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    ordre = models.PositiveIntegerField(default=0, verbose_name="Ordre d'affichage")
     module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name="sequences")
 
     # Rattachement automatique via le module
@@ -192,6 +268,29 @@ class Sequence(models.Model):
         related_name="sequences",
         null=True, blank=True,
         help_text="Hérité du module parent"
+    )
+
+    # ── Déblocage progressif : le quiz de la séquence est-il requis ? ────────
+    quiz_obligatoire = models.BooleanField(
+        default=False,
+        verbose_name="Quiz de la séquence obligatoire pour valider la séquence",
+    )
+    quiz_seuil = models.PositiveSmallIntegerField(
+        default=60,
+        verbose_name="Seuil de réussite du quiz (%)",
+    )
+
+    # ── Publication progressive ───────────────────────────────────────────
+    etat_publication = models.CharField(
+        max_length=20, choices=ETAT_PUBLICATION_CHOICES, default="publie",
+        verbose_name="État de publication",
+        help_text="brouillon / programmé / publié / dépublié (défaut : publié pour compatibilité)",
+    )
+    date_publication_programmee = models.DateTimeField(
+        null=True, blank=True, verbose_name="Publication programmée le",
+    )
+    date_publication_effective = models.DateTimeField(
+        null=True, blank=True, verbose_name="Publié effectivement le",
     )
 
     class Meta:
@@ -334,6 +433,19 @@ class BlocContenu(models.Model):
     est_obligatoire = models.BooleanField(default=True, verbose_name="Contenu obligatoire")
     est_visible = models.BooleanField(default=True, verbose_name="Visible pour les apprenants")
 
+    # ── Publication progressive ───────────────────────────────────────────
+    etat_publication = models.CharField(
+        max_length=20, choices=ETAT_PUBLICATION_CHOICES, default="publie",
+        verbose_name="État de publication",
+        help_text="brouillon / programmé / publié / dépublié (défaut : publié pour compatibilité)",
+    )
+    date_publication_programmee = models.DateTimeField(
+        null=True, blank=True, verbose_name="Publication programmée le",
+    )
+    date_publication_effective = models.DateTimeField(
+        null=True, blank=True, verbose_name="Publié effectivement le",
+    )
+
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)
 
@@ -360,6 +472,11 @@ class BlocContenu(models.Model):
             "code": "⚙️",
         }
         return icones.get(self.type_bloc, "📄")
+
+    def calculer_duree_estimee(self) -> int:
+        """Durée estimée (minutes) calculée à partir du contenu du bloc."""
+        from .estimation import estimer_duree_minutes
+        return estimer_duree_minutes(self)
 
 
 # ============================================================================
@@ -600,7 +717,15 @@ class Suivi(models.Model):
 # ============================================================================
 
 class Session(models.Model):
+    STATUT_CHOICES = [
+        ("planifiee",  "Planifiée"),
+        ("realisee",   "Réalisée"),
+        ("annulee",    "Annulée"),
+    ]
+
     titre = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    lieu = models.CharField(max_length=255, blank=True, default='')
     date_debut = models.DateTimeField()
     date_fin = models.DateTimeField()
     formateur = models.ForeignKey(
@@ -621,6 +746,59 @@ class Session(models.Model):
             ("hybride", "Hybride"),
         ],
         default="presentiel",
+    )
+    # Statut pédagogique : permet de valider qu'une séance a bien eu lieu
+    statut = models.CharField(
+        max_length=20,
+        choices=STATUT_CHOICES,
+        default="planifiee",
+        help_text="planifiee = prévue, realisee = dispensée, annulee = annulée",
+    )
+    nb_presents = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Nombre d'apprenants présents lors de cette séance"
+    )
+
+    # ── Visioconférence (Google Meet) ─────────────────────────────────────
+    lien_visio = models.URLField(
+        blank=True, default='',
+        help_text="Lien de visioconférence à rejoindre (Google Meet ou autre)"
+    )
+    lien_jitsi = models.URLField(
+        blank=True, default='',
+        help_text="Salle Jitsi embarquable dans l'app (réunion dans SOMAPRO)"
+    )
+    visio_provider = models.CharField(
+        max_length=20,
+        choices=[
+            ("aucune", "Aucune"),
+            ("google_meet", "Google Meet"),
+            ("teams", "Microsoft Teams"),
+            ("jitsi", "Jitsi (dans SOMAPRO)"),
+            ("autre", "Autre (lien manuel)"),
+        ],
+        default="aucune",
+        help_text="Plateforme de visioconférence de la séance",
+    )
+    teams_join_url = models.URLField(
+        blank=True, default='',
+        help_text="Lien de réunion Microsoft Teams à rejoindre"
+    )
+    teams_meeting_id = models.CharField(
+        max_length=255, blank=True, default='',
+        help_text="Identifiant de la réunion en ligne Teams (pour le rapport de présence)"
+    )
+    meet_space_name = models.CharField(
+        max_length=255, blank=True, default='',
+        help_text="Ressource Google Meet (ex. 'spaces/abc123') — vide si non généré"
+    )
+    meet_derniere_sync = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Dernière synchronisation automatique des présences depuis Google Meet"
+    )
+    rappel_envoye = models.BooleanField(
+        default=False,
+        help_text="Un rappel « séance à venir » a déjà été envoyé aux participants"
     )
 
     # Rattachement automatique via le cours
@@ -645,17 +823,22 @@ class Session(models.Model):
         ordering = ["-date_debut"]
 
     def __str__(self):
-        return f"{self.titre} - {self.date_debut.strftime('%d/%m/%Y')}"
+        return f"{self.titre} - {self.date_debut.strftime('%d/%m/%Y')} [{self.statut}]"
 
     @property
     def duree_minutes(self):
-        """Calcule la durée de la session en minutes"""
+        """Durée de la séance en minutes (calculée depuis date_debut/date_fin)."""
         if self.date_fin and self.date_debut:
             delta = self.date_fin - self.date_debut
             return int(delta.total_seconds() / 60)
         return 0
 
     def save(self, *args, **kwargs):
+        # Auto-passage en "realisee" si date_fin est passée et statut encore "planifiee"
+        if self.statut == "planifiee" and self.date_fin:
+            from django.utils import timezone
+            if self.date_fin < timezone.now():
+                self.statut = "realisee"
         # Héritage automatique depuis le cours
         if self.cours:
             self.institution = self.cours.institution
@@ -749,6 +932,19 @@ class BlocProgress(models.Model):
     )
     est_termine = models.BooleanField(default=False)
     completed_at = models.DateTimeField(null=True, blank=True)
+
+    # ── Déblocage progressif : « terminé » ≠ « validé » ─────────────────────
+    ETAT_CHOICES = [
+        ('non_commence', 'Non commencé'),
+        ('en_cours',     'En cours'),
+        ('termine',      'Terminé'),
+        ('valide',       'Validé'),
+        ('echoue',       'Échoué'),
+    ]
+    est_valide = models.BooleanField(default=False)
+    valide_le  = models.DateTimeField(null=True, blank=True)
+    etat       = models.CharField(max_length=20, choices=ETAT_CHOICES, default='non_commence')
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -833,3 +1029,30 @@ class CoursProgress(models.Model):
 
     def __str__(self):
         return f"{self.apprenant} - {self.cours}"
+
+
+class SessionInvite(models.Model):
+    """
+    Invité EXTERNE ajouté manuellement à une séance (en plus des éligibles
+    automatiques : formateur du cours + apprenants inscrits).
+
+    Utilisé pour (a) la liste des participants éligibles et (b) les invitations
+    Google Meet/Teams.
+    """
+    session = models.ForeignKey(
+        Session, on_delete=models.CASCADE, related_name="invites_externes"
+    )
+    email = models.EmailField()
+    nom = models.CharField(max_length=120, blank=True, default="")
+    ajoute_par = models.ForeignKey(
+        "users.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="invites_seance_ajoutes",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("session", "email")
+        ordering = ["email"]
+
+    def __str__(self):
+        return f"{self.email} ({self.session_id})"

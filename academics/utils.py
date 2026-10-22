@@ -137,13 +137,8 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
     # Parent      : géré au-dessus
     # ================================================================
     if model_name == 'Departement':
-        if role_name == 'Admin':
+        if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:
             return queryset.filter(institution_id=institution_id)
-
-        if role_name in ['Responsable', 'ResponsableAcademique']:
-            if dept_id:
-                return queryset.filter(institution_id=institution_id, id=dept_id)
-            return queryset.none()
 
         if role_name in ['Formateur', 'Apprenant']:
             return queryset.filter(institution_id=institution_id)
@@ -158,16 +153,8 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
     # Apprenant   : tous (lecture)
     # ================================================================
     if model_name == 'DomaineEtude':
-        if role_name == 'Admin':
+        if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:
             return queryset.filter(institution_id=institution_id)
-
-        if role_name in ['Responsable', 'ResponsableAcademique']:
-            if dept_id:
-                return queryset.filter(
-                    institution_id=institution_id,
-                    departement_id=dept_id
-                )
-            return queryset.none()
 
         if role_name in ['Formateur', 'Apprenant']:
             return queryset.filter(institution_id=institution_id)
@@ -182,16 +169,8 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
     # Apprenant   : toutes (lecture)
     # ================================================================
     if model_name == 'Filiere':
-        if role_name == 'Admin':
+        if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:
             return queryset.filter(institution_id=institution_id)
-
-        if role_name in ['Responsable', 'ResponsableAcademique']:
-            if dept_id:
-                return queryset.filter(
-                    institution_id=institution_id,
-                    domaine_etude__departement_id=dept_id
-                )
-            return queryset.none()
 
         if role_name in ['Formateur', 'Apprenant']:
             return queryset.filter(institution_id=institution_id)
@@ -206,21 +185,8 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
     # Apprenant   : toutes en liste / sa classe en détail
     # ================================================================
     if model_name == 'Classe':
-        if role_name == 'Admin':
+        if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:
             return queryset.filter(institution_id=institution_id)
-
-        if role_name in ['Responsable', 'ResponsableAcademique']:
-            if dept_id:
-                from .models import Filiere
-                filiere_ids = Filiere.objects.filter(
-                    institution_id=institution_id,
-                    domaine_etude__departement_id=dept_id
-                ).values_list('id', flat=True)
-                return queryset.filter(
-                    institution_id=institution_id,
-                    filieres__id__in=filiere_ids
-                ).distinct()
-            return queryset.none()
 
         if role_name == 'Formateur':
             if is_detail:
@@ -249,21 +215,8 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
     # Apprenant   : tous en liste / son groupe en détail
     # ================================================================
     if model_name == 'Groupe':
-        if role_name == 'Admin':
+        if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:
             return queryset.filter(institution_id=institution_id)
-
-        if role_name in ['Responsable', 'ResponsableAcademique']:
-            if dept_id:
-                from .models import Filiere
-                filiere_ids = Filiere.objects.filter(
-                    institution_id=institution_id,
-                    domaine_etude__departement_id=dept_id
-                ).values_list('id', flat=True)
-                return queryset.filter(
-                    institution_id=institution_id,
-                    classe__filieres__id__in=filiere_ids
-                ).distinct()
-            return queryset.none()
 
         if role_name == 'Formateur':
             if is_detail:
@@ -290,21 +243,8 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
     # Apprenant   : uniquement la sienne
     # ================================================================
     if model_name == 'Inscription':
-        if role_name == 'Admin':
+        if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:
             return queryset.filter(institution_id=institution_id)
-
-        if role_name in ['Responsable', 'ResponsableAcademique']:
-            if dept_id:
-                from .models import Filiere
-                filiere_ids = Filiere.objects.filter(
-                    institution_id=institution_id,
-                    domaine_etude__departement_id=dept_id
-                ).values_list('id', flat=True)
-                return queryset.filter(
-                    institution_id=institution_id,
-                    classe__filieres__id__in=filiere_ids
-                ).distinct()
-            return queryset.none()
 
         if role_name == 'Formateur':
             from .models import Groupe
@@ -396,10 +336,19 @@ def _filter_for_parent(queryset, model_name, ctx):
 
     if model_name == 'AnneeScolaire':
         from .models import Inscription
-        annee_ids = Inscription.objects.filter(
-            apprenant_id__in=enfants_ids,
-            statut='actif'
-        ).values_list('annee_scolaire_id', flat=True).distinct()
+        from users.models import Apprenant
+        annee_ids = set(
+            Inscription.objects.filter(
+                apprenant_id__in=enfants_ids,
+                statut='actif'
+            ).values_list('annee_scolaire_id', flat=True)
+        )
+        # ✅ Inclure aussi l'année scolaire ACTIVE des enfants (même sans Inscription).
+        annee_ids |= set(
+            Apprenant.objects.filter(
+                id__in=enfants_ids, annee_scolaire_active_id__isnull=False
+            ).values_list('annee_scolaire_active_id', flat=True)
+        )
         return queryset.filter(id__in=annee_ids)
 
     if model_name == 'Institution':
@@ -458,6 +407,11 @@ def can_modify_academic_resource(user, obj, model_name):
         return model_name == 'Institution'
 
     role_name = get_role_name(user)
+
+    # ✅ L'établissement lui-même : réservé à l'Admin (le Responsable ne modifie
+    # ni ne supprime l'institution — cf. matrice `etablissements`).
+    if model_name == 'Institution':
+        return role_name == 'Admin'
 
     if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:
         if hasattr(obj, 'institution_id'):

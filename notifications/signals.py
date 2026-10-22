@@ -25,12 +25,42 @@ from .models import (
 # UTILITAIRES
 # ============================================================================
 
+# ✅ Règles de notification (Paramètres → Notifications, établissement > global).
+#    Une règle désactivée empêche la création de la notification correspondante.
+_REGLES_NOTIF = {
+    TypeNotification.RAPPEL_SESSION:      "notif_rappel_seance",
+    TypeNotification.SESSION_A_VENIR:     "notif_rappel_seance",
+    TypeNotification.ABSENCE_ENREGISTREE: "notif_absence",
+    TypeNotification.RETARD_ENREGISTRE:   "notif_absence",
+    TypeNotification.ABSENCES_REPETEES:   "notif_absence",
+    TypeNotification.EVALUATION_PUBLIEE:  "notif_publication_evaluation",
+    TypeNotification.EVALUATION_CORRIGEE: "notif_correction_disponible",
+    TypeNotification.RAPPEL_EVALUATION:   "notif_rappel_echeance",
+    TypeNotification.PAIEMENT_DU:         "notif_rappel_echeance",
+}
+
+
+def _regle_notif_active(type_notif, institution) -> bool:
+    """La règle correspondant à ce type de notification est-elle activée ?"""
+    cle = _REGLES_NOTIF.get(type_notif)
+    if not cle:
+        return True
+    try:
+        from parametres.services import effective
+        return bool(effective(cle, institution, True))
+    except Exception:
+        return True
+
+
 def _notifier(recipient, type_notif, titre, message,
               priorite=PrioriteNotification.MOYENNE,
               sender=None, entity_type=None, entity_id=None,
               action_url=None, institution=None, annee_scolaire=None,
               groupe_dedup=None, **metadata):
     """Crée une notification in-app. Silencieux en cas d'erreur."""
+    # ✅ Respecte les règles Paramètres → Notifications.
+    if not _regle_notif_active(type_notif, institution):
+        return
     try:
         Notification.creer(
             recipient=recipient,
@@ -1147,17 +1177,60 @@ try:
                         groupe_dedup=groupe,
                     )
 
-        if instance.score is not None:
-            _notifier(
+        if instance.termine and instance.score is not None:
+            groupe_score = f"quiz_score:{instance.pk}"
+            existing = Notification.objects.filter(
+                groupe_deduplication=groupe_score,
                 recipient=instance.apprenant,
-                type_notif=TypeNotification.EVALUATION_CORRIGEE,
-                titre="Résultat de quiz disponible",
-                message=f"Votre quiz « {instance.quiz.titre} » a été noté : {instance.score} points.",
-                priorite=PrioriteNotification.MOYENNE,
-                entity_type=EntityType.QUIZ,
-                entity_id=instance.quiz.pk,
-            )
+            ).first()
+            if existing:
+                # Mettre à jour le score si la notification existe déjà (score corrigé)
+                correct_msg = f"Votre quiz « {instance.quiz.titre} » a été noté : {instance.score} points."
+                if existing.message != correct_msg:
+                    existing.message = correct_msg
+                    existing.save(update_fields=['message'])
+            else:
+                _notifier(
+                    recipient=instance.apprenant,
+                    type_notif=TypeNotification.EVALUATION_CORRIGEE,
+                    titre="Résultat de quiz disponible",
+                    message=f"Votre quiz « {instance.quiz.titre} » a été noté : {instance.score} points.",
+                    priorite=PrioriteNotification.MOYENNE,
+                    entity_type=EntityType.QUIZ,
+                    entity_id=instance.quiz.pk,
+                    groupe_dedup=groupe_score,
+                )
 
 except ImportError:
     pass  # PassageQuiz pas encore disponible
 
+
+
+# ============================================================================
+# PUSH TEMPS RÉEL (Django Channels) — pousse la notification au WebSocket
+# ============================================================================
+
+from django.db.models.signals import post_save as _post_save  # noqa: E402
+
+
+@receiver(_post_save, sender=Notification, dispatch_uid="notif_ws_push")
+def _push_notification_ws(sender, instance, created, **kwargs):
+    """À chaque notification créée, diffuse la version sérialisée au groupe
+    WebSocket de son destinataire. Silencieux : ne bloque jamais la création."""
+    if not created:
+        return
+    try:
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+        from .serializers import NotificationSerializer
+
+        layer = get_channel_layer()
+        if layer is None:
+            return
+        payload = NotificationSerializer(instance).data
+        async_to_sync(layer.group_send)(
+            f"notif_user_{instance.recipient_id}",
+            {"type": "notif_message", "payload": payload},
+        )
+    except Exception as e:  # pragma: no cover
+        print(f"[Notification WS push error] {e}")

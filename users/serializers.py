@@ -10,6 +10,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.authtoken.models import Token
 
 from django.core.mail import send_mail
+from core.mailer import safe_send_mail
 from django.conf import settings
 from academics.models import AnneeScolaire, Groupe, Institution, Specialite, Departement, Classe, Inscription
 # ❌ NE PAS importer les serializers d'academics ici (import circulaire)
@@ -29,11 +30,39 @@ from .models import (
     SuperAdmin,
     VerificationCode,
 )
+from .security import validate_password_strength
 
 
 # =============================================================================
 # Helpers
 # =============================================================================
+
+
+
+def _envoyer_code_activation(user):
+    """Génère un code d'activation et l'envoie par e-mail (best-effort).
+
+    Utilisé par les créations de comptes côté admin : sans code, un compte
+    créé inactif n'était activable par AUCUN écran.
+    """
+    try:
+        from users.models import VerificationCode
+        from core.mailer import safe_send_mail
+        from django.conf import settings
+        v = VerificationCode.create_activation_code(user)
+        safe_send_mail(
+            subject="Somapro - Code d'activation de votre compte",
+            message=(
+                f"Bonjour,\n\nVotre compte a été créé.\n"
+                f"Code d'activation : {v.code} (valide 15 minutes).\n\n"
+                f"Utilisez la page « Confirmer mon e-mail » pour activer votre compte."
+            ),
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+            recipient_list=[user.email],
+        )
+    except Exception:
+        pass
+
 
 def _get_or_create_role(role_name: str) -> UserRole:
     """Récupère ou crée un rôle utilisateur"""
@@ -85,13 +114,14 @@ def _get_academic_serializers():
 # =============================================================================
 
 class RegisterSerializer(serializers.Serializer):
+    # ✅ SÉCURITÉ : l'inscription publique ne doit JAMAIS permettre de choisir un
+    # rôle privilégié (Admin, ResponsableAcademique, SuperAdmin) — cela
+    # permettait une escalade de privilèges. Les comptes Admin sont créés via
+    # l'onboarding institution (InstitutionSerializer) ou par un admin existant.
     role = serializers.ChoiceField(choices=[
-        ("Admin", "Admin"),
         ("Parent", "Parent"),
         ("Apprenant", "Apprenant"),
         ("Formateur", "Formateur"),
-        ("ResponsableAcademique", "ResponsableAcademique"),
-        ("SuperAdmin", "SuperAdmin"),
     ])
     email    = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
@@ -134,6 +164,11 @@ class RegisterSerializer(serializers.Serializer):
         if get_user_model().objects.filter(email=value).exists():
             raise serializers.ValidationError("Un utilisateur avec cet email existe déjà.")
         return value
+
+    def validate_password(self, value):
+        # ✅ SÉCURITÉ : applique les validateurs Django (longueur, mot de passe
+        # commun, entièrement numérique, similarité avec l'utilisateur).
+        return validate_password_strength(value)
 
     def _attach_role_fk(self, user, role_name: str):
         user.role = _get_or_create_role(role_name)
@@ -208,12 +243,12 @@ class RegisterSerializer(serializers.Serializer):
         self._attach_role_fk(user, role)
 
         v = VerificationCode.create_activation_code(user)
-        send_mail(
+        safe_send_mail(
             subject="Somapro - Code d'activation",
             message=f"Votre code d'activation est : {v.code} (valide 15 minutes).",
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[user.email],
-            fail_silently=False,
+            fail_silently=None,
         )
 
         return {"message": "Compte créé. Un code d'activation à 6 chiffres a été envoyé par email."}
@@ -234,6 +269,10 @@ class UserLoginSerializer(serializers.Serializer):
         if not user.is_active:
             raise AuthenticationFailed("Votre compte n'est pas actif ou est bloqué.")
 
+        # ✅ SESSION STABLE — on RÉUTILISE le token existant.
+        #    DRF n'autorise qu'un seul token par utilisateur (OneToOne) :
+        #    le recréer à chaque connexion déconnectait instantanément les
+        #    autres onglets / appareils et toute session en cours.
         token, _ = Token.objects.get_or_create(user=user)
         attrs["user"]  = user
         attrs["token"] = token.key
@@ -283,12 +322,12 @@ class ResendCodeSerializer(serializers.Serializer):
             return {"message": "Ce compte est déjà actif."}
 
         v = VerificationCode.create_activation_code(user)
-        send_mail(
+        safe_send_mail(
             subject="Somapro - Nouveau code d'activation",
             message=f"Votre nouveau code d'activation est : {v.code} (valide 15 minutes).",
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[user.email],
-            fail_silently=False,
+            fail_silently=None,
         )
         return {"message": "Nouveau code envoyé par email."}
 
@@ -365,6 +404,7 @@ class BaseUserCrudSerializer(serializers.ModelSerializer):
             "email", "nom", "prenom", "telephone",
             "photo",
             "role",
+            "permissions",
             "pays_residence",         "pays_residence_id",
             "annee_scolaire_active",  "annee_scolaire_active_id",
             "is_active", "is_staff", "is_superuser",
@@ -411,6 +451,8 @@ class BaseUserCrudSerializer(serializers.ModelSerializer):
         """Pop et applique le mot de passe s'il est fourni."""
         password = validated_data.pop("password", None)
         if password:
+            # ✅ SÉCURITÉ : refuse les mots de passe faibles (validateurs Django).
+            validate_password_strength(password)
             instance.set_password(password)
         return instance
 
@@ -443,12 +485,14 @@ class AdminCrudSerializer(BaseUserCrudSerializer):
         admin    = Admin(**validated_data)
         # ✅ Hachage garanti
         if password:
+            validate_password_strength(password)
             admin.set_password(password)
         else:
             admin.set_unusable_password()
         admin.role     = _get_or_create_role("Admin")
         admin.is_staff = True
         admin.save()
+        _envoyer_code_activation(admin)
         return admin
 
     @transaction.atomic
@@ -507,11 +551,13 @@ class ParentCrudSerializer(BaseUserCrudSerializer):
         password = validated_data.pop("password", None)
         parent   = Parent(**validated_data)
         if password:
+            validate_password_strength(password)
             parent.set_password(password)
         else:
             parent.set_unusable_password()
         parent.role = _get_or_create_role("Parent")
         parent.save()
+        _envoyer_code_activation(parent)
         return parent
 
     @transaction.atomic
@@ -532,8 +578,24 @@ class ApprenantCrudSerializer(BaseUserCrudSerializer):
     matricule      = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     date_naissance = serializers.DateField(required=False, allow_null=True)
 
+    groupe    = serializers.SerializerMethodField(read_only=True)
+    groupe_id = serializers.PrimaryKeyRelatedField(
+        source="groupe", queryset=Groupe.objects.all(),
+        write_only=True, required=False, allow_null=True,
+    )
+
     tuteur = serializers.SerializerMethodField(read_only=True)
     institution = serializers.SerializerMethodField(read_only=True)
+
+    def get_groupe(self, obj):
+        g = getattr(obj, "groupe", None)
+        if not g:
+            return None
+        return {
+            "id": g.id, "nom": g.nom,
+            "classe_id": g.classe_id,
+            "classe_nom": getattr(g.classe, "nom", None),
+        }
 
     inscription_annee_scolaire = serializers.PrimaryKeyRelatedField(
         queryset=AnneeScolaire.objects.all(), required=False, allow_null=True,
@@ -554,6 +616,7 @@ class ApprenantCrudSerializer(BaseUserCrudSerializer):
             "matricule", "date_naissance",
             "tuteur",    "tuteur_id",
             "institution",
+            "groupe",    "groupe_id",
             "inscription_annee_scolaire",
             "inscription_classe",
         ]
@@ -593,12 +656,14 @@ class ApprenantCrudSerializer(BaseUserCrudSerializer):
         apprenant = Apprenant(**validated_data)
 
         if password:
+            validate_password_strength(password)
             apprenant.set_password(password)
         else:
             apprenant.set_unusable_password()
 
         apprenant.role = _get_or_create_role("Apprenant")
         apprenant.save()
+        _envoyer_code_activation(apprenant)
 
         if annee_scolaire or classe:
             institution = getattr(apprenant, "institution", None)
@@ -703,11 +768,13 @@ class FormateurCrudSerializer(BaseUserCrudSerializer):
 
         formateur = Formateur(**validated_data)
         if password:
+            validate_password_strength(password)
             formateur.set_password(password)
         else:
             formateur.set_unusable_password()
         formateur.role = _get_or_create_role("Formateur")
         formateur.save()
+        _envoyer_code_activation(formateur)
 
         # ✅ M2M assignés après le save()
         formateur.institutions.set(institutions)
@@ -806,11 +873,13 @@ class ResponsableAcademiqueCrudSerializer(BaseUserCrudSerializer):
         password    = validated_data.pop("password", None)
         responsable = ResponsableAcademique(**validated_data)
         if password:
+            validate_password_strength(password)
             responsable.set_password(password)
         else:
             responsable.set_unusable_password()
         responsable.role = _get_or_create_role("ResponsableAcademique")
         responsable.save()
+        _envoyer_code_activation(responsable)
         return responsable
 
     @transaction.atomic
@@ -847,6 +916,8 @@ class ModifierMotDePasseSerializer(serializers.Serializer):
             raise serializers.ValidationError({
                 "new_password": "Le nouveau mot de passe doit être différent de l'actuel."
             })
+        # ✅ SÉCURITÉ : validateurs Django (mot de passe commun, numérique, etc.)
+        validate_password_strength(data['new_password'], self.context['request'].user)
         return data
 
     def save(self):

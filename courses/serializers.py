@@ -17,6 +17,7 @@ from .models import (
     SequenceContent,
     SequenceProgress,
     Session,
+    SessionInvite,
     Suivi,
     BlocContenu,
     RessourceSequence,
@@ -37,17 +38,21 @@ class CoursSerializer(serializers.ModelSerializer):
     institution_nom = serializers.CharField(source="institution.nom", read_only=True)
     annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
 
-    # Stats calculées (properties) 
+    # Stats calculées (properties)
     total_minutes_realises = serializers.IntegerField(read_only=True)
     total_heures_realisees = serializers.FloatField(read_only=True)
     taux_execution = serializers.FloatField(read_only=True)
     statut_calcule = serializers.ReadOnlyField()
+    departement_nom = serializers.CharField(source="departement.nom", read_only=True, default=None)
+    nombre_modules = serializers.SerializerMethodField(read_only=True)
+    nombre_inscrits = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Cours
         fields = [
             "id",
             "titre",
+            "image",
             "groupe",
             "groupe_nom",
             "enseignant",
@@ -58,14 +63,19 @@ class CoursSerializer(serializers.ModelSerializer):
             "institution_nom",
             "annee_scolaire",
             "annee_scolaire_nom",
+            "departement",
+            "departement_nom",
             "volume_horaire",
             "date_debut",
             "date_fin",
             "statut",
             "statut_calcule",
+            "statut_force",
             "total_minutes_realises",
             "total_heures_realisees",
             "taux_execution",
+            "nombre_modules",
+            "nombre_inscrits",
         ]
         extra_kwargs = {
             "titre": {"required": False, "allow_null": True, "allow_blank": True},
@@ -81,6 +91,15 @@ class CoursSerializer(serializers.ModelSerializer):
         nom = getattr(ens, "nom", "")
         full = (f"{prenom} {nom}").strip()
         return full or str(ens)
+
+    def get_nombre_modules(self, obj):
+        # ✅ Utilise l'annotation du queryset si présente (évite le N+1).
+        value = getattr(obj, "nb_modules", None)
+        return value if value is not None else obj.modules.count()
+
+    def get_nombre_inscrits(self, obj):
+        value = getattr(obj, "nb_inscrits", None)
+        return value if value is not None else obj.inscriptions.filter(statut='actif').count()
 
     def validate(self, attrs):
         """Validation des dates et unicité"""
@@ -133,10 +152,14 @@ class ModuleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Module
         fields = [
-            "id", 
-            "titre", 
-            "description", 
+            "id",
+            # ✅ Publication progressive
+            "etat_publication", "date_publication_programmee", "date_publication_effective",
+            "titre",
+            "description",
             "cours",
+            "ordre",
+            "duree_estimee",
             "institution",
             "institution_nom",
             "annee_scolaire",
@@ -147,6 +170,25 @@ class ModuleSerializer(serializers.ModelSerializer):
 # ============================================================================
 # BLOCS DE CONTENU
 # ============================================================================
+
+    def validate(self, attrs):
+        etat = attrs.get("etat_publication", getattr(self.instance, "etat_publication", None))
+        date_p = attrs.get("date_publication_programmee",
+                           getattr(self.instance, "date_publication_programmee", None))
+        if etat == "programme" and date_p is None:
+            raise serializers.ValidationError(
+                {"date_publication_programmee": "Une date de publication est requise pour un contenu programmé."}
+            )
+        if etat == "programme" and date_p is not None:
+            from django.utils import timezone
+            now = timezone.now()
+            if date_p <= now:
+                # Date déjà atteinte → publication immédiate (évite un rejet
+                # silencieux lorsque la minute choisie est déjà en cours).
+                attrs["etat_publication"] = "publie"
+                attrs["date_publication_programmee"] = None
+                attrs["date_publication_effective"] = now
+        return attrs
 
 class BlocContenuSerializer(serializers.ModelSerializer):
     """
@@ -176,6 +218,8 @@ class BlocContenuSerializer(serializers.ModelSerializer):
             'lien_externe', 'code_source', 'langage_code',
             'objectifs', 'duree_estimee_minutes',
             'est_obligatoire', 'est_visible',
+            # ✅ Publication progressive
+            'etat_publication', 'date_publication_programmee', 'date_publication_effective',
             'icone_type', 'date_creation', 'date_modification'
         ]
         read_only_fields = ['id', 'icone_type', 'date_creation', 'date_modification']
@@ -226,6 +270,19 @@ class BlocContenuSerializer(serializers.ModelSerializer):
                 errors['type_bloc'] = ['Ce champ est obligatoire.']
             if errors:
                 raise serializers.ValidationError(errors)
+        # Publication : impossible de publier un bloc si sa séquence (et son module) ne l'est pas
+        if attrs.get("etat_publication") == "publie":
+            seq = attrs.get("sequence") or getattr(self.instance, "sequence", None)
+            if (not seq
+                    or getattr(seq, "etat_publication", None) != "publie"
+                    or getattr(getattr(seq, "module", None), "etat_publication", None) != "publie"):
+                if self.instance is None:
+                    # Création : on aligne le bloc sur sa séquence (brouillon).
+                    attrs["etat_publication"] = "brouillon"
+                else:
+                    raise serializers.ValidationError(
+                        {"etat_publication": "La séquence (et son module) doivent être publiés avant de publier un bloc."}
+                    )
         return attrs
 
 
@@ -246,7 +303,8 @@ class BlocContenuCreateSerializer(serializers.ModelSerializer):
             'video_url', 'audio_url', 'image', 'fichier',
             'lien_externe', 'code_source', 'langage_code',
             'objectifs', 'duree_estimee_minutes',
-            'est_obligatoire', 'est_visible'
+            'est_obligatoire', 'est_visible',
+            'etat_publication', 'date_publication_programmee',
         ]
         extra_kwargs = {
             'contenu_texte':         {'required': False, 'allow_null': True, 'allow_blank': True},
@@ -274,6 +332,32 @@ class BlocContenuCreateSerializer(serializers.ModelSerializer):
 # RESSOURCES SÉQUENCES
 # ============================================================================
 
+    def validate(self, attrs):
+        etat = attrs.get("etat_publication", getattr(self.instance, "etat_publication", None))
+        date_p = attrs.get("date_publication_programmee",
+                           getattr(self.instance, "date_publication_programmee", None))
+        if etat == "programme" and date_p is None:
+            raise serializers.ValidationError(
+                {"date_publication_programmee": "Une date de publication est requise pour un contenu programmé."}
+            )
+        if etat == "programme" and date_p is not None:
+            from django.utils import timezone
+            now = timezone.now()
+            if date_p <= now:
+                # Date déjà atteinte → publication immédiate (évite un rejet
+                # silencieux lorsque la minute choisie est déjà en cours).
+                attrs["etat_publication"] = "publie"
+                attrs["date_publication_programmee"] = None
+                attrs["date_publication_effective"] = now
+        # Un bloc ne peut pas naître publié si sa séquence (et son module) ne le sont pas.
+        if attrs.get("etat_publication") == "publie":
+            seq = attrs.get("sequence")
+            if (not seq
+                    or getattr(seq, "etat_publication", None) != "publie"
+                    or getattr(getattr(seq, "module", None), "etat_publication", None) != "publie"):
+                attrs["etat_publication"] = "brouillon"
+        return attrs
+
 class RessourceSequenceSerializer(serializers.ModelSerializer):
     """Serializer pour les ressources/pièces jointes"""
     
@@ -281,6 +365,12 @@ class RessourceSequenceSerializer(serializers.ModelSerializer):
     extension = serializers.ReadOnlyField()
     icone_extension = serializers.ReadOnlyField()
     ajoute_par_nom = serializers.SerializerMethodField(read_only=True)
+
+    # Contexte pédagogique (lecture seule) — évite les N+1 côté client
+    sequence_titre = serializers.CharField(source='sequence.titre', read_only=True)
+    module_titre = serializers.CharField(source='sequence.module.titre', read_only=True)
+    cours_id = serializers.IntegerField(source='sequence.module.cours_id', read_only=True)
+    cours_titre = serializers.CharField(source='sequence.module.cours.titre', read_only=True)
     
     class Meta:
         model = RessourceSequence
@@ -289,7 +379,8 @@ class RessourceSequenceSerializer(serializers.ModelSerializer):
             'type_ressource', 'taille_fichier', 'taille_lisible',
             'extension', 'icone_extension', 'est_telechargeable',
             'nombre_telechargements', 'ordre', 'date_ajout',
-            'date_modification', 'ajoute_par', 'ajoute_par_nom'
+            'date_modification', 'ajoute_par', 'ajoute_par_nom',
+            'sequence_titre', 'module_titre', 'cours_id', 'cours_titre',
         ]
         read_only_fields = [
             'id', 'taille_fichier', 'nombre_telechargements',
@@ -297,9 +388,12 @@ class RessourceSequenceSerializer(serializers.ModelSerializer):
         ]
     
     def get_ajoute_par_nom(self, obj):
-        if obj.ajoute_par:
-            return obj.ajoute_par.get_full_name()
-        return None
+        # ✅ Le modèle User n'a pas `get_full_name` : on compose prénom + nom.
+        u = getattr(obj, 'ajoute_par', None)
+        if not u:
+            return None
+        nom_complet = f"{getattr(u, 'prenom', '') or ''} {getattr(u, 'nom', '') or ''}".strip()
+        return nom_complet or getattr(u, 'email', None)
 
 
 class RessourceSequenceCreateSerializer(serializers.ModelSerializer):
@@ -319,7 +413,7 @@ class RessourceSequenceCreateSerializer(serializers.ModelSerializer):
 
 class SequenceSerializer(serializers.ModelSerializer):
     """Serializer simple pour les séquences"""
-    
+
     module = serializers.PrimaryKeyRelatedField(queryset=Module.objects.all())
     institution_nom = serializers.CharField(source="institution.nom", read_only=True)
     annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
@@ -327,8 +421,12 @@ class SequenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sequence
         fields = [
-            'id', 
-            'titre', 
+            'id',
+            # ✅ Publication progressive
+            'etat_publication', 'date_publication_programmee', 'date_publication_effective',
+            'titre',
+            'description',
+            'ordre',
             'module',
             'institution',
             'institution_nom',
@@ -337,6 +435,34 @@ class SequenceSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["institution", "annee_scolaire"]
 
+    def validate(self, attrs):
+        etat = attrs.get("etat_publication", getattr(self.instance, "etat_publication", None))
+        date_p = attrs.get("date_publication_programmee",
+                           getattr(self.instance, "date_publication_programmee", None))
+        if etat == "programme" and date_p is None:
+            raise serializers.ValidationError(
+                {"date_publication_programmee": "Une date de publication est requise pour un contenu programmé."}
+            )
+        if etat == "programme" and date_p is not None:
+            from django.utils import timezone
+            now = timezone.now()
+            if date_p <= now:
+                # Date déjà atteinte → publication immédiate (évite un rejet
+                # silencieux lorsque la minute choisie est déjà en cours).
+                attrs["etat_publication"] = "publie"
+                attrs["date_publication_programmee"] = None
+                attrs["date_publication_effective"] = now
+        if attrs.get("etat_publication") == "publie":
+            module = attrs.get("module") or getattr(self.instance, "module", None)
+            if not module or getattr(module, "etat_publication", None) != "publie":
+                if self.instance is None:
+                    # Création : on aligne la séquence sur son module (brouillon).
+                    attrs["etat_publication"] = "brouillon"
+                else:
+                    raise serializers.ValidationError(
+                        {"etat_publication": "Le module doit être publié avant de publier une séquence."}
+                    )
+        return attrs
 
 class SequenceDetailSerializer(serializers.ModelSerializer):
     """Serializer détaillé avec blocs et ressources"""
@@ -355,7 +481,7 @@ class SequenceDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sequence
         fields = [
-            'id', 'titre', 'module', 'module_titre',
+            'id', 'titre', 'description', 'ordre', 'module', 'module_titre',
             'institution', 'institution_nom',
             'annee_scolaire', 'annee_scolaire_nom',
             'nombre_blocs', 'nombre_ressources', 'duree_totale_minutes',
@@ -472,6 +598,13 @@ class SuiviSerializer(serializers.ModelSerializer):
         read_only_fields = ['institution', 'annee_scolaire']
 
 
+class SessionInviteSerializer(serializers.ModelSerializer):
+    """Invité externe d'une séance (ajouté manuellement)."""
+    class Meta:
+        model = SessionInvite
+        fields = ["id", "email", "nom", "created_at"]
+
+
 class SessionSerializer(serializers.ModelSerializer):
     formateur = FormateurSerializer(read_only=True)
     cours = CoursSerializer(read_only=True)
@@ -492,26 +625,87 @@ class SessionSerializer(serializers.ModelSerializer):
     
     duree_minutes = serializers.IntegerField(read_only=True)
 
+    # Invités externes ajoutés manuellement (en plus des éligibles automatiques)
+    invites = SessionInviteSerializer(source="invites_externes", many=True, read_only=True)
+
+    # Champ transitoire (non stocké) : générer le lien de visio à la création.
+    generer_lien_auto = serializers.BooleanField(write_only=True, required=False, default=False)
+
     class Meta:
         model = Session
         fields = [
-            'id', 'titre', 'date_debut', 'date_fin',
+            'id', 'titre', 'description', 'lieu', 'date_debut', 'date_fin',
             'formateur', 'formateur_id', 'cours', 'cours_id',
-            'participation_mode', 'duree_minutes',
+            'participation_mode', 'statut', 'nb_presents', 'duree_minutes',
+            'lien_visio', 'lien_jitsi', 'meet_space_name', 'meet_derniere_sync',
+            'teams_join_url', 'teams_meeting_id',
+            'visio_provider', 'generer_lien_auto',
+            'invites',
             'institution', 'institution_nom',
             'annee_scolaire', 'annee_scolaire_nom'
         ]
-        read_only_fields = ['id', 'duree_minutes', 'institution', 'annee_scolaire']
+        read_only_fields = ['id', 'duree_minutes', 'institution', 'annee_scolaire',
+                            'meet_space_name', 'meet_derniere_sync',
+                            'teams_join_url', 'teams_meeting_id']
+
+    # ── Visio : le lien n'est exposé qu'aux personnes CONCERNÉES ──────────
+    # (formateur du cours = organisateur, ou apprenant inscrit ; + superuser).
+    # Les autres (parent, admin/responsable, autres rôles) ne reçoivent pas le lien.
+    _VISIO_FIELD_NAMES = (
+        "lien_visio", "lien_jitsi", "teams_join_url",
+        "meet_space_name", "teams_meeting_id",
+    )
+
+    @staticmethod
+    def _peut_voir_visio(session, request) -> bool:
+        user = getattr(request, "user", None) if request is not None else None
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        if getattr(user, "is_superuser", False):
+            return True
+        # Responsable académique : autorisé à rejoindre.
+        try:
+            from users.access_control import role_key
+            if role_key(user) in ("responsable", "responsableacademique"):
+                return True
+        except Exception:
+            pass
+        try:
+            if str(session.formateur_id) == str(user.pk):
+                return True
+        except Exception:
+            pass
+        try:
+            from courses.models import InscriptionCours
+            from django.db.models.functions import Lower
+            return (
+                InscriptionCours.objects
+                .filter(cours_id=session.cours_id, apprenant_id=user.pk)
+                .annotate(st=Lower("statut"))
+                .filter(st__in=["inscrit", "en_cours", "en cours", "encours", "termine", "terminé"])
+                .exists()
+            )
+        except Exception:
+            return False
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not self._peut_voir_visio(instance, self.context.get("request")):
+            for field in self._VISIO_FIELD_NAMES:
+                if field in data:
+                    data[field] = ""
+        return data
 
 
 class SessionLiteSerializer(serializers.ModelSerializer):
     """Serializer léger pour les sessions"""
-    
+
     class Meta:
         model = Session
         fields = [
             "id", "titre", "date_debut", "date_fin",
             "cours", "formateur", "participation_mode",
+            "statut", "nb_presents", "duree_minutes",
             "institution", "annee_scolaire"
         ]
 

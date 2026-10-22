@@ -152,6 +152,12 @@ class QuizDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'date_creation', 'date_modification']
 
 
+class QuizDetailApprenantSerializer(QuizDetailSerializer):
+    """✅ Quiz détaillé côté APPRENANT : les corrigés (`est_correcte`) ne sont
+    JAMAIS sérialisés. Le masquage est fait au niveau ORM (sous-serializer)."""
+    questions = QuestionApprenantSerializer(many=True, read_only=True)
+
+
 class ReponseQuizSerializer(serializers.ModelSerializer):
     """Serializer pour les réponses aux questions de quiz"""
     question_texte = serializers.CharField(
@@ -360,6 +366,12 @@ class EvaluationDetailSerializer(serializers.ModelSerializer):
         return obj.est_auto_corrigeable()
 
 
+class EvaluationDetailApprenantSerializer(EvaluationDetailSerializer):
+    """✅ Évaluation détaillée côté APPRENANT : les corrigés (`est_correcte`)
+    ne sont JAMAIS sérialisés (masquage au niveau ORM)."""
+    questions = QuestionApprenantSerializer(many=True, read_only=True)
+
+
 class EvaluationAccessibiliteSerializer(serializers.Serializer):
     """Serializer pour les informations d'accessibilité d'une évaluation"""
     evaluation_id = serializers.IntegerField()
@@ -543,12 +555,29 @@ class PassageEvaluationDetailSerializer(PassageEvaluationSerializer):
         ]
 
     def get_evaluation_detail(self, obj):
-        """Retourne les détails complets de l'évaluation AVEC ses questions"""
-        from .serializers import QuestionSerializer  # import local pour éviter circular
+        """Détails de l'évaluation. Les bonnes réponses ne sont exposées que si
+        l'utilisateur est staff, OU si l'affichage des corrections est autorisé
+        (paramètre effectif : établissement > global)."""
+        from .serializers import QuestionSerializer, QuestionApprenantSerializer
+        from core.rbac import display_role
+        from parametres.services import evaluation_afficher_correction
 
-        questions = obj.evaluation.questions.prefetch_related(
-            'reponses_predefinies'
-        ).all()
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        role = display_role(user) if user is not None else None
+        is_staff = role in ('Admin', 'Responsable', 'Formateur', 'SuperAdmin')
+
+        institution = getattr(getattr(obj.evaluation, 'cours', None), 'institution', None)
+        # ✅ SÉCURITÉ : un apprenant ne reçoit les corrigés QUE si SON passage est
+        #    terminé (soumis/corrigé). Sinon, même avec le paramètre d'affichage
+        #    des corrections actif, les bonnes réponses restent masquées pendant
+        #    l'épreuve (sinon → triche triviale).
+        statut_passage = str(getattr(obj, 'statut', '') or '').lower()
+        passage_termine = statut_passage in ('soumis', 'corrige', 'termine', 'publie')
+        afficher = is_staff or (passage_termine and bool(evaluation_afficher_correction(institution)))
+
+        questions = obj.evaluation.questions.prefetch_related('reponses_predefinies').all()
+        serializer_cls = QuestionSerializer if afficher else QuestionApprenantSerializer
 
         return {
             'id': obj.evaluation.id,
@@ -564,8 +593,7 @@ class PassageEvaluationDetailSerializer(PassageEvaluationSerializer):
             'date_debut': obj.evaluation.date_debut,
             'date_fin': obj.evaluation.date_fin,
             'est_auto_corrigeable': obj.evaluation.est_auto_corrigeable(),
-            # ✅ AJOUT CRITIQUE : les questions avec leurs réponses prédéfinies
-            'questions': QuestionSerializer(questions, many=True).data,
+            'questions': serializer_cls(questions, many=True).data,
         }
 
 

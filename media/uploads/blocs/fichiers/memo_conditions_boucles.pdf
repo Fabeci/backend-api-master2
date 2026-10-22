@@ -1,0 +1,37 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 490 >>
+stream
+BT /F1 18 Tf 50 800 Td (Fiche memo - Conditions et boucles) Tj ET
+BT /F1 11 Tf 50 772 Td (if / elif / else : execute un bloc selon une condition.) Tj ET
+BT /F1 11 Tf 50 756 Td (for : parcourt une sequence \(liste, chaine, range\).) Tj ET
+BT /F1 11 Tf 50 740 Td (while : repete tant que la condition est vraie.) Tj ET
+BT /F1 11 Tf 50 724 Td (break : quitte la boucle ; continue : passe a l'iteration suivante.) Tj ET
+BT /F1 11 Tf 50 708 Td (L'indentation delimite les blocs en Python.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000782 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+852
+%%EOF

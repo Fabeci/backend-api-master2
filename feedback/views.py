@@ -1,11 +1,17 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, permissions
 from .models import Feedback, Progression, HistoriqueProgression, PlanAction
 from .serializers import FeedbackSerializer, ProgressionSerializer, HistoriqueProgressionSerializer, PlanActionSerializer
 
+# ✅ SÉCURITÉ : app legacy non routée, mais on ferme l'accès anonyme par défaut
+# au cas où elle serait rebranchée.
+AUTH_REQUIRED = [permissions.IsAuthenticated]
+
 # Feedback
 class FeedbackListCreateAPIView(APIView):
+    permission_classes = AUTH_REQUIRED
+
     def get(self, request):
         feedbacks = Feedback.objects.all()
         serializer = FeedbackSerializer(feedbacks, many=True)
@@ -20,6 +26,8 @@ class FeedbackListCreateAPIView(APIView):
 
 # Progression
 class ProgressionListCreateAPIView(APIView):
+    permission_classes = AUTH_REQUIRED
+
     def get(self, request):
         progressions = Progression.objects.all()
         serializer = ProgressionSerializer(progressions, many=True)
@@ -34,6 +42,8 @@ class ProgressionListCreateAPIView(APIView):
 
 # HistoriqueProgression
 class HistoriqueProgressionListCreateAPIView(APIView):
+    permission_classes = AUTH_REQUIRED
+
     def get(self, request):
         historique = HistoriqueProgression.objects.all()
         serializer = HistoriqueProgressionSerializer(historique, many=True)
@@ -48,6 +58,8 @@ class HistoriqueProgressionListCreateAPIView(APIView):
 
 # PlanAction
 class PlanActionListCreateAPIView(APIView):
+    permission_classes = AUTH_REQUIRED
+
     def get(self, request):
         plans = PlanAction.objects.all()
         serializer = PlanActionSerializer(plans, many=True)

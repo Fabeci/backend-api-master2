@@ -27,12 +27,30 @@ SECRET_KEY = config('DJANGO_SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost:4200', 'localhost', 'somaproapi.gconnectapp.com', 'www.somaproapi.gconnectapp.com', 'testserver']
+# ✅ Durée de vie des tokens API (secondes) — 14 jours par défaut.
+AUTH_TOKEN_TTL = config('AUTH_TOKEN_TTL', default=14 * 24 * 3600, cast=int)
+# Délai d'inactivité au-delà duquel on repousse l'expiration du token (glissante).
+AUTH_TOKEN_RENEW_AFTER = config('AUTH_TOKEN_RENEW_AFTER', default=300, cast=int)
+
+# ✅ ALLOWED_HOSTS piloté par l'environnement (défauts sûrs).
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in config(
+        'ALLOWED_HOSTS',
+        default='127.0.0.1,localhost,somaproapi.gconnectapp.com,www.somaproapi.gconnectapp.com',
+    ).split(',')
+    if h.strip()
+]
+if DEBUG:
+    ALLOWED_HOSTS += ['testserver']
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    # `daphne` en tête : fournit le serveur ASGI (runserver gère les WebSockets).
+    'daphne',
+    'channels',
     "corsheaders",
     'django.contrib.admin',
     'django.contrib.auth',
@@ -62,6 +80,8 @@ INSTALLED_APPS = [
     "analytics",
     'django_celery_results',  # ← Ajouter
     'django_celery_beat',
+    'parametres',
+    'gamification',
 ]
 
 SITE_ID = 1
@@ -113,8 +133,31 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        'OPTIONS': {
+            'timeout': 30,
+        },
     }
 }
+
+# ✅ Base PostgreSQL optionnelle (recommandée en production) :
+#   DB_ENGINE=postgres + POSTGRES_DB / POSTGRES_USER / POSTGRES_PASSWORD /
+#   POSTGRES_HOST / POSTGRES_PORT
+if config('DB_ENGINE', default='sqlite').strip().lower() in ('postgres', 'postgresql'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('POSTGRES_DB', default='somapro'),
+            'USER': config('POSTGRES_USER', default='somapro'),
+            'PASSWORD': config('POSTGRES_PASSWORD', default=''),
+            'HOST': config('POSTGRES_HOST', default='127.0.0.1'),
+            'PORT': config('POSTGRES_PORT', default='5432'),
+            'CONN_MAX_AGE': 60,
+        }
+    }
+
+# ✅ Limites d'upload : au-delà, Django écrit sur disque (temp) au lieu de la RAM.
+DATA_UPLOAD_MAX_MEMORY_SIZE = config('DATA_UPLOAD_MAX_MEMORY_SIZE', default=10 * 1024 * 1024, cast=int)
+FILE_UPLOAD_MAX_MEMORY_SIZE = config('FILE_UPLOAD_MAX_MEMORY_SIZE', default=10 * 1024 * 1024, cast=int)
 
 
 # Password validation
@@ -142,7 +185,15 @@ AUTHENTICATION_BACKENDS = (
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
+        # Token DRF avec expiration (AUTH_TOKEN_TTL) — même schéma côté client.
+        'users.authentication.ExpiringTokenAuthentication',
+    ],
+    # ✅ SÉCURITÉ : par défaut, tout endpoint exige une authentification.
+    # Les vues publiques (login, register, vérification email, POST inscription
+    # institution…) doivent déclarer explicitement [AllowAny].
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+        'core.rbac.RBACPermission',
     ],
     'EXCEPTION_HANDLER': 'users.utils.custom_exception_handler',
     # Pagination globale — évite les réponses de taille infinie
@@ -166,6 +217,14 @@ EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+
+# ✅ Expéditeur par défaut (sinon Django retombait sur webmaster@localhost).
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER or 'no-reply@somapro.local')
+
+# ✅ Un échec d'envoi d'e-mail ne doit PAS faire échouer une création de compte
+#    (les transactions de création sont atomiques : une exception SMTP les
+#    annulait entièrement). Mettre à False pour rendre l'envoi bloquant.
+EMAIL_FAIL_SILENTLY = config('EMAIL_FAIL_SILENTLY', default=True, cast=bool)
 
 FRONTEND_BASE_URL = 'http://localhost:4200'
 ACCOUNT_EMAIL_REQUIRED = True
@@ -221,9 +280,39 @@ CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 # ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 # Modèle : claude-sonnet-4-20250514 (défaut) ou claude-opus-4
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
-ANTHROPIC_MAX_TOKENS = 4000
+# Plafond de tokens générés — sert aussi de `num_predict` pour Ollama.
+# Sur CPU, une valeur élevée rallonge fortement la génération.
+ANTHROPIC_MAX_TOKENS = config('AI_MAX_TOKENS', default=2000, cast=int)
+
+# ========================================
+# FOURNISSEUR LLM (abstraction multi-provider)
+# ========================================
+# ollama = 100 % local / hors-ligne (aucune donnée ne quitte le serveur).
+AI_PROVIDER = config('AI_PROVIDER', default='claude')  # ollama | claude | gemini | openai | mistral | mock
+AI_TIMEOUT = config('AI_TIMEOUT', default=60, cast=int)
+# Repli "mock" (déterministe, sans réseau) si le fournisseur échoue.
+AI_OFFLINE_FALLBACK = config('AI_OFFLINE_FALLBACK', default=False, cast=bool)
+
+# ── Ollama (LLM local) ──────────────────────────────────────────────────────
+OLLAMA_BASE_URL = config('OLLAMA_BASE_URL', default='http://127.0.0.1:11434')
+OLLAMA_MODEL = config('OLLAMA_MODEL', default='qwen2.5:3b-instruct')
+# Fenêtre de contexte Ollama (tokens). 8192 évite la troncature sur longs prompts.
+OLLAMA_NUM_CTX = config('OLLAMA_NUM_CTX', default=8192, cast=int)
+
+# ── Fournisseurs cloud optionnels (si le réseau est disponible) ──────────────
+GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
+GEMINI_MODEL = config('GEMINI_MODEL', default='gemini-2.0-flash')
+MISTRAL_API_KEY = config('MISTRAL_API_KEY', default='')
+MISTRAL_MODEL = config('MISTRAL_MODEL', default='mistral-small-latest')
 
 USE_AI_MOCK = True
+
+# ── Pré-génération quotidienne du contenu adaptatif ─────────────────────────
+# Lors de l'analyse quotidienne, générer le contenu IA des recommandations
+# prioritaires (priorité 1-2) qui n'en ont pas encore.
+AI_PREGENERATE_DAILY = config('AI_PREGENERATE_DAILY', default=True, cast=bool)
+# Plafond du nombre de générations par exécution (protège le worker/LLM).
+AI_PREGENERATE_MAX_PER_RUN = config('AI_PREGENERATE_MAX_PER_RUN', default=50, cast=int)
 
 # ========================================
 # SEUILS ADAPTATIFS (Détection des triggers)
@@ -296,9 +385,37 @@ CACHES = {
     }
 }
 
+# ✅ CORS / CSRF pilotés par l'environnement (défauts = local).
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:4200",  # Origine de votre application Angular
+    o.strip()
+    for o in config(
+        'CORS_ALLOWED_ORIGINS',
+        default='http://localhost:4200,http://127.0.0.1:4200',
+    ).split(',')
+    if o.strip()
 ]
+
+CSRF_TRUSTED_ORIGINS = [
+    o.strip()
+    for o in config(
+        'CSRF_TRUSTED_ORIGINS',
+        default=','.join(CORS_ALLOWED_ORIGINS),
+    ).split(',')
+    if o.strip()
+]
+
+# ✅ Durcissement en production (DEBUG=False) : cookies sécurisés, HSTS, HTTPS.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+X_FRAME_OPTIONS = 'DENY'
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+    SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=31536000, cast=int)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
 
 CORS_ALLOW_HEADERS = [
     'accept',
@@ -313,3 +430,22 @@ CORS_ALLOW_HEADERS = [
     'x-institution-id',      # ← custom header
     'x-annee-scolaire-id',   # ← custom header
 ]
+
+# ========================================
+# DJANGO CHANNELS — WebSocket temps réel (notifications)
+# ========================================
+ASGI_APPLICATION = 'master_backend_api.asgi.application'
+
+_CHANNEL_REDIS = config('REDIS_URL', default='')
+if _CHANNEL_REDIS:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {'hosts': [_CHANNEL_REDIS]},
+        }
+    }
+else:
+    # Repli sans Redis (mono-processus) — suffisant en dev.
+    CHANNEL_LAYERS = {
+        'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'},
+    }

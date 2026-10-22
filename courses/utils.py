@@ -199,7 +199,12 @@ def _get_apprenant_cours_ids(user, institution_id=None):
     if apprenant is None:
         return InscriptionCours.objects.none().values_list("cours_id", flat=True)
 
-    active = ["inscrit", "en_cours", "en cours", "encours"]
+    # ✅ Statuts considérés comme « visibles » pour l'apprenant.
+    # On INCLUT « termine » : un cours terminé doit rester consultable
+    # (l'interface propose explicitement « Revoir le cours »). Sans cela, les
+    # apprenants dont les inscriptions sont passées à « termine » ne voyaient
+    # plus AUCUN cours.
+    active = ["inscrit", "en_cours", "en cours", "encours", "termine", "terminé"]
     qs = (
         InscriptionCours.objects
         .filter(apprenant=apprenant)
@@ -211,7 +216,35 @@ def _get_apprenant_cours_ids(user, institution_id=None):
     return qs.values_list("cours_id", flat=True)
 
 
-def filter_queryset_by_role(queryset, request, model_name="Cours"):
+
+def _formateur_cours_ids(user):
+    """Cours enseignés par un formateur : en tant qu'enseignant du cours OU
+    enseignant d'un GROUPE du cours (sinon il ne « voyait » aucun contenu)."""
+    from .models import Cours
+    from django.db.models import Q
+    return (
+        Cours.objects
+        .filter(Q(enseignant_id=user.pk) | Q(groupe__enseignants__id=user.pk))
+        .values_list("id", flat=True)
+        .distinct()
+    )
+
+
+
+def is_supervision_admin(user) -> bool:
+    """Admin d'établissement : supervision.
+    Il consulte la LISTE des cours, mais n'accède PAS au détail d'un cours ni
+    aux ressources pédagogiques internes (séquences, blocs, ressources).
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return False
+    role = user.role.name if hasattr(user, "role") and user.role else None
+    return role == "Admin"
+
+
+def _filter_by_role_impl(queryset, request, model_name="Cours"):
     user = request.user
     ctx = get_user_context(request)
 
@@ -325,9 +358,16 @@ def filter_queryset_by_role(queryset, request, model_name="Cours"):
     # ADMIN
     # ================================================================
     if role_name == "Admin":
-        # Evaluation n'a pas institution_id direct → via cours
+        # Modèles SANS `institution_id` : on passe par la relation.
+        # (BlocContenu et RessourceSequence n'ont pas d'établissement direct →
+        #  séquence → module → cours ; sinon erreur 500 « Cannot resolve
+        #  keyword 'institution_id' ».)
         if model_name == "Evaluation":
             return queryset.filter(cours__institution_id=institution_id)
+        if model_name == "BlocContenu":
+            return queryset.filter(sequence__module__cours__institution_id=institution_id)
+        if model_name == "RessourceSequence":
+            return queryset.filter(sequence__module__cours__institution_id=institution_id)
         return queryset.filter(institution_id=institution_id)
 
     # ================================================================
@@ -430,65 +470,67 @@ def filter_queryset_by_role(queryset, request, model_name="Cours"):
         if not formateur_inst_ids:
             return queryset.none()
 
+        cours_ids = _formateur_cours_ids(user)
+
         if model_name == "Cours":
             return queryset.filter(
                 institution_id__in=formateur_inst_ids,
-                enseignant_id=user.pk
+                id__in=cours_ids
             )
 
         if model_name == "Evaluation":
             return queryset.filter(
                 cours__institution_id__in=formateur_inst_ids,
-                cours__enseignant_id=user.pk
+                cours_id__in=cours_ids
             )
 
         if model_name == "Module":
             return queryset.filter(
                 institution_id__in=formateur_inst_ids,
-                cours__enseignant_id=user.pk
+                cours_id__in=cours_ids
             )
 
         if model_name == "Sequence":
             return queryset.filter(
                 module__cours__institution_id__in=formateur_inst_ids,
-                module__cours__enseignant_id=user.pk
+                module__cours_id__in=cours_ids
             )
 
         if model_name == "BlocContenu":
             return queryset.filter(
                 sequence__module__cours__institution_id__in=formateur_inst_ids,
-                sequence__module__cours__enseignant_id=user.pk
+                sequence__module__cours_id__in=cours_ids
             )
 
         if model_name == "RessourceSequence":
             return queryset.filter(
                 sequence__module__cours__institution_id__in=formateur_inst_ids,
-                sequence__module__cours__enseignant_id=user.pk
+                sequence__module__cours_id__in=cours_ids
             )
 
         if model_name == "Session":
             return queryset.filter(
                 institution_id__in=formateur_inst_ids,
-                cours__enseignant_id=user.pk
+                cours_id__in=cours_ids
             )
 
         if model_name == "InscriptionCours":
             return queryset.filter(
                 cours__institution_id__in=formateur_inst_ids,
-                cours__enseignant_id=user.pk,
+                cours_id__in=cours_ids,
                 institution_id__in=formateur_inst_ids 
             )
 
         if model_name == "Suivi":
             return queryset.filter(
                 institution_id__in=formateur_inst_ids,
-                cours__enseignant_id=user.pk
+                cours_id__in=cours_ids
             )
 
         if model_name == "Participation":
             return queryset.filter(
                 institution_id__in=formateur_inst_ids,
-                session__cours__enseignant_id=user.pk
+                session__cours_id__in=cours_ids
             )
 
         return queryset.filter(institution_id__in=formateur_inst_ids)
@@ -501,13 +543,30 @@ def get_filtered_object(model_class, pk, request, model_name):
     return get_object_or_404(qs, pk=pk)
 
 
-def can_create_in_context(user, parent_obj=None):
+def can_create_in_context(user, parent_obj=None, allow_admin=False):
+    """
+    Retourne True si l'utilisateur peut créer/modifier/supprimer du contenu.
+
+    Règle métier LMS :
+      - SuperAdmin      → toujours autorisé
+      - Responsable     → autorisé (dans son périmètre)
+      - Formateur       → autorisé sur ses propres cours uniquement
+      - Admin           → REFUSÉ (supervision lecture seule) SAUF si
+                          `allow_admin=True` (tâches administratives :
+                          inscriptions, suivis)
+      - Apprenant/Parent→ REFUSÉ
+    """
     if user.is_superuser:
         return True
 
     role_name = user.role.name if hasattr(user, "role") and user.role else None
 
-    if role_name in ["Admin", "Responsable", "ResponsableAcademique"]:
+    # Admin : supervision uniquement — pas de contenu pédagogique, mais les
+    # tâches d'administration (inscriptions, suivis) restent autorisées.
+    if role_name == "Admin":
+        return bool(allow_admin)
+
+    if role_name in ["Responsable", "ResponsableAcademique"]:
         return True
 
     if role_name == "Formateur":
@@ -531,3 +590,66 @@ def can_create_in_context(user, parent_obj=None):
         return False
 
     return False
+
+
+def can_manage_cours(user, cours):
+    """Autorise la gestion du contenu d'un cours (séances, blocs…).
+
+    Variante PERMISSIVE de `can_create_in_context`, destinée aux contrôles de
+    propriété ajoutés après coup : elle ne doit JAMAIS retirer un accès qui
+    fonctionnait auparavant.
+
+      - SuperAdmin / Admin / Responsable → oui (comme avant) ;
+      - Formateur → oui s'il est l'enseignant du cours OU enseignant d'un
+        groupe du cours ;
+      - pas de cours / contexte inconnu → oui (on ne bloque pas par défaut) ;
+      - autres rôles → laissé au RBAC et au filtrage de données.
+    """
+    if user is None or cours is None:
+        return True
+    if getattr(user, "is_superuser", False):
+        return True
+
+    role_name = user.role.name if hasattr(user, "role") and user.role else None
+    if role_name in ("Admin", "Responsable", "ResponsableAcademique"):
+        return True
+
+    if role_name == "Formateur":
+        if getattr(cours, "enseignant_id", None) == user.id:
+            return True
+        groupe = getattr(cours, "groupe", None)
+        if groupe is not None:
+            try:
+                if groupe.enseignants.filter(id=user.id).exists():
+                    return True
+            except Exception:
+                pass
+        return False
+
+    # Apprenant / Parent : ne pas bloquer ici (RBAC + scoping s'en chargent).
+    return True
+
+def filter_queryset_by_role(queryset, request, model_name="Cours", inclure_indisponibles=False):
+    """Filtre par rôle PUIS par DISPONIBILITÉ pour les profils apprenant/parent.
+
+    ✅ Séparation autorisation / disponibilité : l'encadrement garde un accès
+    complet (brouillons et programmés inclus) ; seuls apprenant et parent sont
+    restreints aux contenus effectivement disponibles.
+
+    `inclure_indisponibles=True` (endpoints de STRUCTURE) : on conserve les
+    contenus non publiés/programmés pour que l'apprenant voie le PLAN du cours
+    (ils sont marqués verrouillés) — l'accès au CONTENU reste bloqué ailleurs
+    (bloc_disponible).
+    """
+    qs = _filter_by_role_impl(queryset, request, model_name)
+    if inclure_indisponibles:
+        return qs
+    try:
+        ctx = get_user_context(request)
+    except Exception:
+        return qs
+    role = ctx.get("role_name")
+    if role in ("Apprenant", "Parent"):
+        from .publication import filter_disponibles
+        qs = filter_disponibles(qs, model_name)
+    return qs

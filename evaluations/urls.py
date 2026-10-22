@@ -1,6 +1,10 @@
 from django.urls import path
+from .import_create_views import (
+    EvaluationImportCreateAPIView,
+    QuizImportCreateAPIView,
+)
 from .views import (
-    # Quiz
+    EvaluationImportQuestionsAPIView,    # Quiz
     EvaluationExportAPIView,
     QuizListCreateAPIView,
     QuizDetailAPIView,
@@ -197,4 +201,7 @@ urlpatterns = [
          StatistiquesEvaluationAPIView.as_view(), 
          name='stats-evaluation'),
      path("evaluations/<int:pk>/export/", EvaluationExportAPIView.as_view(), name="evaluation-export"),
+     path("evaluations/importer-questions/", EvaluationImportQuestionsAPIView.as_view(), name="evaluation-import-questions"),
+     path("evaluations/importer/", EvaluationImportCreateAPIView.as_view(), name="evaluation-import-create"),
+     path("quiz/importer/", QuizImportCreateAPIView.as_view(), name="quiz-import-create"),
 ] 

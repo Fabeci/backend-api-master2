@@ -5,6 +5,7 @@ import secrets
 import string
 import uuid
 from django.db import transaction
+from core.rbac import RBACPermission
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -32,6 +33,14 @@ from .utils import (
     can_modify_academic_resource
 )
 
+from rest_framework.throttling import AnonRateThrottle
+
+
+class InstitutionCreateAnonThrottle(AnonRateThrottle):
+    """Limite la création anonyme d'établissement (onboarding public)."""
+    scope = "institution_create"
+    rate = "5/hour"
+
 
 # ============================================================================
 # FONCTIONS UTILITAIRES
@@ -47,12 +56,25 @@ def api_success(message: str, data=None, http_status=status.HTTP_200_OK):
 
 
 def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST, data=None):
+    # Message plus précis quand des erreurs de champ sont fournies
+    if errors and isinstance(errors, dict) and (not message or message == "Erreur de validation"):
+        for _field, _val in errors.items():
+            _msgs = _val if isinstance(_val, (list, tuple)) else [_val]
+            _first = next((str(m) for m in _msgs if m), None)
+            if _first:
+                message = f"{_field} : {_first}"
+                break
     payload = {
         "success": False,
         "status": http_status,
         "message": message,
         "data": data,
     }
+    _code_map = {
+        400: "VALIDATION_ERROR", 401: "NOT_AUTHENTICATED", 403: "PERMISSION_DENIED",
+        404: "NOT_FOUND", 409: "CONFLICT", 429: "THROTTLED",
+    }
+    payload["code"] = _code_map.get(http_status, "SERVER_ERROR" if http_status >= 500 else "ERROR")
     if errors is not None:
         payload["errors"] = errors
     return Response(payload, status=http_status)
@@ -65,20 +87,22 @@ def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST
 class InstitutionAPIView(APIView):
     """
     - GET/PUT/PATCH/DELETE : Auth obligatoire + filtrage par rôle
-    - POST : Public (AllowAny) pour permettre onboarding / signup institution
+    - POST : Auth obligatoire + RBAC (création PUBLIQUE retirée)
     """
-    permission_classes = [IsAuthenticated]  # défaut
+    permission_classes = [IsAuthenticated, RBACPermission]  # défaut
 
     def get_permissions(self):
-        if self.request.method == "POST":
-            return [AllowAny()]
-        return [IsAuthenticated()]
+        # ✅ Création PUBLIQUE retirée : la création d'un établissement est
+        #    désormais réservée aux profils authentifiés habilités (plus
+        #    d'auto-inscription anonyme).
+        return [IsAuthenticated(), RBACPermission()]
 
-    # def get_throttles(self):
-    #     # Limite uniquement la création publique
-    #     if self.request.method == "POST" and not getattr(self.request.user, "is_authenticated", False):
-    #         return [InstitutionCreateAnonThrottle()]
-    #     return super().get_throttles()
+    def get_throttles(self):
+        # ✅ Limite uniquement la création publique (onboarding) — corrige
+        # l'absence de limitation sur un endpoint anonyme.
+        if self.request.method == "POST" and not getattr(self.request.user, "is_authenticated", False):
+            return [InstitutionCreateAnonThrottle()]
+        return super().get_throttles()
 
     def get(self, request, pk=None):
         if pk:
@@ -93,10 +117,17 @@ class InstitutionAPIView(APIView):
 
     def post(self, request):
         """
-        Création PUBLIC :
-        - on exige admin_account (création du compte admin + code d'activation)
-        - institution créée même sans user connecté
+        Création d'établissement — réservée à l'administration (SuperAdmin/Admin).
+        La création PUBLIQUE (auto-inscription) a été retirée.
         """
+        user = request.user
+        role = user.role.name if getattr(user, "role", None) else None
+        if not (getattr(user, "is_superuser", False) or role in ("SuperAdmin", "Admin")):
+            return api_error(
+                "Création d'établissement réservée à l'administration.",
+                http_status=status.HTTP_403_FORBIDDEN,
+            )
+
         # ✅ sécurité : forcer un admin pour éviter institutions "orphelines"
         if not request.data.get("admin_account") and not request.data.get("existing_admin_id"):
             return api_error(
@@ -155,7 +186,7 @@ class InstitutionLogoUploadAPIView(APIView):
     Upload ou suppression du logo d'une institution.
     Seul l'Admin de l'institution ou un SuperUser peut modifier le logo.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
     parser_classes = [MultiPartParser, FormParser]   # ← parsers multipart explicites
 
     def patch(self, request, pk):
@@ -217,7 +248,7 @@ class GroupeListCreateAPIView(APIView):
     CRÉATION :
     - Admin/Responsable uniquement
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get(self, request):
         qs = Groupe.objects.all().prefetch_related("enseignants")
@@ -255,7 +286,7 @@ class GroupeDetailAPIView(APIView):
     - Formateur : Uniquement SES groupes (où il enseigne)
     - Apprenant : Uniquement SON groupe
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get_object(self, pk, request):
         return get_filtered_academic_object(Groupe, pk, request, "Groupe")
@@ -309,7 +340,7 @@ class ClasseListCreateAPIView(APIView):
 
     Même logique que Groupe.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get(self, request):
         qs = Classe.objects.all()
@@ -344,7 +375,7 @@ class ClasseDetailAPIView(APIView):
     - Formateur : Uniquement classes de SES groupes
     - Apprenant : Uniquement SA classe
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get_object(self, pk, request):
         return get_filtered_academic_object(Classe, pk, request, "Classe")
@@ -394,7 +425,7 @@ class ClasseDetailAPIView(APIView):
 
 class FiliereListCreateAPIView(APIView):
     """Filières : visibles par tous (modèle transversal)"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get(self, request):
         qs = Filiere.objects.all()
@@ -423,7 +454,7 @@ class FiliereListCreateAPIView(APIView):
 
 class FiliereDetailAPIView(APIView):
     """Détail d'une filière"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get_object(self, pk):
         return get_object_or_404(Filiere, pk=pk)
@@ -483,7 +514,7 @@ class FiliereDetailAPIView(APIView):
 
 class DepartementListCreateAPIView(APIView):
     """Départements : filtrés par institution"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get(self, request):
         qs = Departement.objects.select_related("institution", "responsable_academique")
@@ -508,7 +539,7 @@ class DepartementListCreateAPIView(APIView):
 
 class DepartementDetailAPIView(APIView):
     """Détail d'un département"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get_object(self, pk, request):
         return get_filtered_academic_object(Departement, pk, request, "Departement")
@@ -561,7 +592,7 @@ class InscriptionListCreateAPIView(APIView):
     - Formateur : Inscriptions dans ses groupes/classes
     - Apprenant : Uniquement sa propre inscription
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get(self, request):
         qs = Inscription.objects.all()
@@ -591,7 +622,7 @@ class InscriptionListCreateAPIView(APIView):
 
 class InscriptionDetailAPIView(APIView):
     """Détail d'une inscription"""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
     def get_object(self, pk, request):
         return get_filtered_academic_object(Inscription, pk, request, "Inscription")

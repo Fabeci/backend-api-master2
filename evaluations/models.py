@@ -427,6 +427,11 @@ class PassageEvaluation(models.Model):
         on_delete=models.CASCADE, 
         related_name='passages'
     )
+
+    numero_tentative = models.PositiveIntegerField(
+        default=1,
+        help_text="Numéro de la tentative (1, 2, …)"
+    )
     
     statut = models.CharField(
         max_length=20,
@@ -466,7 +471,7 @@ class PassageEvaluation(models.Model):
     date_correction = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        unique_together = ('apprenant', 'evaluation')
+        unique_together = ('apprenant', 'evaluation', 'numero_tentative')
         verbose_name = "Passage d'évaluation"
         verbose_name_plural = "Passages d'évaluations"
         ordering = ['-date_debut']
@@ -749,15 +754,14 @@ class PassageQuiz(models.Model):
         return f"{self.apprenant} - {self.quiz.titre} - {self.score}pts"
 
     def calculer_score(self):
-        """Calcule le score total du quiz"""
+        """Calcule le score total du quiz (ne sauvegarde pas — l'appelant gère le save)."""
         total_points = 0
         for reponse in self.reponses_quiz.all():
             if reponse.question.mode_correction == 'automatique':
                 reponse.calculer_points_automatique()
             total_points += reponse.points_obtenus
-        
+
         self.score = total_points
-        self.save()
         return self.score
 
 

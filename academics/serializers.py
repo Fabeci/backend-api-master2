@@ -9,6 +9,7 @@ from users.models import Admin, Apprenant, Formateur, Parent, ResponsableAcademi
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 from django.core.mail import send_mail
+from core.mailer import safe_send_mail
 from django.conf import settings
 
 from users.serializers import ApprenantSerializer
@@ -295,19 +296,19 @@ class InstitutionSerializer(serializers.ModelSerializer):
 
                 # Code d'activation + email
                 v = VerificationCode.create_activation_code(admin)
-                send_mail(
+                safe_send_mail(
                     subject="Somapro - Compte administrateur : code d'activation",
                     message=(
                         f"Bonjour {admin.prenom},\n\n"
                         f"Votre compte administrateur pour l'institution « {institution.nom} » a été créé.\n"
                         f"Code d'activation : {v.code} (valide 15 minutes).\n\n"
-                        f"Identifiant : {admin.email}\n"
-                        f"Mot de passe provisoire : {password}\n\n"
-                        f"Merci de valider votre compte et de modifier votre mot de passe après connexion."
+                        f"Identifiant : {admin.email}\n\n"
+                        f"Pour définir votre mot de passe, utilisez « Mot de passe oublié » sur la page de connexion.\n"
+                        f"Merci de valider votre compte puis de définir votre mot de passe."
                     ),
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[admin.email],
-                    fail_silently=False,
+                    fail_silently=None,
                 )
 
             # Lier l'admin à l'institution (si le champ existe)
@@ -384,18 +385,18 @@ class InstitutionSerializer(serializers.ModelSerializer):
                 admin.save()
 
                 v = VerificationCode.create_activation_code(admin)
-                send_mail(
+                safe_send_mail(
                     subject="Somapro - Nouveau compte administrateur",
                     message=(
                         f"Bonjour {admin.prenom},\n\n"
                         f"Un nouveau compte administrateur pour l'institution « {instance.nom} » a été créé.\n"
                         f"Code d'activation : {v.code} (valide 15 minutes).\n\n"
                         f"Identifiant : {admin.email}\n"
-                        f"Mot de passe provisoire : {password}\n"
+                        f"Pour définir votre mot de passe, utilisez « Mot de passe oublié » sur la page de connexion.\n"
                     ),
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[admin.email],
-                    fail_silently=False,
+                    fail_silently=None,
                 )
 
                 if hasattr(instance, "admin"):

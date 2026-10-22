@@ -4,6 +4,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from core.rbac import RBACPermission
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -13,6 +14,7 @@ from .models import (
     ProgressionSequence,
     ProgressionQuiz,
     HistoriqueActivite,
+    SessionApprenant,
     PlanAction,
     ObjectifPlanAction,
 )
@@ -24,10 +26,15 @@ from .serializers import (
     ProgressionSequenceSerializer,
     ProgressionQuizSerializer,
     HistoriqueActiviteSerializer,
+    SessionApprenantSerializer,
     PlanActionSerializer,
     PlanActionCreateSerializer,
     ObjectifPlanActionSerializer,
 )
+
+# ✅ SÉCURITÉ : contrôle d'accès par apprenant (anti-IDOR)
+from users.access_control import accessible_apprenants, user_can_access_apprenant
+from users.models import Apprenant
 
 
 # ============================================================================
@@ -49,15 +56,91 @@ def api_success(message: str, data=None, http_status=status.HTTP_200_OK):
 
 def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST, data=None):
     """Réponse standardisée pour les erreurs"""
+    # Message plus précis quand des erreurs de champ sont fournies
+    if errors and isinstance(errors, dict) and (not message or message == "Erreur de validation"):
+        for _field, _val in errors.items():
+            _msgs = _val if isinstance(_val, (list, tuple)) else [_val]
+            _first = next((str(m) for m in _msgs if m), None)
+            if _first:
+                message = f"{_field} : {_first}"
+                break
     payload = {
         "success": False,
         "status": http_status,
         "message": message,
         "data": data,
     }
+    _code_map = {
+        400: "VALIDATION_ERROR", 401: "NOT_AUTHENTICATED", 403: "PERMISSION_DENIED",
+        404: "NOT_FOUND", 409: "CONFLICT", 429: "THROTTLED",
+    }
+    payload["code"] = _code_map.get(http_status, "SERVER_ERROR" if http_status >= 500 else "ERROR")
     if errors is not None:
         payload["errors"] = errors
     return Response(payload, status=http_status)
+
+
+def _deny_foreign_apprenant(request):
+    """
+    ✅ SÉCURITÉ : retourne une réponse 403 si le payload cible un apprenant
+    dont l'accès n'est pas autorisé pour l'utilisateur courant. None sinon.
+    """
+    raw = request.data.get("apprenant") if hasattr(request.data, "get") else None
+    if raw in (None, ""):
+        return None
+    try:
+        from users.models import Apprenant
+        target = Apprenant.objects.filter(pk=raw).first()
+    except (ValueError, TypeError):
+        return None
+    if target is not None and not user_can_access_apprenant(request.user, target):
+        return api_error(
+            "Accès refusé : cet apprenant n'est pas dans votre périmètre.",
+            http_status=status.HTTP_403_FORBIDDEN,
+        )
+    return None
+
+
+def _check_progression_target(request):
+    """✅ PÉRIMÈTRE : interdit d'écrire la progression d'un apprenant hors
+    périmètre. Les ViewSets ProgressionModule/Sequence ne fournissent que la FK
+    parente (`progression_apprenant` / `progression_module`) : on remonte donc
+    la chaîne jusqu'à l'apprenant réel."""
+    user = request.user
+    try:
+        from users.access_control import is_global_reader
+        if is_global_reader(user):
+            return None
+    except Exception:
+        pass
+
+    data = request.data if hasattr(request.data, "get") else {}
+
+    def _resolve():
+        raw = data.get("apprenant")
+        if raw:
+            return Apprenant.objects.filter(pk=raw).first()
+        raw = data.get("progression_apprenant")
+        if raw:
+            pa = ProgressionApprenant.objects.filter(pk=raw).select_related("apprenant").first()
+            return pa.apprenant if pa else None
+        raw = data.get("progression_module")
+        if raw:
+            pm = ProgressionModule.objects.filter(pk=raw).select_related("progression_apprenant__apprenant").first()
+            return pm.progression_apprenant.apprenant if pm else None
+        return None
+
+    try:
+        target = _resolve()
+    except Exception:
+        target = None
+
+    if target is not None and not user_can_access_apprenant(user, target):
+        return api_error(
+            "Accès refusé : cet apprenant n'est pas dans votre périmètre.",
+            http_status=status.HTTP_403_FORBIDDEN,
+        )
+    return None
 
 
 # ============================================================================
@@ -68,7 +151,8 @@ class ProgressionApprenantViewSet(viewsets.ModelViewSet):
     """
     ViewSet pour gérer les progressions des apprenants dans les cours.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
+    rbac_resource = "progression"
     
     def get_queryset(self):
         queryset = ProgressionApprenant.objects.select_related(
@@ -95,7 +179,12 @@ class ProgressionApprenantViewSet(viewsets.ModelViewSet):
         statut = self.request.query_params.get('statut')
         if statut:
             queryset = queryset.filter(statut=statut)
-        
+
+        # ✅ SÉCURITÉ : limiter aux apprenants autorisés (anti-IDOR).
+        allowed = accessible_apprenants(self.request.user)
+        if allowed is not None:
+            queryset = queryset.filter(apprenant__in=allowed)
+
         return queryset
     
     def get_serializer_class(self):
@@ -141,6 +230,9 @@ class ProgressionApprenantViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """Créer une progression"""
+        denied = _deny_foreign_apprenant(request)
+        if denied:
+            return denied
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             instance = serializer.save()
@@ -289,7 +381,8 @@ class ProgressionModuleViewSet(viewsets.ModelViewSet):
     """ViewSet pour gérer les progressions dans les modules"""
     
     serializer_class = ProgressionModuleSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
+    rbac_resource = "progression"
     
     def get_queryset(self):
         queryset = ProgressionModule.objects.select_related(
@@ -301,7 +394,12 @@ class ProgressionModuleViewSet(viewsets.ModelViewSet):
         progression_id = self.request.query_params.get('progression_apprenant')
         if progression_id:
             queryset = queryset.filter(progression_apprenant_id=progression_id)
-        
+
+        # ✅ SÉCURITÉ : limiter aux apprenants autorisés (anti-IDOR).
+        allowed = accessible_apprenants(self.request.user)
+        if allowed is not None:
+            queryset = queryset.filter(progression_apprenant__apprenant__in=allowed)
+
         return queryset
     
     def list(self, request, *args, **kwargs):
@@ -340,6 +438,10 @@ class ProgressionModuleViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """Créer une progression module"""
+        # ✅ PÉRIMÈTRE : empêche d'écrire la progression d'un autre apprenant
+        err = _check_progression_target(request)
+        if err:
+            return err
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             instance = serializer.save()
@@ -462,7 +564,8 @@ class ProgressionSequenceViewSet(viewsets.ModelViewSet):
     """ViewSet pour gérer les progressions dans les séquences"""
     
     serializer_class = ProgressionSequenceSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
+    rbac_resource = "progression"
     
     def get_queryset(self):
         queryset = ProgressionSequence.objects.select_related(
@@ -474,7 +577,12 @@ class ProgressionSequenceViewSet(viewsets.ModelViewSet):
         progression_module_id = self.request.query_params.get('progression_module')
         if progression_module_id:
             queryset = queryset.filter(progression_module_id=progression_module_id)
-        
+
+        # ✅ SÉCURITÉ : limiter aux apprenants autorisés (anti-IDOR).
+        allowed = accessible_apprenants(self.request.user)
+        if allowed is not None:
+            queryset = queryset.filter(progression_module__progression_apprenant__apprenant__in=allowed)
+
         return queryset
     
     def list(self, request, *args, **kwargs):
@@ -513,6 +621,10 @@ class ProgressionSequenceViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """Créer une progression séquence"""
+        # ✅ PÉRIMÈTRE : empêche d'écrire la progression d'un autre apprenant
+        err = _check_progression_target(request)
+        if err:
+            return err
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             instance = serializer.save()
@@ -630,7 +742,8 @@ class ProgressionQuizViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet pour consulter les progressions dans les quiz"""
     
     serializer_class = ProgressionQuizSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
+    rbac_resource = "progression"
     
     def get_queryset(self):
         queryset = ProgressionQuiz.objects.select_related(
@@ -647,7 +760,12 @@ class ProgressionQuizViewSet(viewsets.ReadOnlyModelViewSet):
         quiz_id = self.request.query_params.get('quiz')
         if quiz_id:
             queryset = queryset.filter(passage_quiz__quiz_id=quiz_id)
-        
+
+        # ✅ SÉCURITÉ : limiter aux apprenants autorisés (anti-IDOR).
+        allowed = accessible_apprenants(self.request.user)
+        if allowed is not None:
+            queryset = queryset.filter(progression_apprenant__apprenant__in=allowed)
+
         return queryset
     
     def list(self, request, *args, **kwargs):
@@ -693,8 +811,157 @@ class HistoriqueActiviteViewSet(viewsets.ModelViewSet):
     """ViewSet pour gérer l'historique des activités"""
     
     serializer_class = HistoriqueActiviteSerializer
-    permission_classes = [IsAuthenticated]
-    
+    permission_classes = [IsAuthenticated, RBACPermission]
+    rbac_resource = "historique"
+
+    @action(detail=False, methods=['post'], url_path='bulk')
+    def bulk(self, request):
+        """Enregistre un LOT d'activités en une seule requête (tracage frontend)."""
+        items = request.data.get('activites') if isinstance(request.data, dict) else request.data
+        if not isinstance(items, list):
+            items = [items] if items else []
+        created, errors = 0, []
+        for raw in items[:300]:
+            if not isinstance(raw, dict):
+                continue
+            appr = Apprenant.objects.filter(pk=raw.get('apprenant')).first()
+            if not appr or not user_can_access_apprenant(request.user, appr):
+                errors.append({'apprenant': raw.get('apprenant'), 'error': 'non autorisé'})
+                continue
+            try:
+                HistoriqueActivite.objects.create(
+                    apprenant=appr,
+                    type_activite=raw.get('type_activite', 'autre'),
+                    objet_type=raw.get('objet_type', '') or '',
+                    objet_id=raw.get('objet_id'),
+                    duree_minutes=int(raw.get('duree_minutes') or 0),
+                    duree_secondes=int(raw.get('duree_secondes') or 0),
+                    description=raw.get('description', '') or '',
+                    metadata=raw.get('metadata') or {},
+                )
+                created += 1
+            except Exception as e:
+                errors.append({'raw': str(raw)[:120], 'error': str(e)})
+        return api_success(
+            f"{created} activité(s) enregistrée(s)",
+            {'created': created, 'errors': errors},
+            status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=['get'], url_path='rapport')
+    def rapport(self, request):
+        """Rapport agrégé d'activité des apprenants (dashboard Admin/Formateur)."""
+        from django.db.models import Sum, Count, Q
+
+        debut = request.query_params.get('date_debut')
+        fin = request.query_params.get('date_fin')
+        apprenant_id = request.query_params.get('apprenant')
+
+        qs = HistoriqueActivite.objects.all()
+        sessions = SessionApprenant.objects.all()
+
+        allowed = accessible_apprenants(request.user)
+        if allowed is not None:
+            qs = qs.filter(apprenant__in=allowed)
+            sessions = sessions.filter(apprenant__in=allowed)
+        if apprenant_id:
+            qs = qs.filter(apprenant_id=apprenant_id)
+            sessions = sessions.filter(apprenant_id=apprenant_id)
+        if debut:
+            qs = qs.filter(date_activite__gte=debut)
+            sessions = sessions.filter(date_debut__gte=debut)
+        if fin:
+            qs = qs.filter(date_activite__lte=fin)
+            sessions = sessions.filter(date_debut__lte=fin)
+
+        def _i(v):
+            return int(v or 0)
+
+        q_agg = qs.aggregate(
+            nb_pages=Count('id', filter=Q(type_activite='page_vue')),
+            temps_page=Sum('duree_secondes', filter=Q(type_activite='page_vue')),
+            nb_pratique=Count('id', filter=Q(type_activite__in=['consultation_cours', 'consultation_bloc', 'consultation_module'])),
+            nb_eval=Count('id', filter=Q(type_activite__in=['debut_evaluation', 'soumission_evaluation', 'debut_quiz', 'fin_quiz', 'soumission_quiz'])),
+            nb_inact=Count('id', filter=Q(type_activite='inactivite')),
+            temps_inact=Sum('duree_secondes', filter=Q(type_activite='inactivite')),
+            nb_offline=Count('id', filter=Q(type_activite='perte_connexion')),
+            nb_onglet_masque=Count('id', filter=Q(type_activite='onglet_masque')),
+            temps_onglet_masque=Sum('duree_secondes', filter=Q(type_activite='onglet_masque')),
+            nb_fenetre_inactive=Count('id', filter=Q(type_activite='fenetre_inactive')),
+            temps_fenetre_inactive=Sum('duree_secondes', filter=Q(type_activite='fenetre_inactive')),
+            nb_hors_app=Count('id', filter=Q(type_activite__in=['onglet_masque', 'fenetre_inactive'])),
+            temps_hors_app=Sum('duree_secondes', filter=Q(type_activite__in=['onglet_masque', 'fenetre_inactive'])),
+            nb_apprenants=Count('apprenant', distinct=True),
+        )
+        s_agg = sessions.aggregate(nb=Count('id'), duree=Sum('duree_secondes'))
+
+        top_pages = list(
+            qs.filter(type_activite='page_vue')
+              .values('description')
+              .annotate(vues=Count('id'), temps=Sum('duree_secondes'))
+              .order_by('-temps')[:12]
+        )
+        for t in top_pages:
+            t['temps'] = _i(t['temps'])
+            t['temps_moyen'] = round(t['temps'] / t['vues']) if t['vues'] else 0
+
+        temps_par_type = list(
+            qs.values('type_activite')
+              .annotate(total=Sum('duree_secondes'), nb=Count('id'))
+              .order_by('-total')[:12]
+        )
+
+        par_apprenant = list(
+            qs.values('apprenant__id', 'apprenant__nom', 'apprenant__prenom')
+              .annotate(pages=Count('id', filter=Q(type_activite='page_vue')),
+                        temps=Sum('duree_secondes', filter=Q(type_activite='page_vue')),
+                        inact=Count('id', filter=Q(type_activite='inactivite')))
+              .order_by('-temps')[:20]
+        )
+
+        sessions_list = [
+            {
+                'id': s.id,
+                'apprenant': s.apprenant_id,
+                'apprenant_nom': f"{s.apprenant.prenom} {s.apprenant.nom}" if s.apprenant_id else '',
+                'date_debut': s.date_debut, 'date_fin': s.date_fin,
+                'duree_secondes': s.duree_effective_secondes,
+                'fin_reason': s.fin_reason, 'actif': s.actif, 'ip_address': s.ip_address,
+            }
+            for s in sessions.select_related('apprenant').order_by('-date_debut')[:25]
+        ]
+
+        nb_sessions = _i(s_agg['nb'])
+        duree_totale = _i(s_agg['duree'])
+        kpis = {
+            'nb_apprenants': _i(q_agg['nb_apprenants']),
+            'nb_sessions': nb_sessions,
+            'duree_totale_s': duree_totale,
+            'duree_moyenne_session_s': round(duree_totale / nb_sessions) if nb_sessions else 0,
+            'nb_pages_vues': _i(q_agg['nb_pages']),
+            'temps_page_s': _i(q_agg['temps_page']),
+            'temps_moyen_page_s': round(_i(q_agg['temps_page']) / _i(q_agg['nb_pages'])) if _i(q_agg['nb_pages']) else 0,
+            'nb_consultations': _i(q_agg['nb_pratique']),
+            'nb_evaluations': _i(q_agg['nb_eval']),
+            'nb_inactivites': _i(q_agg['nb_inact']),
+            'temps_inactivite_s': _i(q_agg['temps_inact']),
+            'nb_pertes_connexion': _i(q_agg['nb_offline']),
+            'nb_onglet_masque': _i(q_agg['nb_onglet_masque']),
+            'temps_onglet_masque_s': _i(q_agg['temps_onglet_masque']),
+            'nb_fenetre_inactive': _i(q_agg['nb_fenetre_inactive']),
+            'temps_fenetre_inactive_s': _i(q_agg['temps_fenetre_inactive']),
+            'nb_sorties_application': _i(q_agg['nb_hors_app']),
+            'temps_hors_application_s': _i(q_agg['temps_hors_app']),
+        }
+
+        return api_success("Rapport d'activité", {
+            'kpis': kpis,
+            'top_pages': top_pages,
+            'temps_par_type': temps_par_type,
+            'par_apprenant': par_apprenant,
+            'sessions': sessions_list,
+        })
+
     def get_queryset(self):
         queryset = HistoriqueActivite.objects.select_related('apprenant')
         
@@ -716,13 +983,25 @@ class HistoriqueActiviteViewSet(viewsets.ModelViewSet):
         date_fin = self.request.query_params.get('date_fin')
         if date_fin:
             queryset = queryset.filter(date_activite__lte=date_fin)
-        
+
+        # ✅ SÉCURITÉ : limiter aux apprenants autorisés (anti-IDOR).
+        allowed = accessible_apprenants(self.request.user)
+        if allowed is not None:
+            queryset = queryset.filter(apprenant__in=allowed)
+
         return queryset.order_by('-date_activite')
     
     def list(self, request, *args, **kwargs):
         """Liste des activités"""
         try:
             queryset = self.get_queryset()
+            # ✅ Limite optionnelle (?limit=N) — utilisée par le détail de cours (5).
+            limit = request.query_params.get('limit')
+            if limit:
+                try:
+                    queryset = queryset[:max(1, int(limit))]
+                except (ValueError, TypeError):
+                    pass
             serializer = self.get_serializer(queryset, many=True)
             return api_success(
                 "Historique des activités récupéré avec succès",
@@ -755,6 +1034,9 @@ class HistoriqueActiviteViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """Créer une activité"""
+        denied = _deny_foreign_apprenant(request)
+        if denied:
+            return denied
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             instance = serializer.save()
@@ -817,7 +1099,8 @@ class HistoriqueActiviteViewSet(viewsets.ModelViewSet):
 class PlanActionViewSet(viewsets.ModelViewSet):
     """ViewSet pour gérer les plans d'action"""
     
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
+    rbac_resource = "planAction"
     
     def get_queryset(self):
         queryset = PlanAction.objects.select_related(
@@ -840,7 +1123,12 @@ class PlanActionViewSet(viewsets.ModelViewSet):
         statut = self.request.query_params.get('statut')
         if statut:
             queryset = queryset.filter(statut=statut)
-        
+
+        # ✅ SÉCURITÉ : limiter aux apprenants autorisés (anti-IDOR).
+        allowed = accessible_apprenants(self.request.user)
+        if allowed is not None:
+            queryset = queryset.filter(apprenant__in=allowed)
+
         return queryset
     
     def get_serializer_class(self):
@@ -884,6 +1172,9 @@ class PlanActionViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """Créer un plan d'action"""
+        denied = _deny_foreign_apprenant(request)
+        if denied:
+            return denied
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             instance = serializer.save()
@@ -972,7 +1263,8 @@ class ObjectifPlanActionViewSet(viewsets.ModelViewSet):
     """ViewSet pour gérer les objectifs des plans d'action"""
     
     serializer_class = ObjectifPlanActionSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
+    rbac_resource = "planAction"
     
     def get_queryset(self):
         queryset = ObjectifPlanAction.objects.select_related('plan_action')
@@ -981,7 +1273,12 @@ class ObjectifPlanActionViewSet(viewsets.ModelViewSet):
         plan_id = self.request.query_params.get('plan_action')
         if plan_id:
             queryset = queryset.filter(plan_action_id=plan_id)
-        
+
+        # ✅ SÉCURITÉ : limiter aux apprenants autorisés (anti-IDOR).
+        allowed = accessible_apprenants(self.request.user)
+        if allowed is not None:
+            queryset = queryset.filter(plan_action__apprenant__in=allowed)
+
         return queryset.order_by('ordre')
     
     def list(self, request, *args, **kwargs):
@@ -1120,3 +1417,69 @@ class ObjectifPlanActionViewSet(viewsets.ModelViewSet):
                 errors={'detail': str(e)},
                 http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+# ============================================================================
+# SESSION APPRENANT — démarrer / heartbeat / terminer
+# ============================================================================
+
+class SessionApprenantViewSet(viewsets.ModelViewSet):
+    """Sessions des apprenants : démarrer, heartbeat, terminer, lister."""
+    serializer_class = SessionApprenantSerializer
+    permission_classes = [IsAuthenticated, RBACPermission]
+    rbac_resource = "progression"
+
+    def create(self, request, *args, **kwargs):
+        """✅ PÉRIMÈTRE : empêche de créer une session au nom d'un autre apprenant."""
+        err = _check_progression_target(request)
+        if err:
+            return err
+        return super().create(request, *args, **kwargs)
+
+    def get_queryset(self):
+        qs = SessionApprenant.objects.select_related('apprenant')
+        apprenant_id = self.request.query_params.get('apprenant')
+        if apprenant_id:
+            qs = qs.filter(apprenant_id=apprenant_id)
+        actif = self.request.query_params.get('actif')
+        if actif in ('1', 'true', 'True'):
+            qs = qs.filter(actif=True)
+        allowed = accessible_apprenants(self.request.user)
+        if allowed is not None:
+            qs = qs.filter(apprenant__in=allowed)
+        return qs.order_by('-date_debut')
+
+    def _client_ip(self, request):
+        xff = request.META.get('HTTP_X_FORWARDED_FOR')
+        return xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR')
+
+    @action(detail=False, methods=['post'], url_path='demarrer')
+    def demarrer(self, request):
+        appr = Apprenant.objects.filter(pk=request.data.get('apprenant')).first()
+        if not appr or not user_can_access_apprenant(request.user, appr):
+            return api_error("Apprenant non autorisé", http_status=status.HTTP_403_FORBIDDEN)
+        # On clôt toute session active restée ouverte (navigateur fermé sans logout)
+        SessionApprenant.objects.filter(apprenant=appr, actif=True).update(
+            actif=False, date_fin=timezone.now(), fin_reason='expiration'
+        )
+        s = SessionApprenant.objects.create(
+            apprenant=appr,
+            ip_address=self._client_ip(request),
+            user_agent=(request.META.get('HTTP_USER_AGENT') or '')[:300],
+        )
+        return api_success("Session démarrée", SessionApprenantSerializer(s).data, status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'], url_path='heartbeat')
+    def heartbeat(self, request):
+        s = SessionApprenant.objects.filter(pk=request.data.get('session'), actif=True).first()
+        if not s or not user_can_access_apprenant(request.user, s.apprenant):
+            return api_error("Session introuvable", http_status=status.HTTP_404_NOT_FOUND)
+        s.touch()
+        return api_success("ok", {'id': s.id, 'duree_secondes': s.duree_effective_secondes})
+
+    @action(detail=False, methods=['post'], url_path='terminer')
+    def terminer(self, request):
+        s = SessionApprenant.objects.filter(pk=request.data.get('session'), actif=True).first()
+        if not s or not user_can_access_apprenant(request.user, s.apprenant):
+            return api_error("Session introuvable", http_status=status.HTTP_404_NOT_FOUND)
+        s.terminer(request.data.get('reason') or 'inconnue')
+        return api_success("Session terminée", SessionApprenantSerializer(s).data)
