@@ -701,6 +701,19 @@ class SessionSerializer(serializers.ModelSerializer):
                 return True
         except Exception:
             pass
+
+        # ✅ Fenêtre d'accès : 15 min avant le début, 30 min après la fin.
+        try:
+            from datetime import timedelta
+            from django.utils import timezone
+            if session.date_debut:
+                now = timezone.now()
+                if now < session.date_debut - timedelta(minutes=15):
+                    return False
+                if session.date_fin and now > session.date_fin + timedelta(minutes=30):
+                    return False
+        except Exception:
+            pass
         try:
             from courses.models import InscriptionCours
             from django.db.models.functions import Lower

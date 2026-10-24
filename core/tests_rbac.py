@@ -46,7 +46,9 @@ class RBACMatrixTests(TestCase):
         self.assertTrue(has_permission(u, "cours", "view"))
         self.assertTrue(has_permission(u, "cours", "create"))
         self.assertTrue(has_permission(u, "evaluations", "create"))
-        self.assertFalse(has_permission(u, "parents", "view"))
+        # ✅ Nouvelle règle : le formateur voit les parents de SES apprenants.
+        self.assertTrue(has_permission(u, "parents", "view"))
+        self.assertFalse(has_permission(u, "parents", "create"))
         self.assertFalse(has_permission(u, "admins", "view"))
         self.assertFalse(has_permission(u, "users", "manage_permissions"))
         self.assertEqual(get_scope(u), "assigned")
@@ -67,10 +69,10 @@ class RBACMatrixTests(TestCase):
 
     def test_additive_permission(self):
         u = self.users["Formateur"]
-        self.assertFalse(has_permission(u, "parents", "view"))
-        u.permissions = ["parents.view"]; u.save()
-        self.assertTrue(has_permission(u, "parents", "view"))
-        self.assertFalse(has_permission(u, "parents", "create"))
+        self.assertFalse(has_permission(u, "admins", "view"))
+        u.permissions = ["admins.view"]; u.save()
+        self.assertTrue(has_permission(u, "admins", "view"))
+        self.assertFalse(has_permission(u, "admins", "create"))
 
     def test_db_override_wins(self):
         u = self.users["Formateur"]
@@ -100,9 +102,10 @@ class RBACApiTests(TestCase):
         client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
         return client
 
-    def test_formateur_cannot_list_parents(self):
+    def test_formateur_can_list_own_parents(self):
+        # ✅ Nouvelle règle : liste autorisée, limitée à ses apprenants.
         c = self._auth("Formateur")
-        self.assertEqual(c.get("/api/v1/parents/").status_code, 403)
+        self.assertEqual(c.get("/api/v1/parents/").status_code, 200)
 
     def test_responsable_can_list_parents(self):
         c = self._auth("Responsable")

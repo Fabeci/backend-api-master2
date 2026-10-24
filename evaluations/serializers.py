@@ -109,6 +109,7 @@ class QuizSerializer(serializers.ModelSerializer):
         source='questions.count', 
         read_only=True
     )
+    passages_count = serializers.IntegerField(source='passages.count', read_only=True)
     sequence_titre = serializers.CharField(
         source='sequence.titre',
         read_only=True
@@ -124,7 +125,8 @@ class QuizSerializer(serializers.ModelSerializer):
             'sequence_titre',
             'date_creation',
             'date_modification',
-            'nombre_questions'
+            'nombre_questions',
+            'passages_count',
         ]
         read_only_fields = ['id', 'date_creation', 'date_modification']
 
@@ -243,6 +245,7 @@ class EvaluationSerializer(serializers.ModelSerializer):
     cours_titre = serializers.CharField(source='cours.titre', read_only=True)
     enseignant_nom = serializers.SerializerMethodField()
     nombre_questions = serializers.IntegerField(read_only=True)
+    passages_count = serializers.IntegerField(source='passages.count', read_only=True)
     est_accessible = serializers.SerializerMethodField()
     peut_soumettre = serializers.SerializerMethodField()
     est_auto_corrigeable = serializers.SerializerMethodField()
@@ -254,7 +257,7 @@ class EvaluationSerializer(serializers.ModelSerializer):
             'titre', 'type_evaluation', 'type_evaluation_display', 'bareme',
             'duree_minutes', 'consigne_texte', 'fichier_sujet', 'date_debut',
             'date_fin', 'date_creation', 'date_modification', 'est_publiee',
-            'nombre_questions', 'est_accessible', 'peut_soumettre',
+            'nombre_questions', 'passages_count', 'est_accessible', 'peut_soumettre',
             'est_auto_corrigeable',
         ]
         read_only_fields = [

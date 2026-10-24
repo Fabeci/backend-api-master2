@@ -837,11 +837,8 @@ class Session(models.Model):
         return 0
 
     def save(self, *args, **kwargs):
-        # Auto-passage en "realisee" si date_fin est passée et statut encore "planifiee"
-        if self.statut == "planifiee" and self.date_fin:
-            from django.utils import timezone
-            if self.date_fin < timezone.now():
-                self.statut = "realisee"
+        # ✅ Le passage en « réalisée » est une action explicite du formateur
+        #    (bouton « Marquer terminée »), plus une déduction automatique.
         # Héritage automatique depuis le cours
         if self.cours:
             self.institution = self.cours.institution

@@ -10,6 +10,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
 import csv
@@ -536,10 +537,24 @@ class QuestionDetailAPIView(APIView):
         if _get_role(request.user) == 'Formateur':
             if not _formateur_owns_question(request.user, question):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        # ✅ Préserver l'historique : type/points figés dès qu'une réponse existe.
+        if question.reponses_apprenants.exists() or question.reponses_quiz.exists():
+            if 'type_question' in request.data and str(request.data.get('type_question')) != str(question.type_question):
+                return api_error("Question déjà répondue : le type n'est plus modifiable.",
+                                 http_status=status.HTTP_400_BAD_REQUEST)
+            try:
+                if 'points' in request.data and float(request.data.get('points')) != float(question.points):
+                    return api_error("Question déjà répondue : les points ne sont plus modifiables.",
+                                     http_status=status.HTTP_400_BAD_REQUEST)
+            except (TypeError, ValueError):
+                return api_error("Points invalides.", http_status=status.HTTP_400_BAD_REQUEST)
         serializer = QuestionSerializer(question, data=request.data, partial=True)
         if serializer.is_valid():
             return api_success("Question mise à jour.", QuestionSerializer(serializer.save()).data)
         return api_error("Erreur de validation.", errors=serializer.errors)
+
+    def patch(self, request, pk):
+        return self.put(request, pk)
 
     def delete(self, request, pk):
         err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')
@@ -549,6 +564,12 @@ class QuestionDetailAPIView(APIView):
         if _get_role(request.user) == 'Formateur':
             if not _formateur_owns_question(request.user, question):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        # ✅ Préserver l'historique : une question déjà répondue ne peut être supprimée.
+        if question.reponses_apprenants.exists() or question.reponses_quiz.exists():
+            return api_error(
+                "Des réponses d'apprenants existent pour cette question : suppression impossible.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
         question.delete()
         return api_success("Question supprimée.", None, status.HTTP_204_NO_CONTENT)
 
@@ -624,10 +645,19 @@ class ReponseDetailAPIView(APIView):
         if _get_role(request.user) == 'Formateur':
             if not _formateur_owns_question(request.user, reponse.question):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        from .models import ReponseQuestion, ReponseQuiz
+        if (ReponseQuestion.objects.filter(choix_selectionnes=reponse).exists()
+                or ReponseQuiz.objects.filter(choix_selectionnes=reponse).exists()):
+            if 'est_correcte' in request.data and bool(request.data.get('est_correcte')) != bool(reponse.est_correcte):
+                return api_error("Réponse déjà sélectionnée : la correction n'est plus modifiable.",
+                                 http_status=status.HTTP_400_BAD_REQUEST)
         serializer = ReponseSerializer(reponse, data=request.data, partial=True)
         if serializer.is_valid():
             return api_success("Réponse mise à jour.", ReponseSerializer(serializer.save()).data)
         return api_error("Erreur de validation.", errors=serializer.errors)
+
+    def patch(self, request, pk):
+        return self.put(request, pk)
 
     def delete(self, request, pk):
         err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')
@@ -637,6 +667,13 @@ class ReponseDetailAPIView(APIView):
         if _get_role(request.user) == 'Formateur':
             if not _formateur_owns_question(request.user, reponse.question):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        from .models import ReponseQuestion, ReponseQuiz
+        if (ReponseQuestion.objects.filter(choix_selectionnes=reponse).exists()
+                or ReponseQuiz.objects.filter(choix_selectionnes=reponse).exists()):
+            return api_error(
+                "Cette réponse a déjà été sélectionnée par un apprenant : suppression impossible.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
         reponse.delete()
         return api_success("Réponse supprimée.", None, status.HTTP_204_NO_CONTENT)
 
@@ -1115,8 +1152,8 @@ class PassageEvaluationSauvegarderAPIView(APIView):
             if _passage_expired(passage):
                 return api_error("Temps écoulé : la sauvegarde est close.",
                                  http_status=status.HTTP_403_FORBIDDEN)
-            if passage.evaluation.type_evaluation != 'simple':
-                return api_error("Route uniquement pour les évaluations simples.")
+            if passage.evaluation.type_evaluation not in ('simple', 'mixte'):
+                return api_error("Route réservée aux évaluations simples ou mixtes.")
             serializer = PassageEvaluationSerializer(passage, data=request.data, partial=True)
             if serializer.is_valid():
                 return api_success("Progression sauvegardée.",
@@ -1147,7 +1184,11 @@ class PassageEvaluationSoumettreAPIView(APIView):
             auto = str(request.data.get('auto', '')).lower() in ('1', 'true', 'yes')
             if not auto:
                 if passage.evaluation.type_evaluation in ('structuree', 'mixte'):
-                    if not passage.reponses_questions.exclude(statut='non_repondu').exists():
+                    has_question = passage.reponses_questions.exclude(statut='non_repondu').exists()
+                    has_simple = bool(passage.reponse_texte or passage.fichier_reponse)
+                    if not has_question and not (
+                        passage.evaluation.type_evaluation == 'mixte' and has_simple
+                    ):
                         return api_error("Aucune question répondue.")
                 elif passage.evaluation.type_evaluation == 'simple':
                     if not passage.reponse_texte and not passage.fichier_reponse:
@@ -1531,16 +1572,29 @@ class PassageQuizListCreateAPIView(APIView):
                 from courses.models import InscriptionCours
                 from courses.publication import cours_commence
 
-                if not InscriptionCours.objects.filter(apprenant=request.user, cours=cours).exists():
+                if not InscriptionCours.objects.filter(
+                    apprenant=request.user, cours=cours,
+                    statut__in=INSCRIPTION_ACTIVE_STATUSES,
+                ).exists():
                     return api_error("Accès refusé à ce cours.",
                                      http_status=status.HTTP_403_FORBIDDEN)
                 if not cours_commence(cours):
                     return api_error("Ce cours n'a pas encore commencé.",
                                      http_status=status.HTTP_403_FORBIDDEN)
 
-            passage = serializer.save()
-            for question in passage.quiz.questions.all():
-                ReponseQuiz.objects.create(passage_quiz=passage, question=question)
+            # ✅ Limite de tentatives (3 par défaut)
+            maxi = 3
+            nb = PassageQuiz.objects.filter(apprenant=request.user, quiz=quiz).count()
+            if nb >= maxi:
+                return api_error(
+                    f"Nombre maximal de tentatives atteint ({nb}/{maxi}).",
+                    http_status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            with transaction.atomic():
+                passage = serializer.save()
+                for question in passage.quiz.questions.all():
+                    ReponseQuiz.objects.create(passage_quiz=passage, question=question)
             return api_success("Passage créé.", PassageQuizDetailSerializer(passage).data,
                                status.HTTP_201_CREATED)
         return api_error("Erreur de validation.", errors=serializer.errors)

@@ -1488,6 +1488,60 @@ class SuiviDetailAPIView(APIView):
 # SESSIONS
 # ============================================================================
 
+class SessionCalendrierAPIView(APIView):
+    """GET /sessions/calendrier/?debut=YYYY-MM-DD&fin=YYYY-MM-DD
+
+    Calendrier global, filtré par le périmètre de rôle (établissement, cours,
+    enfants pour un parent) via `filter_queryset_by_role`.
+    """
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
+    rbac_resource = "sessions"
+
+    def get(self, request):
+        from datetime import timedelta
+
+        from django.utils import timezone
+        from django.utils.dateparse import parse_date
+
+        debut = parse_date(request.query_params.get("debut") or "")
+        fin = parse_date(request.query_params.get("fin") or "")
+        today = timezone.localdate()
+
+        if debut is None:
+            debut = today.replace(day=1)
+        if fin is None:
+            if debut.month == 12:
+                fin = debut.replace(year=debut.year + 1, month=1, day=1) - timedelta(days=1)
+            else:
+                fin = debut.replace(month=debut.month + 1, day=1) - timedelta(days=1)
+
+        if fin < debut:
+            return api_error("La date de fin doit être postérieure au début.",
+                             http_status=status.HTTP_400_BAD_REQUEST)
+        if (fin - debut).days > 400:
+            return api_error("Période trop large (max 400 jours).",
+                             http_status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            qs = (
+                Session.objects
+                .select_related("formateur", "cours", "institution", "annee_scolaire")
+                .filter(date_debut__date__gte=debut, date_debut__date__lte=fin)
+            )
+            qs = filter_queryset_by_role(qs, request, "Session").order_by("date_debut")
+            return api_success(
+                "Calendrier récupéré.",
+                SessionSerializer(qs, many=True, context={"request": request}).data,
+                status.HTTP_200_OK,
+            )
+        except Exception as e:
+            return api_error(
+                "Erreur lors de la récupération du calendrier",
+                errors={"detail": str(e)},
+                http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class SessionListCreateAPIView(APIView):
     """Liste et création de sessions"""
     permission_classes = [permissions.IsAuthenticated, RBACPermission]

@@ -34,9 +34,9 @@ class ParcoursContext:
 
         self.apprenant = apprenant
         self.cours = cours
-        self.modules   = list(Module.objects.filter(cours=cours).order_by('ordre', 'id'))
-        self.sequences = list(Sequence.objects.filter(module__cours=cours).order_by('ordre', 'id'))
-        self.blocs     = list(BlocContenu.objects.filter(sequence__module__cours=cours).order_by('ordre', 'id'))
+        self.modules   = list(Module.objects.filter(cours=cours).select_related('cours', 'institution', 'annee_scolaire').order_by('ordre', 'id'))
+        self.sequences = list(Sequence.objects.filter(module__cours=cours).select_related('module', 'module__cours', 'module__cours__institution').order_by('ordre', 'id'))
+        self.blocs     = list(BlocContenu.objects.filter(sequence__module__cours=cours).select_related('sequence', 'sequence__module', 'sequence__module__cours', 'sequence__module__cours__institution').order_by('ordre', 'id'))
         bloc_ids = [b.pk for b in self.blocs]
         self.prog  = {p.bloc_id: p for p in BlocProgress.objects.filter(apprenant=apprenant, bloc_id__in=bloc_ids)}
         self.summ  = {s.bloc_id: s for s in BlocAnalyticsSummary.objects.filter(apprenant=apprenant, bloc_id__in=bloc_ids)}

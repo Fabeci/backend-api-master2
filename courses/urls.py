@@ -72,6 +72,7 @@ from .views import (
     SuiviListCreateAPIView,
     SuiviDetailAPIView,
     SessionListCreateAPIView,
+    SessionCalendrierAPIView,
     SessionDetailAPIView,
     SessionParticipantsAPIView,
     ParticipationListCreateAPIView,
@@ -128,6 +129,7 @@ urlpatterns = [
     
     # Sessions
     path('sessions/', SessionListCreateAPIView.as_view(), name='session-list-create'),
+    path('sessions/calendrier/', SessionCalendrierAPIView.as_view(), name='session-calendrier'),
     path('sessions/<int:pk>/', SessionDetailAPIView.as_view(), name='session-detail'),
     path('sessions/<int:pk>/participants/', SessionParticipantsAPIView.as_view(), name='session-participants'),
     # Google Meet (réunions en direct)
