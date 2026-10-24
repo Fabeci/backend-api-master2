@@ -187,10 +187,15 @@ class RegisterSerializer(serializers.Serializer):
         }
         password = validated.pop("password")
 
+        from core.tenant import default_institution, default_annee_scolaire
+        inst = default_institution()
+        annee = default_annee_scolaire()
+        validated.pop("institution", None)
+
         if role == "Admin":
-            user = Admin(**common, institution=validated.pop("institution", None))
+            user = Admin(**common, institution=inst)
         elif role == "Parent":
-            user = Parent(**common, institution=validated.pop("institution", None))
+            user = Parent(**common, institution=inst)
         elif role == "Apprenant":
             matricule = _normalize_or_generate_matricule(validated)
             user = Apprenant(
@@ -204,7 +209,7 @@ class RegisterSerializer(serializers.Serializer):
         elif role == "ResponsableAcademique":
             user = ResponsableAcademique(
                 **common,
-                institution=validated.pop("institution", None),
+                institution=inst,
                 departement=validated.pop("departement", None),
             )
         elif role == "SuperAdmin":
@@ -212,29 +217,39 @@ class RegisterSerializer(serializers.Serializer):
         else:
             raise serializers.ValidationError({"role": "Rôle non supporté."})
 
+        # ✅ MONO-ÉTABLISSEMENT : rattachement forcé
+        if inst:
+            user.institution = inst
+        if annee:
+            user.annee_scolaire_active = annee
+
         # ✅ set_password() TOUJOURS appelé ici
         user.set_password(password)
         user.is_active = False
         user.save()
 
         if isinstance(user, Formateur):
-            user.institutions.set(validated.pop("institutions", []))
+            validated.pop("institutions", None)
+            user.institutions.set([inst] if inst else [])
             user.specialites.set(validated.pop("specialites", []))
             user.groupes.set(validated.pop("groupes", []))
 
         if isinstance(user, Apprenant):
             annee_scolaire = validated.pop("inscription_annee_scolaire", None)
             classe = validated.pop("inscription_classe", None)
-            institution = common.get("institution")
-            if not institution and annee_scolaire:
-                institution = getattr(annee_scolaire, "institution", None)
-            if not institution and classe:
-                institution = getattr(classe, "institution", None)
+            if classe and inst and getattr(classe, "institution_id", None) != inst.id:
+                raise serializers.ValidationError(
+                    {"inscription_classe": "La classe doit appartenir à l'établissement."}
+                )
+            if annee_scolaire and inst and getattr(annee_scolaire, "institution_id", None) != inst.id:
+                raise serializers.ValidationError(
+                    {"inscription_annee_scolaire": "L'année doit appartenir à l'établissement."}
+                )
             if annee_scolaire or classe:
                 Inscription.objects.create(
                     apprenant=user,
-                    institution=institution,
-                    annee_scolaire=annee_scolaire,
+                    institution=inst,
+                    annee_scolaire=annee or annee_scolaire,
                     classe=classe,
                     statut="actif",
                     statut_paiement="en_attente",
@@ -412,7 +427,7 @@ class BaseUserCrudSerializer(serializers.ModelSerializer):
             "password",
         ]
         read_only_fields = [
-            "id", "photo", "role",
+            "id", "photo", "role", "permissions",
             "pays_residence", "annee_scolaire_active",
             "date_joined", "date_modification",
             "is_staff", "is_superuser",

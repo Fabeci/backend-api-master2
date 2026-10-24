@@ -25,6 +25,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('DJANGO_SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
+
+# ── MONO-ÉTABLISSEMENT ──────────────────────────────────────────────────────
+# Institution de référence unique. Le multi-tenant est désactivé : toutes les
+# lectures/écritures sont rattachées à cette institution.
+DEFAULT_INSTITUTION_ID = config('DEFAULT_INSTITUTION_ID', default=27, cast=int)
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 
 # ✅ Durée de vie des tokens API (secondes) — 14 jours par défaut.
@@ -199,6 +204,8 @@ REST_FRAMEWORK = {
     # Pagination globale — évite les réponses de taille infinie
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    # ✅ `?format=` est un paramètre métier (exports), pas un format DRF.
+    'URL_FORMAT_OVERRIDE': None,
     # Throttling global — protège contre les abus
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',

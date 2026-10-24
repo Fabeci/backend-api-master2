@@ -434,6 +434,12 @@ class Matiere(models.Model):
     date_debut_validite = models.DateField(null=True, blank=True)
     date_fin_validite = models.DateField(null=True, blank=True)
 
+    # ✅ LMD : la matière est un Élément Constitutif (EC) rattaché à une UE.
+    ue = models.ForeignKey('UE', on_delete=models.SET_NULL, null=True, blank=True,
+                           related_name='matieres')
+    credits = models.PositiveSmallIntegerField(default=0, verbose_name="Crédits (EC)")
+    coefficient = models.FloatField(default=1.0, verbose_name="Coefficient (EC)")
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -473,3 +479,96 @@ class Specialite(models.Model):
 
     def __str__(self):
         return self.nom
+
+
+# ============================================================================
+# AFFECTATION D'ENSEIGNEMENT (formateur ← groupe + matière + année)
+# ============================================================================
+
+class AffectationEnseignement(models.Model):
+    """Charge d'enseignement confiée à un formateur : (groupe, matière, année).
+
+    C'est l'unité métier qui AUTORISE un formateur à créer le cours
+    correspondant. Créée par l'Admin ou le Responsable.
+    """
+    formateur = models.ForeignKey(
+        'users.Formateur', on_delete=models.CASCADE,
+        related_name='affectations_enseignement',
+    )
+    groupe = models.ForeignKey(Groupe, on_delete=models.CASCADE, related_name='affectations_enseignement')
+    matiere = models.ForeignKey(Matiere, on_delete=models.CASCADE, related_name='affectations_enseignement')
+    annee_scolaire = models.ForeignKey(AnneeScolaire, on_delete=models.CASCADE, related_name='affectations_enseignement')
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE,
+                                    related_name='affectations_enseignement', null=True, blank=True)
+    est_actif = models.BooleanField(default=True)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date_creation']
+        verbose_name = "Affectation d'enseignement"
+        verbose_name_plural = "Affectations d'enseignement"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['formateur', 'groupe', 'matiere', 'annee_scolaire'],
+                name='unique_affectation_formateur_groupe_matiere_annee',
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.institution_id:
+            self.institution_id = getattr(self.groupe, 'institution_id', None)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.formateur} — {self.matiere} / {self.groupe} ({self.annee_scolaire})"
+
+
+# ============================================================================
+# LMD — SEMESTRE & UNITÉ D'ENSEIGNEMENT (UE)
+# ============================================================================
+
+class Semestre(models.Model):
+    NUMERO_CHOICES = [(i, f"S{i}") for i in range(1, 7)]
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE,
+                                    related_name="semestres", null=True, blank=True)
+    classe = models.ForeignKey(Classe, on_delete=models.CASCADE,
+                               related_name="semestres", null=True, blank=True)
+    annee_scolaire = models.ForeignKey(AnneeScolaire, on_delete=models.CASCADE,
+                                       related_name="semestres", null=True, blank=True)
+    numero = models.PositiveSmallIntegerField(choices=NUMERO_CHOICES)
+    libelle = models.CharField(max_length=100, blank=True)
+    date_debut = models.DateField(null=True, blank=True)
+    date_fin = models.DateField(null=True, blank=True)
+    est_actif = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("classe", "annee_scolaire", "numero")
+        ordering = ["numero"]
+        verbose_name = "Semestre"
+        verbose_name_plural = "Semestres"
+
+    def __str__(self):
+        return self.libelle or f"S{self.numero}"
+
+
+class UE(models.Model):
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE,
+                                    related_name="ues", null=True, blank=True)
+    semestre = models.ForeignKey(Semestre, on_delete=models.CASCADE,
+                                 related_name="ues", null=True, blank=True)
+    code = models.CharField(max_length=50)
+    libelle = models.CharField(max_length=255)
+    credits = models.PositiveSmallIntegerField(default=0, verbose_name="Crédits (UE)")
+    coefficient = models.FloatField(default=1.0, verbose_name="Coefficient (UE)")
+    seuil_validation = models.FloatField(default=10.0, verbose_name="Seuil de validation (/20)")
+    est_active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("semestre", "code")
+        ordering = ["code"]
+        verbose_name = "Unité d'enseignement"
+        verbose_name_plural = "Unités d'enseignement"
+
+    def __str__(self):
+        return f"{self.code} — {self.libelle}"

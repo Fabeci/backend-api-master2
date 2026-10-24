@@ -1,36 +1,12 @@
-# Environnement virtuel local (Windows) — inutile dans l'image
-env/
-venv/
-.venv/
-
-# Artefacts Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.pytest_cache/
-
-# Base de données et médias : montés via docker-compose
+# Secrets et données locales : ne jamais embarquer dans l'image
+.env
+.env.*
+!.env.example
 db.sqlite3
 media/
 staticfiles/
-static/
-
-# Caches Celery
-celerybeat-schedule*
-celerybeat-schedule-shm
-celerybeat-schedule-wal
-
-# Archives lourdes
-*.zip
-
-# Outils / IDE / VCS
+__pycache__/
+*.pyc
+*.pyo
 .git/
-.gitignore
 .vscode/
-.idea/
-
-# Secrets (injectés à l'exécution via env_file)
-.env
-
-# Scripts de seed / tests volumineux (non nécessaires au runtime)
-seed_output.txt

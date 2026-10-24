@@ -91,6 +91,22 @@ def bloc_est_valide(bloc, prog, summ) -> bool:
     return _consulted(bloc, summ)
 
 
+def _a_commence(prog, summ) -> bool:
+    """Activité RÉELLE : une ligne de suivi vide (0 s, 0 scroll, jamais validée)
+    ne doit pas faire croire que le cours est commencé."""
+    if prog is not None:
+        if prog.est_valide or prog.est_termine:
+            return True
+        if getattr(prog, "etat", "") in ("en_cours", "termine", "valide", "echoue"):
+            return True
+    if summ is not None:
+        if (getattr(summ, "duree_totale_sec", 0) or 0) > 0:
+            return True
+        if (getattr(summ, "scroll_max_pct", 0) or 0) > 0:
+            return True
+    return False
+
+
 def bloc_etat(bloc, prog, summ, unlocked: bool) -> str:
     if not unlocked:
         return 'verrouille'
@@ -98,7 +114,7 @@ def bloc_etat(bloc, prog, summ, unlocked: bool) -> str:
         return 'valide'
     if prog is not None and prog.est_termine:
         return 'termine'
-    if prog is not None or summ is not None:
+    if _a_commence(prog, summ):
         return 'en_cours'
     return 'non_commence'
 
@@ -269,7 +285,7 @@ def resume_position(apprenant, cours) -> dict:
     # État global du cours pour l'apprenant
     all_blocs = [b for m in parc['modules'] for s in m['sequences'] for b in s['blocs']]
     oblig = [b for b in all_blocs if b['obligatoire'] and b['visible']]
-    started = any(b['etat'] != 'non_commence' for b in all_blocs)
+    started = any(b['etat'] in ('en_cours', 'termine', 'valide') for b in all_blocs)
     if oblig and all(b['valide'] for b in oblig):
         state = 'termine'
     elif started:
@@ -384,6 +400,16 @@ def validate_block(apprenant, bloc) -> dict:
     prog.etat = 'valide' if valide else ('termine' if prog.est_termine else 'en_cours')
     prog.save()
     _update_progress_cascade(apprenant, bloc)
+
+    # ✅ Aligner la progression globale utilisée par les dashboards
+    try:
+        from progress.models import ProgressionApprenant
+        cours = bloc.sequence.module.cours
+        pa, _ = ProgressionApprenant.objects.get_or_create(apprenant=apprenant, cours=cours)
+        pa.recalculer_depuis_blocs()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning('[parcours] progression globale non synchronisée : %s', exc)
+
     return {'ok': True, 'valide': valide, 'etat': prog.etat}
 
 

@@ -37,7 +37,7 @@ from academics.models import Inscription
 from django.db.models import Count, Q, Sum
 from rest_framework.parsers import MultiPartParser, FormParser
 
-from courses.utils import (can_create_in_context, can_manage_cours, filter_queryset_by_role,
+from courses.utils import (INSCRIPTION_ACTIVE_STATUSES, can_create_in_context, can_manage_cours, filter_queryset_by_role,
                             get_filtered_object, get_user_context, is_supervision_admin)
 from users.access_control import accessible_apprenants, resolve_apprenant
 from .models import (
@@ -177,7 +177,7 @@ def _cours_ids_inscrits(user):
     """✅ Identifiants des cours où cet apprenant est inscrit."""
     try:
         return list(
-            InscriptionCours.objects.filter(apprenant=user, statut='inscrit')
+            InscriptionCours.objects.filter(apprenant=user, statut__in=INSCRIPTION_ACTIVE_STATUSES)
             .values_list('cours_id', flat=True)
         )
     except Exception:
@@ -254,7 +254,7 @@ class CoursListCreateAPIView(APIView):
                 nb_modules=Count("modules", distinct=True),
                 nb_inscrits=Count(
                     "inscriptions",
-                    filter=Q(inscriptions__statut="actif"),
+                    filter=Q(inscriptions__statut__in=INSCRIPTION_ACTIVE_STATUSES),
                     distinct=True,
                 ),
             ).prefetch_related("sessions").order_by("-id")
@@ -270,23 +270,53 @@ class CoursListCreateAPIView(APIView):
 
     def post(self, request):
         """Crée un nouveau cours"""
-        serializer = CoursSerializer(data=request.data)
+        user = request.user
+        role_name = user.role.name if getattr(user, 'role', None) else None
+        data = request.data
+        if role_name == 'Formateur':
+            # ✅ L'enseignant est TOUJOURS le formateur connecté. On l'injecte
+            #    AVANT la validation : le champ requis est satisfait sans que le
+            #    client puisse désigner un autre formateur (anti-usurpation).
+            data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+            data['enseignant'] = user.pk
+        serializer = CoursSerializer(data=data)
         if serializer.is_valid():
             user = request.user
 
+            # ✅ MONO-ÉTABLISSEMENT : forcer l'institution et l'année de référence
+            from core.tenant import default_institution, default_annee_scolaire
+            inst = default_institution()
+            annee = default_annee_scolaire()
+            if inst:
+                serializer.validated_data['institution'] = inst
+            if annee:
+                serializer.validated_data['annee_scolaire'] = annee
+
             if not user.is_superuser:
-                if 'institution' not in request.data and user.institution:
-                    serializer.validated_data['institution'] = user.institution
-
-                if 'annee_scolaire' not in request.data and user.annee_scolaire_active:
-                    serializer.validated_data['annee_scolaire'] = user.annee_scolaire_active
-
                 role_name = user.role.name if user.role else None
                 if role_name == 'Formateur':
                     # Force toujours l'enseignant = formateur connecté (anti-usurpation)
                     formateur = getattr(user, 'formateur_profile', None) or getattr(user, 'formateur', None)
                     if formateur:
                         serializer.validated_data['enseignant'] = formateur
+
+                        # ✅ AFFECTATION : un formateur ne crée QUE les cours qui
+                        #    lui ont été confiés (Admin/Responsable).
+                        from academics.models import AffectationEnseignement
+                        groupe  = serializer.validated_data.get('groupe')
+                        matiere = serializer.validated_data.get('matiere')
+                        annee   = serializer.validated_data.get('annee_scolaire')
+                        qs_aff = AffectationEnseignement.objects.filter(
+                            formateur=formateur, groupe=groupe, matiere=matiere, est_actif=True,
+                        )
+                        if annee is not None:
+                            qs_aff = qs_aff.filter(annee_scolaire=annee)
+                        if not qs_aff.exists():
+                            return api_error(
+                                "Ce cours ne vous a pas été affecté. Demandez au responsable "
+                                "de vous affecter ce groupe et cette matière.",
+                                http_status=status.HTTP_403_FORBIDDEN,
+                            )
 
             obj = serializer.save()
             return api_success("Cours créé avec succès", CoursSerializer(obj).data, status.HTTP_201_CREATED)
@@ -352,6 +382,11 @@ class CoursModulesAPIView(APIView):
                              http_status=status.HTTP_403_FORBIDDEN)
         try:
             cours = get_filtered_object(Cours, cours_id, request, 'Cours')
+            if _cours_non_ouvert(request, cours):
+                return api_error(
+                    "Ce cours n'a pas encore commencé. Son contenu sera accessible à partir de sa date de début.",
+                    http_status=status.HTTP_403_FORBIDDEN,
+                )
             modules = Module.objects.filter(cours=cours).order_by('id')
             # ✅ Structure : on garde les modules non publiés/programmés (verrouillés)
             #    pour que l'apprenant voie le plan du cours.
@@ -670,6 +705,11 @@ class SequenceBlocsAPIView(APIView):
                 Sequence.objects.all(), request, 'Sequence', inclure_indisponibles=True
             )
             sequence = get_object_or_404(seq_qs, pk=sequence_id)
+            if _cours_non_ouvert(request, sequence.module.cours):
+                return api_error(
+                    "Ce cours n'a pas encore commencé.",
+                    http_status=status.HTTP_403_FORBIDDEN,
+                )
 
             blocs = BlocContenu.objects.filter(
                 sequence=sequence
@@ -833,7 +873,14 @@ class BlocContenuDetailAPIView(APIView):
         # programmé / parent indisponible n'est PAS accessible.
         appr = _get_own_apprenant(request.user)
         if appr is not None:
-            from .publication import bloc_disponible
+            from rest_framework.exceptions import PermissionDenied
+
+            from .publication import bloc_disponible, cours_commence
+
+            # Le cours lui-même doit avoir commencé.
+            if not cours_commence(bloc.sequence.module.cours):
+                raise PermissionDenied("Ce cours n'a pas encore commencé.")
+
             if not bloc_disponible(bloc):
                 raise Http404("Bloc non disponible.")
 
@@ -1258,7 +1305,7 @@ class InscriptionCoursListCreateAPIView(APIView):
                              http_status=status.HTTP_403_FORBIDDEN)
         # ✅ RÈGLE MÉTIER : les inscriptions administratives relèvent de
         #    l'administration (Admin / SuperAdmin / Responsable) — PAS du formateur.
-        if _role_name(request) not in ('Admin', 'SuperAdmin', 'Responsable'):
+        if _role_name(request) not in ('Admin', 'Responsable'):
             return api_error("Seule l'administration peut gérer les inscriptions.",
                              http_status=status.HTTP_403_FORBIDDEN)
         serializer = InscriptionCoursSerializer(data=request.data, context={"request": request})
@@ -2082,6 +2129,13 @@ def _get_own_apprenant(user):
     return get_own_apprenant(user)
 
 
+def _cours_non_ouvert(request, cours) -> bool:
+    """True si l'utilisateur est un apprenant et que le cours n'a pas commencé."""
+    from .publication import cours_commence
+    appr = _get_own_apprenant(request.user)
+    return appr is not None and not cours_commence(cours)
+
+
 class ParcoursAPIView(APIView):
     """GET /api/v1/cours/<cours_id>/parcours/ — arbre + états + verrous + reprise."""
     permission_classes = [permissions.IsAuthenticated, RBACPermission]
@@ -2095,6 +2149,12 @@ class ParcoursAPIView(APIView):
             appr = _get_own_apprenant(request.user)
             if appr is None:
                 return api_success("Parcours (lecture)", build_parcours_staff(cours), status.HTTP_200_OK)
+            from .publication import cours_commence
+            if not cours_commence(cours):
+                return api_error(
+                    "Ce cours n'a pas encore commencé.",
+                    http_status=status.HTTP_403_FORBIDDEN,
+                )
             data = build_parcours(appr, cours)
             data['resume'] = resume_position(appr, cours)
             return api_success("Parcours", data, status.HTTP_200_OK)
@@ -2118,6 +2178,12 @@ class ResumeAPIView(APIView):
             cours = get_object_or_404(
                 filter_queryset_by_role(Cours.objects.all(), request, 'Cours'), pk=cours_id,
             )
+            from .publication import cours_commence
+            if not cours_commence(cours):
+                return api_error(
+                    "Ce cours n'a pas encore commencé.",
+                    http_status=status.HTTP_403_FORBIDDEN,
+                )
             return api_success("Reprise", resume_position(appr, cours), status.HTTP_200_OK)
         except Http404:
             return api_error("Cours introuvable.", http_status=status.HTTP_404_NOT_FOUND)
@@ -2140,6 +2206,12 @@ class BlocValiderAPIView(APIView):
         from .models import InscriptionCours
         if not InscriptionCours.objects.filter(apprenant=appr, cours=cours).exists():
             return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        from .publication import cours_commence
+        if not cours_commence(cours):
+            return api_error(
+                "Ce cours n'a pas encore commencé.",
+                http_status=status.HTTP_403_FORBIDDEN,
+            )
         res = validate_block(appr, bloc)
         if not res.get('ok'):
             return api_error(res.get('raison', 'Bloc verrouillé.'), http_status=status.HTTP_403_FORBIDDEN)

@@ -1,6 +1,7 @@
 # courses/utils.py
 
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models.functions import Lower
@@ -9,6 +10,9 @@ from courses.models import (
     BlocContenu, Sequence, Module, Cours,
     BlocProgress, SequenceProgress, ModuleProgress, CoursProgress
 )
+
+# Statuts d'inscription actifs (terminé = cours consultable).
+INSCRIPTION_ACTIVE_STATUSES = ("inscrit", "en_cours", "en cours", "encours", "termine", "terminé")
 
 
 def _set_done_flag(obj, done: bool):
@@ -69,20 +73,26 @@ def recompute_cascade(apprenant, sequence: Sequence):
 
 
 def get_user_context(request):
+    """Contexte MONO-ÉTABLISSEMENT (institution 27 par défaut).
+
+    - Aucun `institution_id` / `X-Institution-ID` n'est accepté : le périmètre
+      est toujours l'institution de référence.
+    - L'année scolaire peut être choisie, mais uniquement dans cette institution.
+    """
+    from core.tenant import default_institution_id, default_annee_scolaire
+
     user = request.user
+    iid = default_institution_id()
+    default_annee = default_annee_scolaire()
 
     ctx = {
         "bypass": False,
-        "institution_id": None,
-        "annee_scolaire_id": None,
+        "institution_id": iid,
+        "annee_scolaire_id": getattr(default_annee, "id", None),
         "departement_id": None,
         "strict": False,
         "role_name": None,
     }
-
-    if getattr(user, "is_superuser", False):
-        ctx["bypass"] = True
-        return ctx
 
     _role = getattr(user, "role", None)
     if _role is None:
@@ -102,29 +112,21 @@ def get_user_context(request):
         if isinstance(user, _Apprenant):
             ctx["role_name"] = "Apprenant"
 
+    # Un éventuel superuser technique est traité comme Admin de l'établissement
+    # unique : plus aucun bypass global.
+    if getattr(user, "is_superuser", False) and not ctx["role_name"]:
+        ctx["role_name"] = "Admin"
+
     if ctx["role_name"] == "Responsable":
         try:
             from users.models import ResponsableAcademique
-            fresh = ResponsableAcademique.objects.filter(
-                pk=user.pk
-            ).values('departement_id', 'institution_id').first()
+            fresh = ResponsableAcademique.objects.filter(pk=user.pk).values(
+                'departement_id'
+            ).first()
             if fresh:
                 ctx["departement_id"] = fresh['departement_id']
-                if fresh['institution_id']:
-                    ctx["institution_id"] = fresh['institution_id']
         except Exception:
             ctx["departement_id"] = getattr(user, "departement_id", None)
-
-    # ✅ Formateur : institution_id via M2M institutions
-    if ctx["role_name"] == "Formateur":
-        from users.models import Formateur as FormateurModel
-        try:
-            formateur_obj = FormateurModel.objects.get(pk=user.pk)
-            inst_ids = list(formateur_obj.institutions.values_list('id', flat=True))
-            if inst_ids:
-                ctx["institution_id"] = inst_ids[0]
-        except Exception:
-            pass
 
     if ctx["role_name"] == "Apprenant" or (
         ctx["role_name"] is None and hasattr(user, "apprenant")
@@ -133,51 +135,42 @@ def get_user_context(request):
         ctx["strict"] = True
 
         apprenant_obj = _get_apprenant_obj(user)
-        if apprenant_obj is not None:
+        if apprenant_obj is not None and iid:
             inscription = (
                 InscriptionCours.objects
-                .filter(apprenant=apprenant_obj)
+                .filter(apprenant=apprenant_obj, institution_id=iid)
                 .annotate(statut_l=Lower("statut"))
                 .filter(statut_l__in=["inscrit", "en_cours", "en cours", "encours"])
-                .select_related("institution", "annee_scolaire")
+                .select_related("annee_scolaire")
                 .order_by("-id")
                 .first()
             )
-            if inscription:
-                ctx["institution_id"] = inscription.institution_id
+            if inscription and inscription.annee_scolaire_id:
                 ctx["annee_scolaire_id"] = inscription.annee_scolaire_id
-                return ctx
 
-        ctx["institution_id"] = getattr(user, "institution_id", None)
-        ctx["annee_scolaire_id"] = getattr(user, "annee_scolaire_active_id", None)
-        return ctx
-
-    ctx["institution_id"] = getattr(user, "institution_id", None)
-    ctx["annee_scolaire_id"] = getattr(user, "annee_scolaire_active_id", None)
-
-    inst_param = (
-        request.query_params.get("institution_id")
-        or request.headers.get("X-Institution-ID")
-    )
+    # Année : autorisée seulement si elle appartient à l'institution par défaut.
     annee_param = (
         request.query_params.get("annee_scolaire_id")
         or request.headers.get("X-Annee-Scolaire-ID")
     )
+    try:
+        annee_id = int(str(annee_param).strip()) if annee_param else None
+    except (TypeError, ValueError):
+        annee_id = None
 
-    def to_int(v):
-        if v is None:
-            return None
-        if isinstance(v, int):
-            return v
-        try:
-            return int(str(v).strip())
-        except (ValueError, TypeError):
-            return None
+    if annee_id and iid:
+        from academics.models import AnneeScolaire
+        if not AnneeScolaire.objects.filter(pk=annee_id, institution_id=iid).exists():
+            annee_id = None
 
-    if inst_param:
-        ctx["institution_id"] = to_int(inst_param)
-    if annee_param:
-        ctx["annee_scolaire_id"] = to_int(annee_param)
+    if annee_id:
+        ctx["annee_scolaire_id"] = annee_id
+    else:
+        user_annee = getattr(user, "annee_scolaire_active_id", None)
+        if user_annee and iid:
+            from academics.models import AnneeScolaire
+            if AnneeScolaire.objects.filter(pk=user_annee, institution_id=iid).exists():
+                ctx["annee_scolaire_id"] = user_annee
 
     return ctx
 
@@ -377,79 +370,98 @@ def _filter_by_role_impl(queryset, request, model_name="Cours"):
         dept_id = ctx.get("departement_id")
         annee_id = ctx.get("annee_scolaire_id")
 
+        def _dept_q(prefix: str = ""):
+            """Département du responsable OU contenu NON AFFECTÉ (NULL).
+
+            Les cours importés sans département (groupe sans filière) ne doivent
+            pas disparaître des listes du responsable : ils restent visibles au
+            niveau de l'établissement.
+            """
+            return (
+                Q(**{f"{prefix}departement_id": dept_id})
+                | Q(**{f"{prefix}departement__isnull": True})
+            )
+
         if model_name == "Cours":
             f = {"institution_id": institution_id}
             if annee_id:
                 f["annee_scolaire_id"] = annee_id
+            qs = queryset.filter(**f)
             if dept_id:
-                f["departement_id"] = dept_id
-            return queryset.filter(**f)
+                qs = qs.filter(_dept_q(""))
+            return qs
 
         if model_name == "Evaluation":
-            f = {"cours__institution_id": institution_id}
+            qs = queryset.filter(cours__institution_id=institution_id)
             if dept_id:
-                f["cours__departement_id"] = dept_id
-            return queryset.filter(**f)
+                qs = qs.filter(_dept_q("cours__"))
+            return qs
 
         if model_name == "Module":
             f = {"cours__institution_id": institution_id}
             if annee_id:
                 f["cours__annee_scolaire_id"] = annee_id
+            qs = queryset.filter(**f)
             if dept_id:
-                f["cours__departement_id"] = dept_id
-            return queryset.filter(**f)
+                qs = qs.filter(_dept_q("cours__"))
+            return qs
 
         if model_name == "Sequence":
             f = {"module__cours__institution_id": institution_id}
             if annee_id:
                 f["module__cours__annee_scolaire_id"] = annee_id
+            qs = queryset.filter(**f)
             if dept_id:
-                f["module__cours__departement_id"] = dept_id
-            return queryset.filter(**f)
+                qs = qs.filter(_dept_q("module__cours__"))
+            return qs
 
         if model_name == "BlocContenu":
-            f = {"sequence__module__cours__institution_id": institution_id}
+            qs = queryset.filter(sequence__module__cours__institution_id=institution_id)
             if dept_id:
-                f["sequence__module__cours__departement_id"] = dept_id
-            return queryset.filter(**f)
+                qs = qs.filter(_dept_q("sequence__module__cours__"))
+            return qs
 
         if model_name == "RessourceSequence":
-            f = {"sequence__module__cours__institution_id": institution_id}
+            qs = queryset.filter(sequence__module__cours__institution_id=institution_id)
             if dept_id:
-                f["sequence__module__cours__departement_id"] = dept_id
-            return queryset.filter(**f)
+                qs = qs.filter(_dept_q("sequence__module__cours__"))
+            return qs
 
         if model_name == "Session":
             f = {"institution_id": institution_id}
             if annee_id:
                 f["annee_scolaire_id"] = annee_id
+            qs = queryset.filter(**f)
             if dept_id:
-                f["cours__departement_id"] = dept_id
-            return queryset.filter(**f)
+                qs = qs.filter(_dept_q("cours__"))
+            return qs
 
         if model_name == "InscriptionCours":
             f = {"cours__institution_id": institution_id}
             if annee_id:
                 f["cours__annee_scolaire_id"] = annee_id
+            qs = queryset.filter(**f)
             if dept_id:
-                f["cours__departement_id"] = dept_id
-            return queryset.filter(**f)
+                qs = qs.filter(_dept_q("cours__"))
+            return qs
 
         if model_name == "Suivi":
             f = {"institution_id": institution_id}
             if annee_id:
                 f["annee_scolaire_id"] = annee_id
+            qs = queryset.filter(**f)
             if dept_id:
-                f["cours__departement_id"] = dept_id
-            return queryset.filter(**f)
+                qs = qs.filter(_dept_q("cours__"))
+            return qs
 
         if model_name == "Participation":
             f = {"institution_id": institution_id}
             if annee_id:
                 f["annee_scolaire_id"] = annee_id
+            qs = queryset.filter(**f)
             if dept_id:
-                f["session__cours__departement_id"] = dept_id
-            return queryset.filter(**f)
+                qs = qs.filter(_dept_q("session__cours__"))
+            return qs
 
         return queryset.filter(institution_id=institution_id)
 
@@ -457,19 +469,8 @@ def _filter_by_role_impl(queryset, request, model_name="Cours"):
     # FORMATEUR
     # ================================================================
     if role_name == "Formateur":
-        # ✅ Récupérer les institutions du formateur via M2M
-        from users.models import Formateur as FormateurModel
-        try:
-            formateur_obj = FormateurModel.objects.get(pk=user.pk)
-            formateur_inst_ids = list(
-                formateur_obj.institutions.values_list('id', flat=True)
-            )
-        except FormateurModel.DoesNotExist:
-            return queryset.none()
-
-        if not formateur_inst_ids:
-            return queryset.none()
-
+        # ✅ MONO-ÉTABLISSEMENT : le formateur opère sur l'institution par défaut
+        formateur_inst_ids = [institution_id]
         cours_ids = _formateur_cours_ids(user)
 
         if model_name == "Cours":

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from courses.utils import INSCRIPTION_ACTIVE_STATUSES
 from django.db.models import Avg, Count, ExpressionWrapper, F, FloatField, Q, Sum
 
 from .dashboard_base import BaseDashboardService
@@ -121,7 +122,7 @@ class DashboardAdminService(BaseDashboardService):
 
         top_cours_insc = []
         for c in cours_qs.order_by('-id')[:6]:
-            nb = insc_qs.filter(cours=c, statut__in=['actif', 'inscrit']).count()
+            nb = insc_qs.filter(cours=c, statut__in=INSCRIPTION_ACTIVE_STATUSES).count()
             top_cours_insc.append({'cours': c.titre or f'Cours #{c.id}', 'statut': c.statut, 'nb_inscrits': nb})
         top_cours_insc.sort(key=lambda x: x['nb_inscrits'], reverse=True)
 

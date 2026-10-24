@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from courses.utils import INSCRIPTION_ACTIVE_STATUSES
 from django.db.models import Avg, Count, ExpressionWrapper, F, FloatField, Q, Sum
 
 from .dashboard_base import BaseDashboardService
@@ -126,7 +127,7 @@ class DashboardResponsableService(BaseDashboardService):
 
         # ── Section Apprenants ────────────────────────────────────────────────
         top_cours_raw = (
-            insc_qs.filter(statut__in=['actif', 'inscrit'])
+            insc_qs.filter(statut__in=INSCRIPTION_ACTIVE_STATUSES)
             .values('cours__titre', 'cours__statut')
             .annotate(nb=Count('id'))
             .order_by('-nb')[:5]
@@ -169,7 +170,7 @@ class DashboardResponsableService(BaseDashboardService):
         cours_sans_mod      = cours_qs.exclude(id__in=mod_cours_ids).count()
         cours_sans_form_nb  = cours_qs.filter(statut='en_cours', enseignant__isnull=True).count()
         cours_sans_eval     = cours_qs.filter(statut='en_cours').exclude(id__in=cours_avec_eval_ids).count()
-        avg_appr_per_cours  = round(insc_qs.filter(statut__in=['actif', 'inscrit']).count() / cours_total, 1) if cours_total else 0
+        avg_appr_per_cours  = round(insc_qs.filter(statut__in=INSCRIPTION_ACTIVE_STATUSES).count() / cours_total, 1) if cours_total else 0
 
         section_cours_contenu = {
             'total': cours_total,
@@ -315,7 +316,7 @@ class DashboardResponsableService(BaseDashboardService):
         for ci, c in enumerate(cours_qs.order_by('-id')[:15]):
             fid      = str(getattr(c, 'enseignant_id', None) or '')
             form_obj = form_map.get(fid)
-            nb_app   = insc_qs.filter(cours=c, statut__in=['actif', 'inscrit']).count()
+            nb_app   = insc_qs.filter(cours=c, statut__in=INSCRIPTION_ACTIVE_STATUSES).count()
             nb_mod   = mod_qs.filter(cours=c).count()
             has_eval = c.id in cours_avec_eval_ids
             tx       = getattr(c, 'taux_execution', 0) or 0

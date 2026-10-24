@@ -1,3 +1,5 @@
+from django.db.models import Q
+from core.tenant import default_institution_id
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -210,7 +212,10 @@ class ForumListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, format=None):
-        forums = Forum.objects.all()
+        iid = default_institution_id()
+        forums = Forum.objects.filter(
+            Q(cours__institution_id=iid) | Q(cours__isnull=True)
+        )
         serializer = ForumSerializer(forums, many=True)
         return Response(serializer.data)
 
@@ -269,7 +274,10 @@ class CommentaireListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, format=None):
-        commentaires = Commentaire.objects.all()
+        iid = default_institution_id()
+        commentaires = Commentaire.objects.filter(
+            Q(forum__cours__institution_id=iid) | Q(forum__cours__isnull=True)
+        )
         serializer = CommentaireSerializer(commentaires, many=True)
         return Response(serializer.data)
 

@@ -219,10 +219,8 @@ class PassageQuizSerializer(serializers.ModelSerializer):
             return str(obj.apprenant)
 
     def get_pourcentage(self, obj):
-        total_points = sum(q.points for q in obj.quiz.questions.all())
-        if total_points == 0:
-            return 0
-        return round((obj.score / total_points) * 100, 2)
+        # `score` est déjà un pourcentage (0-100).
+        return round(float(obj.score or 0), 2)
 
 
 class PassageQuizDetailSerializer(PassageQuizSerializer):
@@ -518,8 +516,8 @@ class PassageEvaluationSerializer(serializers.ModelSerializer):
             'est_corrige',
             'necessite_correction',
             'peut_etre_repris',
-            'peut_etre_soumis'
-        ]
+            'peut_etre_soumis',
+            'numero_tentative', 'session']
         read_only_fields = [
             'id', 
             'date_debut', 
@@ -565,7 +563,7 @@ class PassageEvaluationDetailSerializer(PassageEvaluationSerializer):
         request = self.context.get('request')
         user = getattr(request, 'user', None)
         role = display_role(user) if user is not None else None
-        is_staff = role in ('Admin', 'Responsable', 'Formateur', 'SuperAdmin')
+        is_staff = role in ('Admin', 'Responsable', 'Formateur')
 
         institution = getattr(getattr(obj.evaluation, 'cours', None), 'institution', None)
         # ✅ SÉCURITÉ : un apprenant ne reçoit les corrigés QUE si SON passage est

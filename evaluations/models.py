@@ -58,6 +58,16 @@ class Evaluation(models.Model):
         default='structuree'
     )
     bareme = models.FloatField(help_text="Note maximale possible")
+
+    # ✅ LMD : catégorie pédagogique + coefficient
+    CATEGORIE_CHOICES = [
+        ('cc', 'Contrôle continu'),
+        ('tp', 'Travaux pratiques'),
+        ('examen', 'Examen'),
+        ('autre', 'Autre'),
+    ]
+    categorie = models.CharField(max_length=20, choices=CATEGORIE_CHOICES, default='examen')
+    coefficient = models.FloatField(default=1.0, verbose_name="Coefficient")
     duree_minutes = models.PositiveIntegerField(
         null=True,
         blank=True,
@@ -139,7 +149,14 @@ class Evaluation(models.Model):
         """Vérifie si l'évaluation est accessible pour passer"""
         if not self.est_publiee:
             return False
-        
+
+        # ✅ Même règle que le contenu : le cours doit avoir commencé.
+        cours = getattr(self, "cours", None)
+        if cours is not None:
+            from courses.publication import cours_commence
+            if not cours_commence(cours):
+                return False
+
         now = timezone.now()
         
         if self.date_debut and now < self.date_debut:
@@ -154,7 +171,13 @@ class Evaluation(models.Model):
         """Vérifie si on peut encore soumettre (respecte date_fin)"""
         if not self.est_publiee:
             return False
-        
+
+        cours = getattr(self, "cours", None)
+        if cours is not None:
+            from courses.publication import cours_commence
+            if not cours_commence(cours):
+                return False
+
         now = timezone.now()
         
         if self.date_fin and now > self.date_fin:
@@ -427,6 +450,12 @@ class PassageEvaluation(models.Model):
         on_delete=models.CASCADE, 
         related_name='passages'
     )
+
+    SESSION_CHOICES = [
+        ('normale', 'Session normale'),
+        ('rattrapage', 'Session de rattrapage'),
+    ]
+    session = models.CharField(max_length=20, choices=SESSION_CHOICES, default='normale')
 
     numero_tentative = models.PositiveIntegerField(
         default=1,
@@ -751,17 +780,22 @@ class PassageQuiz(models.Model):
         ordering = ['-date_passage']
 
     def __str__(self):
-        return f"{self.apprenant} - {self.quiz.titre} - {self.score}pts"
+        return f"{self.apprenant} - {self.quiz.titre} - {self.score}%"
 
     def calculer_score(self):
-        """Calcule le score total du quiz (ne sauvegarde pas — l'appelant gère le save)."""
+        """Calcule le score du quiz en POURCENTAGE (0-100), pas en points bruts.
+
+        Les seuils (`quiz_seuil`), les dashboards et les badges utilisent tous
+        une échelle 0-100 : stocker un pourcentage évite les incohérences.
+        """
         total_points = 0
         for reponse in self.reponses_quiz.all():
             if reponse.question.mode_correction == 'automatique':
                 reponse.calculer_points_automatique()
             total_points += reponse.points_obtenus
 
-        self.score = total_points
+        total_possible = sum((q.points or 0) for q in self.quiz.questions.all())
+        self.score = round((total_points / total_possible) * 100, 2) if total_possible else 0.0
         return self.score
 
 

@@ -177,7 +177,7 @@ def _seance_preparer_presences(sender, instance, created, **kwargs):
     Participation.objects.bulk_create(
         [
             Participation(
-                session=instance, apprenant_id=aid, statut="present", source="auto",
+                session=instance, apprenant_id=aid, statut="absent", source="auto",
                 institution=instance.institution, annee_scolaire=instance.annee_scolaire,
             )
             for aid in apprenant_ids

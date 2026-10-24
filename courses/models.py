@@ -22,7 +22,7 @@ class Cours(models.Model):
     groupe = models.ForeignKey(Groupe, on_delete=models.CASCADE, related_name="cours")
     enseignant = models.ForeignKey(Formateur, on_delete=models.CASCADE, related_name="cours_enseignes")
     matiere = models.ForeignKey(Matiere, on_delete=models.CASCADE, related_name="cours")
-    volume_horaire = models.IntegerField(default=0, help_text="Volume horaire prévu en minutes")
+    volume_horaire = models.IntegerField(default=0, help_text="Volume horaire prévu en heures")
     date_debut = models.DateField(null=True, blank=True)
     date_fin = models.DateField(null=True, blank=True)
     statut = models.CharField(
@@ -93,7 +93,10 @@ class Cours(models.Model):
         return self.statut or "planifie"
     
     def save(self, *args, **kwargs):
-        if self.date_debut or self.date_fin:
+        # ✅ Un cours annulé ne doit pas être écrasé par le recalcul de dates.
+        if self.statut == "annule" and not self.statut_force:
+            self.statut_force = True
+        if (self.date_debut or self.date_fin) and not self.statut_force:
             self.statut = self.statut_calcule
         if self.groupe and not self.departement_id:
             self._auto_set_departement()

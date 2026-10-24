@@ -576,3 +576,62 @@ class InscriptionSerializer(serializers.ModelSerializer):
             'annee_scolaire_display', 'classe_display',
             'statut', 'statut_paiement',
         ]
+
+class AffectationEnseignementSerializer(serializers.ModelSerializer):
+    """Affectation (formateur, groupe, matière, année) — lue par les 3 rôles."""
+    formateur_nom = serializers.SerializerMethodField()
+    groupe_nom = serializers.CharField(source='groupe.nom', read_only=True)
+    matiere_nom = serializers.CharField(source='matiere.nom', read_only=True)
+    annee_libelle = serializers.CharField(source='annee_scolaire.annee_format_classique', read_only=True)
+
+    class Meta:
+        model = __import__('academics.models', fromlist=['AffectationEnseignement']).AffectationEnseignement
+        fields = [
+            'id', 'formateur', 'formateur_nom', 'groupe', 'groupe_nom',
+            'matiere', 'matiere_nom', 'annee_scolaire', 'annee_libelle',
+            'institution', 'est_actif', 'date_creation',
+        ]
+        read_only_fields = ['institution', 'date_creation']
+
+    def get_formateur_nom(self, obj):
+        u = getattr(obj, 'formateur', None)
+        if not u:
+            return None
+        nom = f"{getattr(u, 'prenom', '') or ''} {getattr(u, 'nom', '') or ''}".strip()
+        return nom or getattr(u, 'email', None)
+
+    def create(self, validated_data):
+        groupe = validated_data.get('groupe')
+        if groupe is not None and not validated_data.get('institution_id'):
+            validated_data['institution_id'] = getattr(groupe, 'institution_id', None)
+        return super().create(validated_data)
+
+
+class SemestreSerializer(serializers.ModelSerializer):
+    classe_nom = serializers.CharField(source='classe.nom', read_only=True)
+    annee_libelle = serializers.CharField(source='annee_scolaire.annee_format_classique', read_only=True)
+
+    class Meta:
+        model = __import__('academics.models', fromlist=['Semestre']).Semestre
+        fields = '__all__'
+        read_only_fields = ['institution']
+
+
+class UESerializer(serializers.ModelSerializer):
+    semestre_numero = serializers.IntegerField(source='semestre.numero', read_only=True)
+    semestre_libelle = serializers.SerializerMethodField()
+    ecs = serializers.SerializerMethodField()
+
+    class Meta:
+        model = __import__('academics.models', fromlist=['UE']).UE
+        fields = '__all__'
+        read_only_fields = ['institution']
+
+    def get_semestre_libelle(self, obj):
+        return str(obj.semestre) if obj.semestre else None
+
+    def get_ecs(self, obj):
+        return [
+            {'id': m.id, 'nom': m.nom, 'credits': m.credits, 'coefficient': m.coefficient}
+            for m in obj.matieres.all()
+        ]

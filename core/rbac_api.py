@@ -19,7 +19,7 @@ logger = logging.getLogger("somapro.rbac")
 BASE_ACTIONS = ["view", "create", "edit", "delete"]
 
 # ✅ Garde-fous : rôles, ressources et actions modifiables via l'API.
-KNOWN_ROLES = {"SuperAdmin", "Admin", "Responsable", "Formateur", "Apprenant", "Parent"}
+KNOWN_ROLES = {"Admin", "Responsable", "Formateur", "Apprenant", "Parent"}
 VALID_RESOURCES = set(ROLE_PERMISSIONS.keys()) | {k.split(".", 1)[0] for k in BUSINESS_RULES}
 VALID_ACTIONS = set(BASE_ACTIONS) | {k.split(".", 1)[1] for k in BUSINESS_RULES}
 
@@ -104,14 +104,6 @@ class RolePermissionsView(APIView):
         if role not in KNOWN_ROLES:
             return api_error("Rôle inconnu.", http_status=status.HTTP_400_BAD_REQUEST)
 
-        # ✅ Seul un Super administrateur peut modifier le rôle SuperAdmin
-        #    (empêche un Admin de s'octroyer/altérer les droits suprêmes).
-        if role == "SuperAdmin" and display_role(request.user) != "SuperAdmin":
-            return api_error(
-                "Seul un Super administrateur peut modifier le rôle SuperAdmin.",
-                http_status=status.HTTP_403_FORBIDDEN,
-            )
-
         overrides = request.data.get("overrides", {})
         if not isinstance(overrides, dict):
             return api_error("Format attendu : { overrides: { 'resource.action': bool } }",
@@ -135,7 +127,7 @@ class RolePermissionsView(APIView):
             # ✅ Anti-verrouillage : un non-SuperAdmin ne peut pas retirer la
             #    gestion des permissions (sinon plus personne ne peut revenir).
             if (resource, action) == ("users", "manage_permissions") and not value \
-                    and display_role(request.user) != "SuperAdmin":
+                    and not request.user.is_superuser:
                 return api_error(
                     "Impossible de retirer la gestion des permissions (réservé au Super administrateur).",
                     http_status=status.HTTP_403_FORBIDDEN,

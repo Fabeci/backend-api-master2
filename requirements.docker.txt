@@ -42,6 +42,7 @@ google-auth==2.36.0
 google-auth-httplib2==0.2.0
 python-docx==1.1.2
 pypdf==5.1.0
+pdfplumber==0.11.4
 greenlet==3.3.1
 h11==0.16.0
 hf-xet==1.2.0
@@ -95,3 +96,4 @@ urllib3==2.6.3
 vine==5.1.0
 wcwidth==0.6.0
 zope.interface==8.2
+reportlab==4.2.5

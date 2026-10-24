@@ -61,7 +61,7 @@ def create_child(child_model, email, role_name, **kw):
         role=role_obj,
         is_active=True,
         is_staff=True,  # Tous les profils peuvent accéder à l'interface admin
-        is_superuser=(role_name=='SuperAdmin'),
+        is_superuser=False,
         **kw
     )
     child.set_password("password123")
@@ -146,7 +146,7 @@ print(f"\n[OK] {total} supprimes")
 # ROLES & PAYS
 # =============================
 print("\n=== Roles ===")
-for r in ['Admin','Parent','Apprenant','Formateur','ResponsableAcademique','SuperAdmin']:
+for r in ['Admin','Parent','Apprenant','Formateur','ResponsableAcademique']:
     UserRole.objects.get_or_create(name=r)
 print("[OK] 6 roles")
 
@@ -236,10 +236,6 @@ print(f"[OK] {len(domaines)}D, {len(filieres)}F, {len(specs)}S, {len(mats)}M")
 # =============================
 # UTILISATEURS
 # =============================
-print("\n=== SuperAdmins ===")
-for i in range(1):
-    sa = create_child(SuperAdmin, f"superadmin{i+1}@sma.pro", "SuperAdmin", nom="Sup", prenom=f"Adm{i+1}", telephone=rand_phone())
-print(f"[OK] {SuperAdmin.objects.count()} SuperAdmin")
 
 print("\n=== Admins ===")
 for i,inst in enumerate(insts):

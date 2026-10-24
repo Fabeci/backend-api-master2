@@ -122,7 +122,7 @@ class InstitutionAPIView(APIView):
         """
         user = request.user
         role = user.role.name if getattr(user, "role", None) else None
-        if not (getattr(user, "is_superuser", False) or role in ("SuperAdmin", "Admin")):
+        if not (getattr(user, "is_superuser", False) or role == "Admin"):
             return api_error(
                 "Création d'établissement réservée à l'administration.",
                 http_status=status.HTTP_403_FORBIDDEN,
@@ -206,6 +206,21 @@ class InstitutionLogoUploadAPIView(APIView):
         # Upload
         logo_file = request.FILES.get("logo")
         if logo_file:
+            import os as _os
+            _ext = _os.path.splitext(logo_file.name or '')[1].lower()
+            if _ext not in {'.jpg', '.jpeg', '.png', '.gif', '.webp'}:
+                return api_error("Format d'image non autorisé (jpg, png, gif, webp).",
+                                 http_status=status.HTTP_400_BAD_REQUEST)
+            if logo_file.size > 5 * 1024 * 1024:
+                return api_error("Logo trop volumineux (max 5 Mo).",
+                                 http_status=status.HTTP_400_BAD_REQUEST)
+            try:
+                from PIL import Image
+                Image.open(logo_file).verify()
+                logo_file.seek(0)
+            except Exception:
+                return api_error("Fichier image invalide.",
+                                 http_status=status.HTTP_400_BAD_REQUEST)
             # Supprimer l'ancien logo s'il existe
             if institution.logo:
                 institution.logo.delete(save=False)
@@ -663,3 +678,135 @@ class InscriptionDetailAPIView(APIView):
 
         obj.delete()
         return api_success("Inscription supprimée", data=None, http_status=status.HTTP_204_NO_CONTENT)
+
+
+# ============================================================================
+# LMD — BULLETIN (Sup'Info)
+# ============================================================================
+
+class BulletinAPIView(APIView):
+    """Bulletin semestriel/annuel : moyennes EC → UE → semestre, crédits, mention."""
+
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
+    rbac_resource = "resultats"
+
+    def get(self, request, apprenant_id, annee_id):
+        from users.models import Apprenant
+        from users.access_control import user_can_access_apprenant
+        from .models import Semestre, AnneeScolaire
+        from .services.lmd import bulletin
+
+        apprenant = Apprenant.objects.filter(pk=apprenant_id).select_related("groupe__classe").first()
+        if apprenant is None:
+            return Response({"success": False, "status": 404, "message": "Apprenant introuvable."},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        if not user_can_access_apprenant(request.user, apprenant):
+            return Response({"success": False, "status": 403, "message": "Accès refusé."},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        annee = AnneeScolaire.objects.filter(pk=annee_id).first()
+        if annee is None:
+            return Response({"success": False, "status": 404, "message": "Année scolaire introuvable."},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        classe = getattr(getattr(apprenant, "groupe", None), "classe", None)
+        semestres = (
+            Semestre.objects.filter(classe=classe, annee_scolaire=annee).order_by("numero")
+            if classe else Semestre.objects.none()
+        )
+
+        data = bulletin(apprenant, semestres, annee)
+        return Response({"success": True, "status": 200, "message": "Bulletin.", "data": data},
+                        status=status.HTTP_200_OK)
+
+
+class BulletinExportAPIView(APIView):
+    """Export CSV du bulletin (semestre → UE → EC + synthèse)."""
+
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
+    rbac_resource = "resultats"
+
+    def get(self, request, apprenant_id, annee_id):
+        import csv
+        from django.http import HttpResponse
+        from users.models import Apprenant
+        from users.access_control import user_can_access_apprenant
+        from .models import Semestre, AnneeScolaire
+        from .services.lmd import bulletin
+
+        apprenant = Apprenant.objects.filter(pk=apprenant_id).select_related("groupe__classe").first()
+        if apprenant is None:
+            return Response({"success": False, "message": "Apprenant introuvable."}, status=404)
+        if not user_can_access_apprenant(request.user, apprenant):
+            return Response({"success": False, "message": "Accès refusé."}, status=403)
+
+        annee = AnneeScolaire.objects.filter(pk=annee_id).first()
+        if annee is None:
+            return Response({"success": False, "message": "Année introuvable."}, status=404)
+
+        classe = getattr(getattr(apprenant, "groupe", None), "classe", None)
+        semestres = (Semestre.objects.filter(classe=classe, annee_scolaire=annee).order_by("numero")
+                     if classe else Semestre.objects.none())
+
+        data = bulletin(apprenant, semestres, annee)
+
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="bulletin_{apprenant_id}_{annee_id}.csv"'
+        response.write("\ufeff")  # BOM Excel
+        w = csv.writer(response, delimiter=";")
+        w.writerow(["SOMAPRO - Bulletin", f"{apprenant.prenom} {apprenant.nom}", str(annee)])
+        w.writerow([])
+        w.writerow(["Semestre", "UE", "EC", "Crédits", "Coefficient", "Moyenne", "État"])
+
+        for s in data["semestres"]:
+            for u in s["ues"]:
+                w.writerow([s["libelle"], f'{u["code"]} — {u["libelle"]}', "",
+                            u["credits"], u["coefficient"], u["moyenne"] or "",
+                            "Validée" if u["valide"] else "Ajournée"])
+                for e in u["ecs"]:
+                    w.writerow(["", "", e["code"], e["credits"], e["coefficient"],
+                                e["moyenne"] or "", ""])
+
+        w.writerow([])
+        w.writerow(["Moyenne annuelle", data["moyenne_annee"] or ""])
+        w.writerow(["Crédits acquis", f'{data["credits_acquis"]}/{data["credits_annee"]}'])
+        w.writerow(["Mention", data["mention"] or ""])
+        w.writerow(["Décision", "Admis" if data["valide_annee"] else "Ajourné"])
+        return response
+
+
+class BulletinPDFAPIView(APIView):
+    """Bulletin au format PDF (ReportLab)."""
+
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
+    rbac_resource = "resultats"
+
+    def get(self, request, apprenant_id, annee_id):
+        from django.http import HttpResponse
+        from users.models import Apprenant
+        from users.access_control import user_can_access_apprenant
+        from .models import Semestre, AnneeScolaire
+        from .services.lmd import bulletin
+        from .services.bulletin_pdf import rendre_bulletin_pdf
+
+        apprenant = Apprenant.objects.filter(pk=apprenant_id).select_related("groupe__classe").first()
+        if apprenant is None:
+            return Response({"success": False, "message": "Apprenant introuvable."}, status=404)
+        if not user_can_access_apprenant(request.user, apprenant):
+            return Response({"success": False, "message": "Accès refusé."}, status=403)
+
+        annee = AnneeScolaire.objects.filter(pk=annee_id).first()
+        if annee is None:
+            return Response({"success": False, "message": "Année introuvable."}, status=404)
+
+        classe = getattr(getattr(apprenant, "groupe", None), "classe", None)
+        semestres = (Semestre.objects.filter(classe=classe, annee_scolaire=annee).order_by("numero")
+                     if classe else Semestre.objects.none())
+
+        data = bulletin(apprenant, semestres, annee)
+        pdf = rendre_bulletin_pdf(apprenant, annee, data)
+
+        response = HttpResponse(pdf, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="bulletin_{apprenant_id}_{annee_id}.pdf"'
+        return response

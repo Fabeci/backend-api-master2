@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from courses.utils import INSCRIPTION_ACTIVE_STATUSES
 from django.db.models import Avg, Count, ExpressionWrapper, F, FloatField, Q, Sum
 
 from .dashboard_base import BaseDashboardService
@@ -150,7 +151,7 @@ class DashboardFormateurService(BaseDashboardService):
         temps_moy_min   = round(float(self._safe_avg(prog_qs, 'temps_total_minutes')), 0)
 
         top_cours_appr = (
-            insc_qs.filter(statut__in=['actif', 'inscrit'])
+            insc_qs.filter(statut__in=INSCRIPTION_ACTIVE_STATUSES)
             .values('cours__titre', 'cours__statut')
             .annotate(nb=Count('apprenant', distinct=True))
             .order_by('-nb')[:5]

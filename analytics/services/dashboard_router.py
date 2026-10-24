@@ -12,7 +12,6 @@ import logging
 from .dashboard_context import (
     DashboardContext,
     PermissionDenied,
-    ROLE_SUPER_ADMIN,
     ROLE_ADMIN,
     ROLE_RESPONSABLE,
     ROLE_FORMATEUR,
@@ -24,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 # Mapping role → service class (import paresseux dans __call__)
 _SERVICE_MAP: dict = {
-    ROLE_SUPER_ADMIN: 'analytics.services.dashboard_superadmin.DashboardSuperAdminService',
     ROLE_ADMIN:       'analytics.services.dashboard_admin.DashboardAdminService',
     ROLE_RESPONSABLE: 'analytics.services.dashboard_responsable.DashboardResponsableService',
     ROLE_FORMATEUR:   'analytics.services.dashboard_formateur.DashboardFormateurService',

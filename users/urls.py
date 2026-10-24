@@ -20,6 +20,10 @@ from .views import (
 
 from core.rbac_api import RolesListView, RolePermissionsView, RoleFeaturesView
 from .search_views import GlobalSearchAPIView
+from .import_users_views import (
+    UtilisateurImportAnalyseAPIView,
+    UtilisateurImportCreateAPIView,
+)
 
 
 router = DefaultRouter()
@@ -55,6 +59,10 @@ urlpatterns = [
     path('rbac/roles/', RolesListView.as_view(), name='rbac-roles'),
     path('rbac/roles/<str:role>/permissions/', RolePermissionsView.as_view(), name='rbac-role-permissions'),
     path('rbac/roles/<str:role>/features/', RoleFeaturesView.as_view(), name='rbac-role-features'),
+
+    # ── Import utilisateurs (formateurs / responsables) ──────────────────────
+    path('utilisateurs/importer/analyser/', UtilisateurImportAnalyseAPIView.as_view(), name='utilisateurs-import-analyser'),
+    path('utilisateurs/importer/', UtilisateurImportCreateAPIView.as_view(), name='utilisateurs-import-create'),
 
     path('', include(router.urls)),
 ]

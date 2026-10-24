@@ -167,16 +167,13 @@ class BaseModelViewSet(viewsets.ModelViewSet):
     # ---------------------------------------------------------------------
     def get_queryset(self):
         qs = super().get_queryset()
-        user = self.request.user
-
-        if getattr(user, "is_superuser", False):
-            return qs
+        from core.tenant import default_institution_id
 
         if hasattr(qs.model, "institution_id"):
-            institution_id = getattr(user, "institution_id", None)
-            if not institution_id:
+            iid = default_institution_id()
+            if not iid:
                 return qs.none()
-            return qs.filter(institution_id=institution_id)
+            return qs.filter(institution_id=iid)
 
         return qs
 
@@ -188,41 +185,28 @@ class BaseModelViewSet(viewsets.ModelViewSet):
         return bool(model and hasattr(model, "institution_id"))
 
     def _get_user_institution_id(self):
-        return getattr(self.request.user, "institution_id", None)
+        from core.tenant import default_institution_id
+        return default_institution_id()
 
     # ---------------------------------------------------------------------
     # DRF hooks : c'est ici qu'on force institution
     # ---------------------------------------------------------------------
     def perform_create(self, serializer):
-        user = self.request.user
-
-        if getattr(user, "is_superuser", False):
-            serializer.save()
-            return
-
         if self._needs_institution(serializer):
             institution_id = self._get_user_institution_id()
             if not institution_id:
-                raise ValidationError({"institution": ["Utilisateur sans institution."]})
+                raise ValidationError({"institution": ["Institution par défaut introuvable."]})
             serializer.save(institution_id=institution_id)
             return
-
         serializer.save()
 
     def perform_update(self, serializer):
-        user = self.request.user
-
-        if getattr(user, "is_superuser", False):
-            serializer.save()
-            return
-
         if self._needs_institution(serializer):
             institution_id = self._get_user_institution_id()
             if not institution_id:
-                raise ValidationError({"institution": ["Utilisateur sans institution."]})
+                raise ValidationError({"institution": ["Institution par défaut introuvable."]})
             serializer.save(institution_id=institution_id)
             return
-
         serializer.save()
 
     # ---------------------------------------------------------------------

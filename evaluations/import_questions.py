@@ -149,7 +149,7 @@ def _parse_csv(data: bytes) -> list[dict]:
 # 2) TEXTE — Word / PDF / TXT (heuristiques)
 # ─────────────────────────────────────────────────────────────────────────────
 
-_Q_START = re.compile(r"^\s*(?:question\s*)?(\d{1,3})\s*[).:\-]\s*(.+)$", re.IGNORECASE)
+_Q_START = re.compile(r"^\s*(?:question\s*)?(\d{1,3})\s*(?:\([^)]*\)\s*)?[).:\-]\s*(.+)$", re.IGNORECASE)
 _OPT = re.compile(r"^\s*\(?([a-hA-H])\s*[)\].:\-]\s*(.+)$")
 _ANS = re.compile(r"^\s*(?:bonne\s+)?(?:r[eé]ponse|answer|correct(?:e)?)\s*[:\-]\s*(.+)$", re.IGNORECASE)
 _PTS = re.compile(r"\(?\s*(\d+(?:[.,]\d+)?)\s*(?:pts?|points?)\s*\)?", re.IGNORECASE)

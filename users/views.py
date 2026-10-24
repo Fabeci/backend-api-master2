@@ -1,6 +1,7 @@
 # users/views.py
 import logging
 from django.contrib.auth.tokens import default_token_generator
+from django.db.models import Q
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
@@ -80,10 +81,18 @@ def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST
 # =============================================================================
 
 def _user_institution(user):
-    return getattr(user, "institution", None)
+    """MONO-ÉTABLISSEMENT : toujours l'institution de référence."""
+    from core.tenant import default_institution
+    return default_institution()
 
 def _user_annee_active(user):
-    return getattr(user, "annee_scolaire_active", None)
+    """Année active de l'utilisateur si elle appartient à l'institution de
+    référence, sinon l'année courante de cette institution."""
+    from core.tenant import default_institution_id, default_annee_scolaire
+    annee = getattr(user, "annee_scolaire_active", None)
+    if annee and getattr(annee, "institution_id", None) == default_institution_id():
+        return annee
+    return default_annee_scolaire()
 
 def _role_name(user):
     return getattr(getattr(user, "role", None), "name", None)
@@ -434,6 +443,16 @@ class ParentViewSet(ProfileActionsMixin, BaseModelViewSet):
 
             return Parent.objects.filter(institution=inst) if inst else Parent.objects.none()
 
+        if role_name == "Formateur":
+            # ✅ Parents des apprenants de SES cours (enseignant direct ou groupe).
+            cours_ids = Cours.objects.filter(
+                Q(enseignant=user) | Q(groupe__enseignants=user)
+            ).values_list('id', flat=True)
+            appr_ids = InscriptionCours.objects.filter(
+                cours_id__in=cours_ids
+            ).values_list('apprenant_id', flat=True).distinct()
+            return Parent.objects.filter(children__id__in=appr_ids).distinct()
+
         return Parent.objects.none()
 class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):
     queryset           = Apprenant.objects.select_related('institution', 'role', 'groupe', 'tuteur', 'pays_residence', 'annee_scolaire_active').all()
@@ -455,9 +474,20 @@ class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):
         if role_name == "Admin":
             return self._qs_base().filter(institution=inst) if inst else Apprenant.objects.none()
 
-        # ✅ Responsable : périmètre établissement (comme l'Admin)
+        # ✅ Responsable : son DÉPARTEMENT (repli établissement si le
+        #    département n'a pas encore de structure académique liée).
         if role_name in ["ResponsableAcademique", "Responsable", "Responsable Académique"]:
-            return self._qs_base().filter(institution=inst) if inst else Apprenant.objects.none()
+            if not inst:
+                return Apprenant.objects.none()
+            dept_id, _ = _get_responsable_context(user)
+            if dept_id:
+                qs_dept = self._qs_base().filter(
+                    institution=inst,
+                    groupe__classe__filieres__domaine_etude__departement_id=dept_id,
+                ).distinct()
+                if qs_dept.exists():
+                    return qs_dept
+            return self._qs_base().filter(institution=inst)
 
         if role_name == "Formateur":
 
@@ -475,7 +505,7 @@ class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):
             #    `enseignant=user`) — cohérent avec `can_manage_cours`.
             cours_ids = list(
                 Cours.objects.filter(
-                    Q(enseignant=user) | Q(groupes__enseignants=user),
+                    Q(enseignant=user) | Q(groupe__enseignants=user),
                     institution_id__in=formateur_inst_ids,
                 ).distinct().values_list("id", flat=True)
             )
@@ -584,24 +614,16 @@ class FormateurViewSet(ProfileActionsMixin, BaseModelViewSet):
             if not inst_id:
                 return Formateur.objects.none()
 
+            # ✅ Responsable : formateurs de SON DÉPARTEMENT (via leurs groupes),
+            #    avec repli établissement si le département n'a pas de structure.
             if dept_id:
-                from academics.models import Filiere, Groupe
-                filiere_ids = Filiere.objects.filter(
-                    institution_id=inst_id,
-                    domaine_etude__departement_id=dept_id
-                ).values_list('id', flat=True)
-                # Groupes du département via la chaîne Filiere → Classe → Groupe
-                groupe_ids = Groupe.objects.filter(
-                    institution_id=inst_id,
-                    classe__filieres__id__in=filiere_ids
-                ).values_list('id', flat=True)
-                # Formateurs assignés à ces groupes (M2M : academics_groupes)
-                return Formateur.objects.filter(
+                qs_dept = Formateur.objects.filter(
                     institutions__id=inst_id,
-                    academics_groupes__id__in=groupe_ids
+                    academics_groupes__classe__filieres__domaine_etude__departement_id=dept_id,
                 ).distinct()
-
-            return Formateur.objects.filter(institutions=inst) if inst else Formateur.objects.none()
+                if qs_dept.exists():
+                    return qs_dept
+            return Formateur.objects.filter(institutions__id=inst_id).distinct()
 
         # Autres rôles authentifiés : lecture seule sur l'institution
         if inst:

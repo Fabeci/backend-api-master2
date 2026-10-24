@@ -48,7 +48,7 @@ def run():
     # --- Roles ---
     title("2. Creation des roles")
     roles = {}
-    for nom in ["SuperAdmin", "Admin", "ResponsableAcademique", "Formateur", "Apprenant", "Parent"]:
+    for nom in ["Admin", "ResponsableAcademique", "Formateur", "Apprenant", "Parent"]:
         r, created = UserRole.objects.get_or_create(name=nom)
         roles[nom] = r
         ok(f"Role {'cree' if created else 'existant'} : {nom}")
@@ -109,13 +109,6 @@ def run():
         return obj
 
     title("4. Creation des comptes utilisateurs")
-
-    # 1. SuperAdmin
-    sa = SuperAdmin(email="superadmin@testlms.com",
-                    **base_fields("SuperAdmin", "Kamara", "Ibrahim", "+23500000001",
-                                  is_staff=True, is_superuser=True))
-    save_user(sa, PASSWORD)
-    ok("SuperAdmin            : superadmin@testlms.com")
 
     # 2. Admin
     ad = Admin(email="admin@testlms.com",
@@ -186,7 +179,6 @@ def run():
     out(f"  {'Role':<26} {'Email':<32} Acces")
     out(f"  {'-'*24} {'-'*30} {'-'*18}")
     rows = [
-        ("SuperAdmin",             "superadmin@testlms.com",     "Total - toutes institutions"),
         ("Admin",                  "admin@testlms.com",          "Gestion institution entiere"),
         ("ResponsableAcademique",  "responsable@testlms.com",    "Departement Informatique"),
         ("Formateur",              "formateur@testlms.com",      "Cours, Modules, Evaluations"),

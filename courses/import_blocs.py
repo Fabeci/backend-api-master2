@@ -238,10 +238,105 @@ def _read_pdf(data):
     return "\n".join((p.extract_text() or "") for p in PdfReader(io.BytesIO(data)).pages)
 
 
+def _heading_level(style: str, size_pt: float) -> int:
+    st = (style or "").lower()
+    m = re.match(r"heading\s*(\d)", st)
+    if m:
+        return max(1, min(6, int(m.group(1))))
+    if st.startswith("title"):
+        return 1
+    if size_pt:
+        if size_pt >= 22:
+            return 1
+        if size_pt >= 17:
+            return 2
+        if size_pt >= 14.5:
+            return 3
+        if size_pt >= 12.5:
+            return 4
+    return 0
+
+
+def _align_class(alignment) -> str:
+    try:
+        v = int(alignment) if alignment is not None else None
+    except Exception:
+        return ""
+    # WD_ALIGN_PARAGRAPH: 1=CENTER, 2=RIGHT, 3=JUSTIFY
+    return {1: "doc-center", 2: "doc-right", 3: "doc-justify"}.get(v, "")
+
+
+def _align_css(alignment) -> str:
+    return {"doc-center": "center", "doc-right": "right", "doc-justify": "justify"}.get(
+        _align_class(alignment), ""
+    )
+
+
+def _docx_family(name: str) -> str:
+    f = (name or "").lower()
+    if "courier" in f or "consolas" in f or "mono" in f:
+        return f"{name}, monospace"
+    if "times" in f or "georgia" in f or "garamond" in f or "cambria" in f:
+        return f"{name}, Times, serif"
+    return f"{name}, Arial, sans-serif"
+
+
+def _run_style(r, base=None) -> str:
+    """Style inline d'un run Word : police, taille, couleur, gras/italique/souligné.
+    `base` = police héritée du style de paragraphe / style Normal."""
+    st = []
+    try:
+        f = r.font
+        name = (f.name if f is not None else None) or (base.name if base is not None else None)
+        if name:
+            st.append(f"font-family:{_docx_family(name)}")
+        size = None
+        if f is not None and f.size:
+            try:
+                size = float(f.size.pt)
+            except Exception:
+                size = None
+        if size is None and base is not None and base.size:
+            try:
+                size = float(base.size.pt)
+            except Exception:
+                size = None
+        if size:
+            st.append(f"font-size:{size}pt")
+        color = None
+        try:
+            if f is not None and f.color and f.color.rgb:
+                color = f"#{f.color.rgb}"
+        except Exception:
+            color = None
+        if color is None:
+            try:
+                if base is not None and base.color and base.color.rgb:
+                    color = f"#{base.color.rgb}"
+            except Exception:
+                color = None
+        if color:
+            st.append(f"color:{color}")
+    except Exception:
+        pass
+    if r.bold:
+        st.append("font-weight:700")
+    if r.italic:
+        st.append("font-style:italic")
+    if getattr(r, "underline", False):
+        st.append("text-decoration:underline")
+    return ";".join(st)
+
+
 def _docx_to_blocs(data):
-    """Convertit un document Word en blocs HTML (titres, gras/italique, listes, tableaux)."""
+    """Convertit un document Word en blocs HTML en s'appuyant sur la mise en forme
+    réelle (styles, taille de police, gras/italique/souligné, alignement)."""
     import docx
     d = docx.Document(io.BytesIO(data))
+    try:
+        normal_font = d.styles["Normal"].font
+    except Exception:
+        normal_font = None
     blocs = []
     cur = None
 
@@ -251,47 +346,76 @@ def _docx_to_blocs(data):
                "url": "", "est_obligatoire": True, "est_visible": True}
         blocs.append(cur)
 
-    for p in d.paragraphs:
-        txt = (p.text or "").strip()
-        if not txt:
-            continue
-        style = ((p.style.name if p.style else "") or "").lower()
-        if style.startswith(("heading", "title", "titre")):
-            _new(txt)
-            continue
-        if cur is None:
-            _new("Introduction")
+    def _runs_html(p, base=None):
         parts = []
         for r in p.runs:
             s = _html.escape(r.text or "")
             if not s:
                 continue
-            if r.bold:
-                s = f"<strong>{s}</strong>"
-            if r.italic:
-                s = f"<em>{s}</em>"
-            if getattr(r, "underline", False):
-                s = f"<u>{s}</u>"
-            parts.append(s)
-        inner = "".join(parts) or _html.escape(txt)
-        if style.startswith("list bullet"):
+            style = _run_style(r, base)
+            if style:
+                parts.append(f'<span style="{style}">{s}</span>')
+            else:
+                parts.append(s)
+        return "".join(parts) or _html.escape((p.text or "").strip())
+
+    def _size(p):
+        sizes = []
+        for r in p.runs:
+            try:
+                if r.font and r.font.size:
+                    sizes.append(float(r.font.size.pt))
+            except Exception:
+                pass
+        return max(sizes) if sizes else 0.0
+
+    for p in d.paragraphs:
+        txt = (p.text or "").strip()
+        if not txt:
+            continue
+        style = (p.style.name if p.style else "") or ""
+        level = _heading_level(style, _size(p))
+
+        align_css = _align_css(getattr(p, "alignment", None))
+        style_attr = f' style="text-align:{align_css}"' if align_css else ""
+
+        try:
+            base_font = p.style.font if p.style else None
+        except Exception:
+            base_font = None
+        if base_font is None or (not base_font.name and not base_font.size):
+            base_font = normal_font
+
+        if level:
+            _new(txt)
+            cur["contenu"] = f"<h{level}{style_attr}>{_runs_html(p, base_font)}</h{level}>\n"
+            continue
+
+        if cur is None:
+            _new("Introduction")
+        st = style.lower()
+        inner = _runs_html(p, base_font)
+        if st.startswith("list bullet"):
             inner = f"<ul><li>{inner}</li></ul>"
-        elif style.startswith("list number"):
+        elif st.startswith("list number"):
             inner = f"<ol><li>{inner}</li></ol>"
-        elif "code" in style:
+        elif "code" in st:
             inner = f"<pre><code>{_html.escape(txt)}</code></pre>"
         else:
-            inner = f"<p>{inner}</p>"
+            inner = f"<p{style_attr}>{inner}</p>"
         cur["contenu"] += inner + "\n"
 
     for table in d.tables:
         if cur is None:
             _new("Tableau")
         rows = "".join(
-            "<tr>" + "".join(f"<td>{_html.escape(c.text)}</td>" for c in row.cells) + "</tr>"
+            "<tr>" + "".join(
+                f'<td style="border:1px solid #CBD5E1;padding:4px 6px;">{_html.escape(c.text)}</td>'
+                for c in row.cells
+            ) + "</tr>"
             for row in table.rows
         )
-        cur["contenu"] += f"<table>{rows}</table>\n"
+        cur["contenu"] += f'<table style="border-collapse:collapse;width:100%;margin:8px 0;">{rows}</table>\n'
 
     return blocs
 
@@ -331,7 +455,12 @@ def extract_blocs(filename: str, data: bytes) -> dict:
     elif name.endswith(".txt"):
         blocs = _text_to_blocs(data.decode("utf-8-sig", errors="ignore"), base)
     elif name.endswith(".pdf"):
-        blocs = _text_to_blocs(_read_pdf(data), base)
+        try:
+            from .pdf_style import pdf_to_blocs
+            blocs = pdf_to_blocs(data)
+        except Exception as exc:
+            _warn(f"Extraction PDF stylée impossible ({exc}) → repli en texte.")
+            blocs = _text_to_blocs(_read_pdf(data), base)
     else:
         _warn("Format non pris en charge (.xlsx, .csv, .docx, .pdf, .txt).")
         blocs = []

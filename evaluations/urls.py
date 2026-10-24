@@ -4,6 +4,7 @@ from .import_create_views import (
     QuizImportCreateAPIView,
 )
 from .views import (
+    PassageEvaluationRattrapageAPIView,
     EvaluationImportQuestionsAPIView,    # Quiz
     EvaluationExportAPIView,
     QuizListCreateAPIView,
@@ -32,6 +33,7 @@ from .views import (
     PassageEvaluationSoumettreAPIView,
     PassageEvaluationListAPIView,
     PassageEvaluationDetailAPIView,
+    PassageEvaluationRattrapageAPIView,
     
     # Réponses aux questions
     ReponseQuestionSauvegarderAPIView,
@@ -129,6 +131,7 @@ urlpatterns = [
          name='passage-evaluation-demarrer'),
     
     # Reprendre une évaluation en cours
+    path('passages-evaluations/<int:pk>/rattrapage/', PassageEvaluationRattrapageAPIView.as_view(), name='passage-evaluation-rattrapage'),
     path('passages-evaluations/<int:pk>/reprendre/', 
          PassageEvaluationReprendreAPIView.as_view(), 
          name='passage-evaluation-reprendre'),

@@ -37,14 +37,16 @@ def role_key(user) -> str | None:
 
 
 def display_role(user) -> str | None:
+    # MONO-ÉTABLISSEMENT : plus de rôle SuperAdmin. Un éventuel superuser
+    # technique est traité comme Admin de l'établissement unique.
     if getattr(user, "is_superuser", False):
-        return "SuperAdmin"
+        return "Admin"
     return _CANON.get(role_key(user) or "")
 
 
 # ── Matrice de base : ressource → action → rôles ─────────────────────────────
-_SUPER = ["SuperAdmin"]
-_ADMIN_SA = ["SuperAdmin", "Admin"]
+_SUPER = []  # MONO-ÉTABLISSEMENT : plus de SuperAdmin
+_ADMIN_SA = ["Admin"]
 _STAFF = ["Admin", "Responsable"]
 _CONTENT_MAKERS = ["Formateur"]  # ✅ Responsable = LECTURE SEULE (spec)
 
@@ -55,7 +57,7 @@ ROLE_PERMISSIONS: dict = {
     "formateurs":  {"view": _STAFF + ["Formateur"], "create": ["Admin"], "edit": ["Admin"], "delete": ["Admin"]},
     "apprenants":  {"view": ["SuperAdmin", "Admin", "Responsable", "Formateur", "Apprenant", "Parent"],
                     "create": ["Admin"], "edit": ["Admin"], "delete": ["Admin"]},
-    "parents":     {"view": _STAFF, "create": ["Admin"], "edit": ["Admin"], "delete": ["Admin"]},
+    "parents":     {"view": _STAFF + ["Formateur"], "create": ["Admin"], "edit": ["Admin"], "delete": ["Admin"]},
 
     # Lecture : tous les profils voient LEUR établissement (le queryset reste
     # filtré par établissement → aucune fuite). Écriture : Admin/SuperAdmin.
@@ -72,6 +74,10 @@ ROLE_PERMISSIONS: dict = {
     "inscriptions": {"view": _ADMIN_SA + _STAFF + ["Formateur", "Apprenant", "Parent"],
                      "create": ["SuperAdmin", "Admin"], "edit": ["SuperAdmin", "Admin"], "delete": ["SuperAdmin", "Admin"]},
 
+    # ✅ Affectations d'enseignement : le Responsable PEUT les gérer (son périmètre).
+    "affectations": {"view": _STAFF + ["Formateur"], "create": _STAFF, "edit": _STAFF, "delete": _STAFF},
+    "semestres":   {"view": _STAFF + ["Formateur"], "create": _STAFF, "edit": _STAFF, "delete": _STAFF},
+    "ues":         {"view": _STAFF + ["Formateur"], "create": _STAFF, "edit": _STAFF, "delete": _STAFF},
     "cours":      {"view": _ADMIN_SA + ["Responsable", "Formateur", "Apprenant", "Parent"],
                    "create": _CONTENT_MAKERS, "edit": _CONTENT_MAKERS, "delete": _CONTENT_MAKERS},
     "modules":    {"view": _ADMIN_SA + ["Responsable", "Formateur", "Apprenant", "Parent"],
@@ -157,9 +163,6 @@ def has_permission(user, resource: str, action: str) -> bool:
     role = display_role(user)
     if role is None:
         return False
-    if role == "SuperAdmin":
-        return True
-
     # Surcharges en base (prioritaires sur la matrice par défaut)
     override = _role_override(role, resource, action)
     if override is not None:
@@ -192,6 +195,8 @@ VIEW_RESOURCE = {
 #    volontairement exclus pour ne rien casser.
 CLASS_RESOURCE = {
     # courses — contenu
+    "AffectationEnseignementViewSet": "affectations",
+    "SemestreViewSet": "semestres", "UEViewSet": "ues",
     "CoursListCreateAPIView": "cours", "CoursDetailAPIView": "cours", "CoursModulesAPIView": "cours",
     "CoursIndicateursAPIView": "cours",
     "ModuleListCreateAPIView": "modules", "ModuleDetailAPIView": "modules", "ModuleSequencesAPIView": "modules",
@@ -277,7 +282,7 @@ class RBACPermission(permissions.BasePermission):
         user = request.user
         if not user or not getattr(user, "is_authenticated", False):
             return False
-        if getattr(user, "is_superuser", False) or display_role(user) == "SuperAdmin":
+        if getattr(user, "is_superuser", False):
             return True
 
         if hasattr(obj, "institution_id") and getattr(user, "institution_id", None):

@@ -5,6 +5,7 @@ from academics.models import Groupe, Matiere, Institution, AnneeScolaire
 from users.models import Apprenant, Formateur
 from users.serializers import ApprenantSerializer, FormateurSerializer
 
+from .utils import INSCRIPTION_ACTIVE_STATUSES
 from .models import (
     BlocProgress,
     Cours,
@@ -99,7 +100,7 @@ class CoursSerializer(serializers.ModelSerializer):
 
     def get_nombre_inscrits(self, obj):
         value = getattr(obj, "nb_inscrits", None)
-        return value if value is not None else obj.inscriptions.filter(statut='actif').count()
+        return value if value is not None else obj.inscriptions.filter(statut__in=INSCRIPTION_ACTIVE_STATUSES).count()
 
     def validate(self, attrs):
         """Validation des dates et unicité"""
@@ -647,6 +648,31 @@ class SessionSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'duree_minutes', 'institution', 'annee_scolaire',
                             'meet_space_name', 'meet_derniere_sync',
                             'teams_join_url', 'teams_meeting_id']
+
+    def validate(self, attrs):
+        """Cohérence des dates + absence de conflit formateur/groupe."""
+        debut = attrs.get('date_debut', getattr(self.instance, 'date_debut', None))
+        fin = attrs.get('date_fin', getattr(self.instance, 'date_fin', None))
+        cours = attrs.get('cours', getattr(self.instance, 'cours', None))
+
+        if debut and fin and fin <= debut:
+            raise serializers.ValidationError(
+                {"date_fin": "La date de fin doit être postérieure à la date de début."}
+            )
+
+        if debut and fin and cours:
+            base = Session.objects.filter(date_debut__lt=fin, date_fin__gt=debut)
+            if self.instance is not None:
+                base = base.exclude(pk=self.instance.pk)
+            if base.filter(cours__enseignant_id=cours.enseignant_id).exists():
+                raise serializers.ValidationError(
+                    {"date_debut": "Le formateur a déjà une séance sur ce créneau."}
+                )
+            if base.filter(cours__groupe_id=cours.groupe_id).exists():
+                raise serializers.ValidationError(
+                    {"date_debut": "Ce groupe a déjà une séance sur ce créneau."}
+                )
+        return attrs
 
     # ── Visio : le lien n'est exposé qu'aux personnes CONCERNÉES ──────────
     # (formateur du cours = organisateur, ou apprenant inscrit ; + superuser).

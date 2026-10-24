@@ -13,11 +13,13 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
 import csv
+from datetime import timedelta
 from io import BytesIO
 from django.http import HttpResponse
 from django.db.models import Prefetch
 from users.models import Apprenant, Parent as ParentModel
 from courses.models import InscriptionCours
+from courses.utils import INSCRIPTION_ACTIVE_STATUSES
 from .models import Evaluation, PassageEvaluation, ReponseQuestion
 from .models import (
     Quiz, Question, Reponse, Evaluation, PassageEvaluation,
@@ -51,6 +53,42 @@ def _get_role(user):
         }.get(raw.lower().replace(' ', '').replace('-', '').replace('_', ''), raw)
     return None
 
+
+
+
+def _passage_deadline(passage):
+    d = getattr(getattr(passage, "evaluation", None), "duree_minutes", 0) or 0
+    if d <= 0:
+        return None
+    return passage.date_debut + timedelta(minutes=d)
+
+
+def _passage_expired(passage) -> bool:
+    dl = _passage_deadline(passage)
+    return bool(dl and timezone.now() > dl)
+
+
+def _cours_scope_ok(user, cours) -> bool:
+    """Périmètre objet : institution de référence + département du Responsable."""
+    if cours is None:
+        return False
+    from core.tenant import default_institution_id
+    iid = getattr(user, "institution_id", None) or default_institution_id()
+    if iid and cours.institution_id != iid:
+        return False
+    if _get_role(user) == 'Responsable':
+        dept_id = getattr(user, 'departement_id', None)
+        if dept_id is None:
+            try:
+                from users.models import ResponsableAcademique
+                dept_id = ResponsableAcademique.objects.filter(pk=user.pk).values_list(
+                    'departement_id', flat=True
+                ).first()
+            except Exception:
+                dept_id = None
+        if dept_id and cours.departement_id not in (None, dept_id):
+            return False
+    return True
 
 def _is_super_admin(user):
     return getattr(user, 'is_superuser', False)
@@ -118,6 +156,18 @@ def _get_responsable_dept_id(user):
         except Exception:
             dept_id = None
     return dept_id
+
+
+def _dept_q(prefix: str, dept_id):
+    """Département du responsable OU élément NON AFFECTÉ (NULL).
+
+    Les cours/évaluations importés sans département ne doivent pas être
+    invisibles pour le responsable.
+    """
+    return (
+        Q(**{f"{prefix}departement_id": dept_id})
+        | Q(**{f"{prefix}departement__isnull": True})
+    )
 
 def _filter_quiz_by_institution(qs, user):
     institution_id = getattr(user, 'institution_id', None)
@@ -196,12 +246,12 @@ class QuizListCreateAPIView(APIView):
             if role == 'Admin':
                 qs = _filter_quiz_by_institution(qs, request.user)
 
-            elif role == 'ResponsableAcademique':
+            elif role == 'Responsable':
                 institution_id = getattr(request.user, 'institution_id', None)
                 qs = qs.filter(sequence__module__cours__institution_id=institution_id)
                 dept_id = _get_responsable_dept_id(request.user)
                 if dept_id:
-                    qs = qs.filter(sequence__module__cours__departement_id=dept_id)
+                    qs = qs.filter(_dept_q("sequence__module__cours__", dept_id))
 
             elif role == 'Formateur':
                 institution_id = getattr(request.user, 'institution_id', None)
@@ -219,6 +269,13 @@ class QuizListCreateAPIView(APIView):
                     .values_list('cours_id', flat=True)
                 )
                 qs = qs.filter(sequence__module__cours_id__in=cours_ids)
+
+                # ✅ Le cours doit avoir commencé (même règle que les blocs).
+                today = timezone.localdate()
+                qs = qs.exclude(sequence__module__cours__statut="annule").filter(
+                    Q(sequence__module__cours__date_debut__isnull=True)
+                    | Q(sequence__module__cours__date_debut__lte=today)
+                )
             else:
                 qs = qs.none()
 
@@ -271,7 +328,7 @@ class QuizDetailAPIView(APIView):
         qs = Quiz.objects.select_related('sequence__module__cours')
         if role == 'Apprenant':
             cours_ids = _IC.objects.filter(
-                apprenant=request.user, statut='inscrit'
+                apprenant=request.user, statut__in=INSCRIPTION_ACTIVE_STATUSES
             ).values_list('cours_id', flat=True)
             qs = qs.filter(sequence__module__cours_id__in=list(cours_ids))
         elif role == 'Formateur':
@@ -284,6 +341,11 @@ class QuizDetailAPIView(APIView):
                 qs = qs.filter(sequence__module__cours__institution_id=inst)
 
         quiz = get_object_or_404(qs, pk=pk)
+        if role == 'Apprenant':
+            from courses.publication import cours_commence
+            if not cours_commence(quiz.sequence.module.cours):
+                return api_error("Ce cours n'a pas encore commencé.",
+                                 http_status=status.HTTP_403_FORBIDDEN)
         # ✅ Jamais de corrigés pour un apprenant
         if role == 'Apprenant':
             from .serializers import QuizDetailApprenantSerializer
@@ -350,15 +412,15 @@ class QuestionListCreateAPIView(APIView):
                     Q(evaluation__cours__institution_id=institution_id)
                 )
 
-            elif role == 'ResponsableAcademique':
+            elif role == 'Responsable':
                 institution_id = getattr(request.user, 'institution_id', None)
                 dept_id = _get_responsable_dept_id(request.user)
                 if dept_id:
                     qs = qs.filter(
-                        Q(quiz__sequence__module__cours__institution_id=institution_id,
-                        quiz__sequence__module__cours__departement_id=dept_id) |
-                        Q(evaluation__cours__institution_id=institution_id,
-                        evaluation__cours__departement_id=dept_id)
+                        (Q(quiz__sequence__module__cours__institution_id=institution_id)
+                         & _dept_q("quiz__sequence__module__cours__", dept_id)) |
+                        (Q(evaluation__cours__institution_id=institution_id)
+                         & _dept_q("evaluation__cours__", dept_id))
                     )
                 else:
                     qs = qs.filter(
@@ -372,7 +434,7 @@ class QuestionListCreateAPIView(APIView):
                 )
             elif role == 'Apprenant':
                 cours_ids = InscriptionCours.objects.filter(
-                    apprenant=request.user, statut='inscrit'
+                    apprenant=request.user, statut__in=INSCRIPTION_ACTIVE_STATUSES
                 ).values_list('cours_id', flat=True)
                 qs = qs.filter(
                     Q(quiz__sequence__module__cours_id__in=cours_ids) |
@@ -419,7 +481,7 @@ def _scope_questions(request, qs, prefix=""):
 
     if role == 'Apprenant':
         ids = list(InscriptionCours.objects.filter(
-            apprenant=request.user, statut='inscrit'
+            apprenant=request.user, statut__in=INSCRIPTION_ACTIVE_STATUSES
         ).values_list('cours_id', flat=True))
         return qs.filter(
             Q(**{f"{prefix}quiz__sequence__module__cours_id__in": ids}) |
@@ -429,7 +491,7 @@ def _scope_questions(request, qs, prefix=""):
     if role == 'Formateur':
         cours_ids = list(
             Cours.objects.filter(
-                Q(enseignant=request.user) | Q(groupes__enseignants=request.user)
+                Q(enseignant=request.user) | Q(groupe__enseignants=request.user)
             ).distinct().values_list('id', flat=True)
         )
         return qs.filter(
@@ -609,7 +671,7 @@ class EvaluationListCreateAPIView(APIView):
             if role == 'Admin':
                 qs = _filter_by_institution(qs, request.user)
 
-            elif role == 'ResponsableAcademique':
+            elif role == 'Responsable':
                 institution_id = getattr(request.user, 'institution_id', None)
                 if not institution_id:
                     qs = qs.none()
@@ -626,7 +688,7 @@ class EvaluationListCreateAPIView(APIView):
 
                     qs = qs.filter(cours__institution_id=institution_id)
                     if dept_id:
-                        qs = qs.filter(cours__departement_id=dept_id)
+                        qs = qs.filter(_dept_q("cours__", dept_id))
 
             elif role == 'Formateur':
                 institution_id = getattr(request.user, 'institution_id', None)
@@ -729,13 +791,13 @@ class EvaluationDetailAPIView(APIView):
         role = _get_role(request.user)
         evaluation = get_object_or_404(Evaluation, pk=pk)
 
-        if role in ('Admin', 'ResponsableAcademique'):
+        if role in ('Admin', 'Responsable'):
             institution_id = getattr(request.user, 'institution_id', None)
             if evaluation.cours.institution_id != institution_id:
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
 
             # ✅ Vérification département pour ResponsableAcademique
-            if role == 'ResponsableAcademique':
+            if role == 'Responsable':
                 dept_id = getattr(request.user, 'departement_id', None)
                 if dept_id is None:
                     try:
@@ -755,7 +817,7 @@ class EvaluationDetailAPIView(APIView):
             is_inscrit = InscriptionCours.objects.filter(
                 apprenant=request.user,
                 cours=evaluation.cours,
-                statut='inscrit'
+                statut__in=INSCRIPTION_ACTIVE_STATUSES
             ).exists()
             if not is_inscrit or not evaluation.est_publiee:
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
@@ -793,6 +855,8 @@ class EvaluationDetailAPIView(APIView):
         if _get_role(request.user) == 'Formateur':
             if not _formateur_owns_cours(request.user, evaluation.cours):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        if _get_role(request.user) in ('Admin', 'Responsable') and not _cours_scope_ok(request.user, evaluation.cours):
+            return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         serializer = EvaluationSerializer(evaluation, data=request.data, partial=True)
         if serializer.is_valid():
             return api_success("Évaluation mise à jour.", EvaluationSerializer(serializer.save()).data)
@@ -806,6 +870,8 @@ class EvaluationDetailAPIView(APIView):
         if _get_role(request.user) == 'Formateur':
             if not _formateur_owns_cours(request.user, evaluation.cours):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        if _get_role(request.user) in ('Admin', 'Responsable') and not _cours_scope_ok(request.user, evaluation.cours):
+            return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         evaluation.delete()
         return api_success("Évaluation supprimée.", None, status.HTTP_204_NO_CONTENT)
 
@@ -823,6 +889,8 @@ class EvaluationPublierAPIView(APIView):
             if _get_role(request.user) == 'Formateur':
                 if not _formateur_owns_cours(request.user, evaluation.cours):
                     return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+            if _get_role(request.user) == 'Admin' and not _cours_scope_ok(request.user, evaluation.cours):
+                return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
 
             action = request.data.get('action', 'publier')
             if action not in ['publier', 'depublier']:
@@ -981,6 +1049,11 @@ class PassageEvaluationDemarrerAPIView(APIView):
                           'tentatives': nb, 'max': maxi},
                 )
 
+            from courses.publication import cours_commence
+            if evaluation.cours_id and not cours_commence(evaluation.cours):
+                return api_error("Ce cours n'a pas encore commencé.",
+                                 http_status=status.HTTP_403_FORBIDDEN)
+
             if not evaluation.est_accessible():
                 return api_error("Cette évaluation n'est pas accessible actuellement.",
                                  http_status=status.HTTP_403_FORBIDDEN)
@@ -1039,6 +1112,9 @@ class PassageEvaluationSauvegarderAPIView(APIView):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
             if passage.statut != 'en_cours':
                 return api_error("Impossible de sauvegarder après soumission.")
+            if _passage_expired(passage):
+                return api_error("Temps écoulé : la sauvegarde est close.",
+                                 http_status=status.HTTP_403_FORBIDDEN)
             if passage.evaluation.type_evaluation != 'simple':
                 return api_error("Route uniquement pour les évaluations simples.")
             serializer = PassageEvaluationSerializer(passage, data=request.data, partial=True)
@@ -1068,18 +1144,20 @@ class PassageEvaluationSoumettreAPIView(APIView):
             if not passage.peut_etre_soumis():
                 return api_error("Date limite dépassée.", http_status=status.HTTP_403_FORBIDDEN)
 
-            if passage.evaluation.type_evaluation == 'structuree':
-                if not passage.reponses_questions.exclude(statut='non_repondu').exists():
-                    return api_error("Aucune question répondue.")
-            elif passage.evaluation.type_evaluation == 'simple':
-                if not passage.reponse_texte and not passage.fichier_reponse:
-                    return api_error("Aucune réponse fournie.")
+            auto = str(request.data.get('auto', '')).lower() in ('1', 'true', 'yes')
+            if not auto:
+                if passage.evaluation.type_evaluation in ('structuree', 'mixte'):
+                    if not passage.reponses_questions.exclude(statut='non_repondu').exists():
+                        return api_error("Aucune question répondue.")
+                elif passage.evaluation.type_evaluation == 'simple':
+                    if not passage.reponse_texte and not passage.fichier_reponse:
+                        return api_error("Aucune réponse fournie.")
 
             passage.statut = 'soumis'
             passage.date_soumission = timezone.now()
             passage.save()
 
-            if passage.evaluation.type_evaluation == 'structuree':
+            if passage.evaluation.type_evaluation in ('structuree', 'mixte'):
                 if passage.evaluation.est_auto_corrigeable():
                     passage.auto_corriger()
                     msg = "Évaluation soumise et corrigée automatiquement."
@@ -1122,12 +1200,12 @@ class PassageEvaluationListAPIView(APIView):
                 institution_id = getattr(request.user, 'institution_id', None)
                 qs = qs.filter(evaluation__cours__institution_id=institution_id)
 
-            elif role == 'ResponsableAcademique':
+            elif role == 'Responsable':
                 institution_id = getattr(request.user, 'institution_id', None)
                 qs = qs.filter(evaluation__cours__institution_id=institution_id)
                 dept_id = _get_responsable_dept_id(request.user)
                 if dept_id:
-                    qs = qs.filter(evaluation__cours__departement_id=dept_id)
+                    qs = qs.filter(_dept_q("evaluation__cours__", dept_id))
 
             elif role == 'Formateur':
                 qs = qs.filter(evaluation__cours__enseignant=request.user)
@@ -1163,6 +1241,8 @@ class PassageEvaluationDetailAPIView(APIView):
 
         passage = get_object_or_404(PassageEvaluation, pk=pk)
 
+        if role in ('Admin', 'Responsable') and not _cours_scope_ok(request.user, passage.evaluation.cours):
+            return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         if role == 'Apprenant' and passage.apprenant_id != request.user.id:
             return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         if role == 'Parent':
@@ -1199,6 +1279,9 @@ class ReponseQuestionSauvegarderAPIView(APIView):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
             if passage.statut != 'en_cours':
                 return api_error("Impossible de modifier après soumission.")
+            if _passage_expired(passage):
+                return api_error("Temps écoulé : la sauvegarde est close.",
+                                 http_status=status.HTTP_403_FORBIDDEN)
 
             reponse, _ = ReponseQuestion.objects.get_or_create(
                 passage_evaluation_id=passage_evaluation_id,
@@ -1209,7 +1292,16 @@ class ReponseQuestionSauvegarderAPIView(APIView):
             if 'reponse_texte' in request.data:
                 reponse.reponse_texte = request.data['reponse_texte']
             if 'fichier_reponse' in request.FILES:
-                reponse.fichier_reponse = request.FILES['fichier_reponse']
+                f = request.FILES['fichier_reponse']
+                import os as _os
+                _ext = _os.path.splitext(f.name or '')[1].lower()
+                if _ext not in {'.pdf', '.docx', '.doc', '.jpg', '.jpeg', '.png', '.gif', '.txt'}:
+                    return api_error("Extension de fichier non autorisée.",
+                                     http_status=status.HTTP_400_BAD_REQUEST)
+                if f.size > 20 * 1024 * 1024:
+                    return api_error("Fichier trop volumineux (max 20 Mo).",
+                                     http_status=status.HTTP_400_BAD_REQUEST)
+                reponse.fichier_reponse = f
 
             reponse.statut = 'repondu' if (
                 reponse.choix_selectionnes.exists() or reponse.reponse_texte or reponse.fichier_reponse
@@ -1231,6 +1323,10 @@ class ReponseQuestionDetailAPIView(APIView):
             return err
         role = _get_role(request.user)
         reponse = get_object_or_404(ReponseQuestion, pk=pk)
+        if role in ('Admin', 'Responsable') and not _cours_scope_ok(
+            request.user, reponse.passage_evaluation.evaluation.cours
+        ):
+            return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         if role == 'Apprenant' and reponse.passage_evaluation.apprenant_id != request.user.id:
             return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         if role == 'Parent':
@@ -1257,6 +1353,10 @@ class CorrectionReponseAPIView(APIView):
             if _get_role(request.user) == 'Formateur':
                 if not _formateur_owns_cours(request.user, reponse.passage_evaluation.evaluation.cours):
                     return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+            if _get_role(request.user) == 'Admin' and not _cours_scope_ok(
+                request.user, reponse.passage_evaluation.evaluation.cours
+            ):
+                return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
             if reponse.question.mode_correction == 'automatique':
                 return api_error("Cette question est corrigée automatiquement.")
             if reponse.passage_evaluation.statut not in ('soumis', 'corrige'):
@@ -1288,6 +1388,8 @@ class CorrectionEvaluationAPIView(APIView):
             if _get_role(request.user) == 'Formateur':
                 if not _formateur_owns_cours(request.user, passage.evaluation.cours):
                     return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+            if _get_role(request.user) == 'Admin' and not _cours_scope_ok(request.user, passage.evaluation.cours):
+                return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
             if passage.statut not in ('soumis', 'corrige'):
                 return api_error("Le passage doit être soumis pour être corrigé.")
 
@@ -1305,6 +1407,17 @@ class CorrectionEvaluationAPIView(APIView):
                 note_finale = request.data.get('note')
                 if note_finale is None:
                     return api_error("La note est requise pour les évaluations simples.")
+
+            try:
+                note_finale = float(note_finale)
+            except (TypeError, ValueError):
+                return api_error("Note invalide.", http_status=status.HTTP_400_BAD_REQUEST)
+            bareme = float(passage.evaluation.bareme or 0)
+            if note_finale < 0 or (bareme and note_finale > bareme):
+                return api_error(
+                    f"La note doit être comprise entre 0 et {bareme:g}.",
+                    http_status=status.HTTP_400_BAD_REQUEST,
+                )
 
             passage.note = note_finale
             passage.commentaire_enseignant = request.data.get('commentaire_enseignant', '')
@@ -1333,12 +1446,12 @@ class EvaluationsACorrigerAPIView(APIView):
                 institution_id = getattr(request.user, 'institution_id', None)
                 qs = qs.filter(evaluation__cours__institution_id=institution_id)
 
-            elif role == 'ResponsableAcademique':
+            elif role == 'Responsable':
                 institution_id = getattr(request.user, 'institution_id', None)
                 qs = qs.filter(evaluation__cours__institution_id=institution_id)
                 dept_id = _get_responsable_dept_id(request.user)
                 if dept_id:
-                    qs = qs.filter(evaluation__cours__departement_id=dept_id)
+                    qs = qs.filter(_dept_q("evaluation__cours__", dept_id))
             elif role == 'Formateur':
                 qs = qs.filter(evaluation__cours__enseignant=request.user)
 
@@ -1374,12 +1487,12 @@ class PassageQuizListCreateAPIView(APIView):
                 institution_id = getattr(request.user, 'institution_id', None)
                 qs = qs.filter(quiz__sequence__module__cours__institution_id=institution_id)
 
-            elif role == 'ResponsableAcademique':
+            elif role == 'Responsable':
                 institution_id = getattr(request.user, 'institution_id', None)
                 qs = qs.filter(quiz__sequence__module__cours__institution_id=institution_id)
                 dept_id = _get_responsable_dept_id(request.user)
                 if dept_id:
-                    qs = qs.filter(quiz__sequence__module__cours__departement_id=dept_id)
+                    qs = qs.filter(_dept_q("quiz__sequence__module__cours__", dept_id))
 
             elif role == 'Formateur':
                 qs = qs.filter(quiz__sequence__module__cours__enseignant=request.user)
@@ -1410,6 +1523,21 @@ class PassageQuizListCreateAPIView(APIView):
                     serializer.validated_data.get('apprenant'), 'id') else '') != str(request.user.id):
                 return api_error("Vous ne pouvez passer que vos propres quiz.",
                                  http_status=status.HTTP_403_FORBIDDEN)
+
+            # ✅ Le cours doit avoir commencé et l'apprenant doit y être inscrit.
+            quiz = serializer.validated_data.get('quiz')
+            cours = getattr(getattr(getattr(quiz, 'sequence', None), 'module', None), 'cours', None)
+            if cours is not None:
+                from courses.models import InscriptionCours
+                from courses.publication import cours_commence
+
+                if not InscriptionCours.objects.filter(apprenant=request.user, cours=cours).exists():
+                    return api_error("Accès refusé à ce cours.",
+                                     http_status=status.HTTP_403_FORBIDDEN)
+                if not cours_commence(cours):
+                    return api_error("Ce cours n'a pas encore commencé.",
+                                     http_status=status.HTTP_403_FORBIDDEN)
+
             passage = serializer.save()
             for question in passage.quiz.questions.all():
                 ReponseQuiz.objects.create(passage_quiz=passage, question=question)
@@ -1650,6 +1778,8 @@ class EvaluationExportAPIView(APIView):
         if _get_role(request.user) == 'Formateur':
             if not _formateur_owns_cours(request.user, evaluation.cours):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        if _get_role(request.user) in ('Admin', 'Responsable') and not _cours_scope_ok(request.user, evaluation.cours):
+            return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
 
         export_format = request.query_params.get("format", "csv").lower()
         detail = request.query_params.get("detail", "false").lower() == "true"
@@ -1838,6 +1968,10 @@ class EvaluationImportQuestionsAPIView(APIView):
     def post(self, request):
         from .import_questions import extract_questions
 
+        if _get_role(request.user) != "Formateur":
+            return api_error("Import réservé aux formateurs.",
+                             http_status=status.HTTP_403_FORBIDDEN)
+
         f = request.FILES.get("file")
         if not f:
             return api_error("Aucun fichier fourni.", http_status=status.HTTP_400_BAD_REQUEST)
@@ -1855,3 +1989,36 @@ class EvaluationImportQuestionsAPIView(APIView):
             )
 
         return api_success(f"{result['nb']} question(s) extraite(s).", result, status.HTTP_200_OK)
+
+
+class PassageEvaluationRattrapageAPIView(APIView):
+    """Crée une session de rattrapage (par EC → par évaluation) pour un apprenant."""
+
+    permission_classes = [IsAuthenticated, RBACPermission]
+    rbac_resource = "evaluations"
+
+    def post(self, request, pk):
+        err = _require_roles(request.user, "Admin", "Formateur")
+        if err:
+            return err
+
+        original = get_object_or_404(PassageEvaluation, pk=pk)
+        if _get_role(request.user) == "Formateur":
+            if not _formateur_owns_cours(request.user, original.evaluation.cours):
+                return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+
+        dernier = (PassageEvaluation.objects
+                   .filter(apprenant=original.apprenant, evaluation=original.evaluation)
+                   .order_by("-numero_tentative").first())
+        numero = (dernier.numero_tentative if dernier else 0) + 1
+
+        passage = PassageEvaluation.objects.create(
+            apprenant=original.apprenant,
+            evaluation=original.evaluation,
+            numero_tentative=numero,
+            session="rattrapage",
+            statut="en_cours",
+        )
+        return api_success("Session de rattrapage créée.",
+                           PassageEvaluationSerializer(passage).data,
+                           status.HTTP_201_CREATED)

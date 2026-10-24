@@ -84,20 +84,6 @@ class UnifiedDashboardAPIView(APIView):
 # Vues dédiées (backward compat — conservées pour les routes existantes)
 # ══════════════════════════════════════════════════════════════════════════════
 
-class SuperAdminDashboardAPIView(APIView):
-    permission_classes = [IsSuperUser]
-
-    def get(self, request):
-        try:
-            from .services.dashboard_superadmin import DashboardSuperAdminService
-            ctx     = DashboardContext(request.user, dict(request.query_params))
-            service = DashboardSuperAdminService(ctx)
-            return Response(service.build(ctx.filters))
-        except Exception:
-            logger.exception('SuperAdminDashboardAPIView')
-            return Response(_empty('Dashboard Super Admin'))
-
-
 class AdminDashboardAPIView(APIView):
     permission_classes = [IsAuthenticated]
 

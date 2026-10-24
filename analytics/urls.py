@@ -49,7 +49,6 @@ from .adaptive_views import (
     RecommendationsView,
 )
 from .dashboard_api_views import (
-    SuperAdminDashboardAPIView,
     AdminDashboardAPIView,
     FormateurDashboardAPIView,
     ResponsableDashboardAPIView,
@@ -64,7 +63,6 @@ urlpatterns = [
     path('dashboard/',                        UnifiedDashboardAPIView.as_view(),     name='dashboard-unified'),
 
     # ── Endpoints dédiés (backward compat) ────────────────────────────────
-    path('dashboard/super-admin/',            SuperAdminDashboardAPIView.as_view(),  name='dashboard-super-admin'),
     path('dashboard/admin/',                  AdminDashboardAPIView.as_view(),       name='dashboard-admin'),
     path('dashboard/formateur/',              FormateurDashboardAPIView.as_view(),   name='dashboard-formateur'),
     path('dashboard/responsable-academique/', ResponsableDashboardAPIView.as_view(), name='dashboard-responsable'),

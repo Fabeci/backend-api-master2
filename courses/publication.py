@@ -63,6 +63,27 @@ def session_disponible(s) -> bool:
     return timezone.now() >= debut
 
 
+def cours_commence(cours) -> bool:
+    """Un cours est accessible aux apprenants à partir de sa date de début.
+
+    - cours annulé → jamais accessible ;
+    - pas de date de début → accessible ;
+    - sinon, accessible dès `date_debut` (jour inclus).
+    """
+    if not cours:
+        return False
+    if getattr(cours, "statut", None) == "annule":
+        return False
+    debut = getattr(cours, "date_debut", None)
+    if debut is None:
+        return True
+    return timezone.localdate() >= debut
+
+
+def cours_disponible(cours) -> bool:
+    return cours_commence(cours)
+
+
 # ── Filtrage de queryset (usage : profils APPRENANT / PARENT uniquement) ─────
 
 def _q_date(prefix: str = "") -> Q:

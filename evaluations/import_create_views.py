@@ -76,7 +76,10 @@ class EvaluationImportCreateAPIView(APIView):
 
         cours = get_object_or_404(Cours.objects.select_related("enseignant"), pk=cours_id)
         user = request.user
-        if not (getattr(user, "is_superuser", False) or can_create_in_context(user, cours)):
+        role = user.role.name if getattr(user, "role", None) else None
+        if role != "Formateur":
+            return api_error("Import réservé aux formateurs.", http_status=status.HTTP_403_FORBIDDEN)
+        if not can_create_in_context(user, cours):
             return api_error("Action réservée au créateur du cours.", http_status=status.HTTP_403_FORBIDDEN)
 
         try:
@@ -128,7 +131,10 @@ class QuizImportCreateAPIView(APIView):
 
         seq = get_object_or_404(Sequence.objects.select_related("module__cours"), pk=sequence_id)
         user = request.user
-        if not (getattr(user, "is_superuser", False) or can_create_in_context(user, seq.module.cours)):
+        role = user.role.name if getattr(user, "role", None) else None
+        if role != "Formateur":
+            return api_error("Import réservé aux formateurs.", http_status=status.HTTP_403_FORBIDDEN)
+        if not can_create_in_context(user, seq.module.cours):
             return api_error("Action réservée au créateur du cours.", http_status=status.HTTP_403_FORBIDDEN)
 
         try:

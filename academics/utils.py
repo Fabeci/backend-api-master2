@@ -18,10 +18,12 @@ def get_parent_enfants_ids(user):
 def get_user_academic_context(request):
     user = request.user
 
+    from core.tenant import default_institution_id
+
     ctx = {
         "bypass": False,
         "blocked": False,
-        "institution_id": None,
+        "institution_id": default_institution_id(),
         "departement_id": None,
         "role_name": None,
         "user_classe_id": None,
@@ -29,13 +31,11 @@ def get_user_academic_context(request):
         "enfants_ids": [],
     }
 
-    if getattr(user, "is_superuser", False):
-        ctx["bypass"] = True
-        return ctx
-
+    # MONO-ÉTABLISSEMENT : plus de bypass SuperAdmin.
     role_name = get_role_name(user)
+    if getattr(user, "is_superuser", False) and not role_name:
+        role_name = "Admin"
     ctx["role_name"] = role_name
-    ctx["institution_id"] = getattr(user, "institution_id", None)
 
     # ✅ CRITIQUE : pour les responsables, toujours recharger depuis la BD
     # user.departement_id peut être obsolète (cache session/ORM)
@@ -47,8 +47,6 @@ def get_user_academic_context(request):
             ).first()
             if fresh:
                 ctx["departement_id"] = fresh['departement_id']
-                if fresh['institution_id']:
-                    ctx["institution_id"] = fresh['institution_id']
             else:
                 ctx["departement_id"] = getattr(user, 'departement_id', None)
         except Exception:
@@ -64,6 +62,7 @@ def get_user_academic_context(request):
         from .models import Inscription
         inscription = Inscription.objects.filter(
             apprenant=user,
+            institution_id=ctx["institution_id"],
             statut="actif"
         ).select_related('classe').first()
 
@@ -86,21 +85,8 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
     # INSTITUTION
     # ================================================================
     if model_name == 'Institution':
-        if ctx.get("bypass"):
-            return queryset
-        role_name = ctx.get("role_name")
+        # MONO-ÉTABLISSEMENT : une seule institution visible, pour tous les rôles.
         institution_id = ctx.get("institution_id")
-
-        if role_name == 'Parent':
-            enfants_ids = ctx.get("enfants_ids", [])
-            if not enfants_ids:
-                return queryset.none()
-            from users.models import Apprenant
-            inst_ids = Apprenant.objects.filter(
-                id__in=enfants_ids
-            ).values_list('institution_id', flat=True).distinct()
-            return queryset.filter(id__in=inst_ids)
-
         if institution_id:
             return queryset.filter(id=institution_id)
         return queryset.none()
@@ -443,6 +429,7 @@ def get_user_classe_id(user):
         from .models import Inscription
         inscription = Inscription.objects.filter(
             apprenant=user,
+            institution_id=ctx["institution_id"],
             statut="actif"
         ).select_related('classe').first()
         if inscription and inscription.classe:

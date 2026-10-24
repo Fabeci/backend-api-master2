@@ -49,6 +49,7 @@ urlpatterns = [
     path('api/v1/', include('gamification.urls')),
 ]
 
-# ✅ Servir les fichiers media EN DÉVELOPPEMENT
-# static() ne fonctionne que si DEBUG=True — on le force pour le dev local
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# ✅ Médias servis UNIQUEMENT en développement.
+# En production : proxy authentifié ou URLs signées (ne pas exposer /media/).
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

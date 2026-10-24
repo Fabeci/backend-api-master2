@@ -20,6 +20,14 @@ from courses.import_views import (
     BlocsImportExtractAPIView,
     SequenceBlocsImportCreateAPIView,
 )
+from courses.import_course_views import (
+    CoursImportAnalyseAPIView,
+    CoursImportCreateAPIView,
+)
+from courses.import_inscription_views import (
+    InscriptionImportAnalyseAPIView,
+    InscriptionImportCreateAPIView,
+)
 from .views import (
     # Cours
     BlocContenuUploadView,
@@ -77,6 +85,9 @@ from .views import (
 urlpatterns = [
     # Cours
     path('cours/', CoursListCreateAPIView.as_view(), name='cours-list-create'),
+    # Import d'un cours complet (Word / PDF → modules, séquences, blocs, quiz)
+    path('cours/importer/analyser/', CoursImportAnalyseAPIView.as_view(), name='cours-import-analyser'),
+    path('cours/importer/', CoursImportCreateAPIView.as_view(), name='cours-import-create'),
     path('cours/<int:pk>/', CoursDetailAPIView.as_view(), name='cours-detail'),
     path('cours/<int:cours_id>/modules/', CoursModulesAPIView.as_view(), name='cours-modules'),
     path('cours/<int:pk>/indicateurs/',  CoursIndicateursAPIView.as_view()),
@@ -106,6 +117,9 @@ urlpatterns = [
     
     # Inscriptions
     path('inscriptions/', InscriptionCoursListCreateAPIView.as_view(), name='inscription-list-create'),
+    # Import d'inscriptions depuis un document (CSV / Excel / Word / PDF / TXT)
+    path('inscriptions/importer/analyser/', InscriptionImportAnalyseAPIView.as_view(), name='inscriptions-import-analyser'),
+    path('inscriptions/importer/', InscriptionImportCreateAPIView.as_view(), name='inscriptions-import-create'),
     path('inscriptions/<int:pk>/', InscriptionCoursDetailAPIView.as_view(), name='inscription-detail'),
     
     # Suivis

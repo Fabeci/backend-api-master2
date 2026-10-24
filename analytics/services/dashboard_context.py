@@ -13,7 +13,6 @@ from django.utils import timezone
 
 
 # Noms de rôles reconnus (valeurs en base dans UserRole.name)
-ROLE_SUPER_ADMIN  = 'SuperAdmin'
 ROLE_ADMIN        = 'Admin'
 ROLE_RESPONSABLE  = 'Responsable'
 ROLE_FORMATEUR    = 'Formateur'
@@ -21,7 +20,7 @@ ROLE_APPRENANT    = 'Apprenant'
 ROLE_PARENT       = 'Parent'
 
 ALL_ROLES = {
-    ROLE_SUPER_ADMIN, ROLE_ADMIN, ROLE_RESPONSABLE,
+    ROLE_ADMIN, ROLE_RESPONSABLE,
     ROLE_FORMATEUR, ROLE_APPRENANT, ROLE_PARENT,
 }
 
@@ -60,7 +59,7 @@ class DashboardContext:
     @cached_property
     def role_name(self) -> Optional[str]:
         if self.user.is_superuser:
-            return ROLE_SUPER_ADMIN
+            return ROLE_ADMIN
         raw = getattr(getattr(self.user, 'role', None), 'name', None)
         if not raw:
             return None
@@ -68,7 +67,7 @@ class DashboardContext:
         # (sans quoi le router de dashboard renvoie 403 pour ce rôle).
         key = str(raw).lower().replace(' ', '').replace('-', '').replace('_', '')
         return {
-            'superadmin':            ROLE_SUPER_ADMIN,
+            'superadmin':            ROLE_ADMIN,
             'admin':                 ROLE_ADMIN,
             'responsable':           ROLE_RESPONSABLE,
             'responsableacademique': ROLE_RESPONSABLE,
@@ -170,8 +169,6 @@ class DashboardContext:
         qs = model.objects.all()
 
         role = self.role_name
-        if role == ROLE_SUPER_ADMIN:
-            return qs
         if role in (ROLE_ADMIN, ROLE_RESPONSABLE):
             return qs.filter(institution=self.institution)
         if role == ROLE_FORMATEUR:
