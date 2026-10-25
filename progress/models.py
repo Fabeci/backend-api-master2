@@ -140,54 +140,40 @@ class ProgressionApprenant(models.Model):
         super().save(*args, **kwargs)
     
     def calculer_progression(self):
+        """✅ Progression = AVANCEMENT DANS LE CONTENU uniquement.
+
+        L'ancienne formule pondérée (60 % modules / 30 % quiz / 10 % évaluations)
+        est retirée : elle plafonnait à 60-70 % les cours sans quiz et mélangeait
+        réussite et avancement. La RÉUSSITE est désormais calculée séparément
+        (`academics/services/lmd.py` : moyennes EC/UE, crédits, mention).
         """
-        Calcule le pourcentage de completion du cours.
-        Pondération : 60% modules, 30% quiz, 10% évaluations
-        """
-        # 1. Progression des modules (60%)
         total_modules = self.cours.modules.count()
-        if total_modules > 0:
-            modules_termines = self.progressions_modules.filter(
-                est_termine=True
-            ).count()
-            progression_modules = (modules_termines / total_modules) * 60
+        if total_modules == 0:
+            self.pourcentage_completion = 0.0
         else:
-            progression_modules = 0
-        
-        # 2. Progression des quiz (30%)
-        total_quiz = Quiz.objects.filter(
-            sequence__module__cours=self.cours
+            modules_termines = self.progressions_modules.filter(est_termine=True).count()
+            self.pourcentage_completion = round(
+                (modules_termines / total_modules) * 100, 2
+            )
+        self.save()
+        return self.pourcentage_completion
+
+    def recalculer_depuis_blocs(self):
+        """
+        Progression basée sur le CONTENU réellement parcouru :
+        blocs de contenu terminés (courses.BlocProgress) / total des blocs.
+        C'est la source fiable alimentée par le lecteur de cours.
+        """
+        from django.db.models import Q
+        from courses.models import BlocContenu, BlocProgress
+        total = BlocContenu.objects.filter(sequence__module__cours=self.cours).count()
+        done = BlocProgress.objects.filter(
+            Q(est_termine=True) | Q(est_valide=True),
+            apprenant=self.apprenant,
+            bloc__sequence__module__cours=self.cours,
         ).count()
-        
-        if total_quiz > 0:
-            quiz_reussis = self.progressions_quiz.filter(
-                pourcentage_reussite__gte=50
-            ).count()
-            progression_quiz = (quiz_reussis / total_quiz) * 30
-        else:
-            progression_quiz = 0
-        
-        # 3. Progression des évaluations (10%)
-        # On compte les évaluations soumises/corrigées
-        total_evaluations = self.cours.evaluations.filter(
-            est_publiee=True
-        ).count()
-        
-        if total_evaluations > 0:
-            evaluations_passees = PassageEvaluation.objects.filter(
-                apprenant=self.apprenant,
-                evaluation__cours=self.cours,
-                statut__in=['soumis', 'corrige']
-            ).count()
-            progression_evaluations = (evaluations_passees / total_evaluations) * 10
-        else:
-            progression_evaluations = 0
-        
-        # Total
-        self.pourcentage_completion = round(
-            progression_modules + progression_quiz + progression_evaluations,
-            2
-        )
+        self.pourcentage_completion = round((done / total) * 100, 2) if total else 0.0
+        # save() recalcule automatiquement le statut (non_commence / en_cours / termine)
         self.save()
         return self.pourcentage_completion
     
@@ -247,7 +233,9 @@ class ProgressionApprenant(models.Model):
     
     @property
     def nombre_evaluations_reussies(self):
-        """Nombre d'évaluations réussies (note >= 50% du barème)"""
+        """Nombre d'évaluations réussies (seuil effectif : établissement > global)."""
+        from parametres.services import evaluation_note_passage_pct
+        seuil = evaluation_note_passage_pct(getattr(self.cours, 'institution', None))
         return PassageEvaluation.objects.filter(
             apprenant=self.apprenant,
             evaluation__cours=self.cours,
@@ -255,7 +243,7 @@ class ProgressionApprenant(models.Model):
         ).annotate(
             pourcentage=models.F('note') * 100.0 / models.F('evaluation__bareme')
         ).filter(
-            pourcentage__gte=50
+            pourcentage__gte=seuil
         ).count()
 
 
@@ -475,7 +463,9 @@ class ProgressionQuiz(models.Model):
 class HistoriqueActivite(models.Model):
     """Historique de toutes les activités d'un apprenant"""
     
+    # ⚠️ Aligné sur `activite-tracker.service.ts` (frontend) pour éviter les 400.
     TYPE_ACTIVITE_CHOICES = [
+        # Existants
         ('connexion', 'Connexion'),
         ('deconnexion', 'Déconnexion'),
         ('consultation_cours', 'Consultation de cours'),
@@ -488,22 +478,37 @@ class HistoriqueActivite(models.Model):
         ('telechargement_ressource', 'Téléchargement de ressource'),
         ('participation_session', 'Participation à une session'),
         ('autre', 'Autre activité'),
-        ('consultation_bloc',      'Consultation de bloc'),
-        ('completion_cours',       'Cours complété à 100%'),
-        ('reprise_cours',          'Reprise de cours (smart nav)'),
+        # Player
+        ('consultation_bloc', 'Consultation de bloc'),
+        ('completion_cours', 'Achèvement de cours'),
+        ('reprise_cours', 'Reprise de cours'),
         ('telechargement_fichier', 'Téléchargement de fichier'),
-        ('ouverture_lien',         'Ouverture de lien externe'),
-        ('recherche_contenu',      'Recherche dans le contenu'),
-        ('connexion_reussie',      'Connexion réussie'),
-        ('connexion_echouee',      'Tentative de connexion échouée'),
+        ('ouverture_lien', 'Ouverture de lien'),
+        ('recherche_contenu', 'Recherche de contenu'),
+        # Nouveaux — toute l'application
+        ('connexion_reussie', 'Connexion réussie'),
+        ('connexion_echouee', 'Connexion échouée'),
         ('consultation_dashboard', 'Consultation du tableau de bord'),
-        ('consultation_profil',    'Consultation du profil'),
-        ('consultation_fiche_cours','Consultation fiche cours'),
-        ('inscription_cours',       'Inscription à un cours'),
+        ('consultation_profil', 'Consultation du profil'),
+        ('consultation_fiche_cours', 'Consultation d\'une fiche de cours'),
+        ('inscription_cours', 'Inscription à un cours'),
         ('consultation_evaluation', 'Consultation d\'une évaluation'),
-        ('soumission_quiz',         'Soumission d\'un quiz'),
-        ('modification_profil',    'Modification du profil'),
-        ('changement_mot_de_passe','Changement de mot de passe'),
+        ('soumission_quiz', 'Soumission de quiz'),
+        ('modification_profil', 'Modification du profil'),
+        ('changement_mot_de_passe', 'Changement de mot de passe'),
+        # Traçage global (pages / onglets / inactivité / réseau)
+        ('page_vue', 'Page visitée'),
+        ('onglet_masque', 'Onglet masqué (perte de focus)'),
+        ('onglet_visible', 'Onglet revenu au premier plan'),
+        ('fenetre_inactive', 'Fenêtre inactive (sortie de l\'application)'),
+        ('fenetre_active', 'Retour dans l\'application'),
+        ('inactivite', 'Inactivité détectée'),
+        ('reprise_activite', 'Reprise après inactivité'),
+        ('perte_connexion', 'Perte de connexion (hors-ligne)'),
+        ('retour_connexion', 'Retour de connexion (en ligne)'),
+        ('fermeture_onglet', 'Fermeture de l\'onglet / navigateur'),
+        ('session_debut', 'Début de session'),
+        ('session_fin', 'Fin de session'),
     ]
     
     apprenant = models.ForeignKey(
@@ -533,6 +538,10 @@ class HistoriqueActivite(models.Model):
     duree_minutes = models.IntegerField(
         default=0,
         help_text="Durée de l'activité en minutes"
+    )
+    duree_secondes = models.PositiveIntegerField(
+        default=0,
+        help_text="Durée de l'activité en secondes (tracage fin : pages, onglets)"
     )
     description = models.TextField(blank=True)
     
@@ -713,3 +722,64 @@ class ObjectifPlanAction(models.Model):
             self.est_complete = False
             self.date_completion = None
             self.save()
+
+# ============================================================================
+# SESSION APPRENANT — suivi connexion/inactivité/réseau
+# ============================================================================
+
+class SessionApprenant(models.Model):
+    """
+    Session d'un apprenant : de la connexion à la fin (déconnexion, inactivité,
+    perte de connexion ou fermeture du navigateur). Permet de reconstituer :
+      - le temps total passé,
+      - le motif de fin,
+      - l'adresse IP et le navigateur.
+    """
+    FIN_CHOICES = [
+        ('deconnexion', 'Déconnexion volontaire'),
+        ('inactivite', 'Fin pour inactivité'),
+        ('perte_connexion', 'Perte de connexion'),
+        ('fermeture_navigateur', 'Fermeture du navigateur / onglet'),
+        ('expiration', 'Expiration'),
+        ('inconnue', 'Inconnue'),
+    ]
+
+    apprenant = models.ForeignKey(
+        Apprenant, on_delete=models.CASCADE, related_name='sessions'
+    )
+    date_debut = models.DateTimeField(auto_now_add=True)
+    derniere_activite = models.DateTimeField(auto_now_add=True)
+    date_fin = models.DateTimeField(null=True, blank=True)
+    duree_secondes = models.PositiveIntegerField(default=0)
+    fin_reason = models.CharField(max_length=30, choices=FIN_CHOICES, default='inconnue')
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=300, blank=True)
+    actif = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "Session apprenant"
+        verbose_name_plural = "Sessions apprenants"
+        ordering = ['-date_debut']
+        indexes = [
+            models.Index(fields=['apprenant', '-date_debut']),
+            models.Index(fields=['actif']),
+        ]
+
+    def __str__(self):
+        return f"{self.apprenant.prenom} — {self.date_debut:%Y-%m-%d %H:%M} ({'active' if self.actif else self.fin_reason})"
+
+    @property
+    def duree_effective_secondes(self):
+        fin = self.date_fin or timezone.now()
+        return max(0, int((fin - self.date_debut).total_seconds()))
+
+    def terminer(self, reason='inconnue'):
+        self.date_fin = timezone.now()
+        self.actif = False
+        self.fin_reason = reason
+        self.duree_secondes = self.duree_effective_secondes
+        self.save(update_fields=['derniere_activite', 'date_fin', 'actif', 'fin_reason', 'duree_secondes'])
+
+    def touch(self):
+        self.derniere_activite = timezone.now()
+        self.save(update_fields=['derniere_activite'])

@@ -8,6 +8,7 @@ from .views import (
     ProgressionSequenceViewSet,
     ProgressionQuizViewSet,
     HistoriqueActiviteViewSet,
+    SessionApprenantViewSet,
     PlanActionViewSet,
     ObjectifPlanActionViewSet,
 )
@@ -20,6 +21,7 @@ router.register(r'progressions-modules', ProgressionModuleViewSet, basename='pro
 router.register(r'progressions-sequences', ProgressionSequenceViewSet, basename='progression-sequence')
 router.register(r'progressions-quiz', ProgressionQuizViewSet, basename='progression-quiz')
 router.register(r'historique-activites', HistoriqueActiviteViewSet, basename='historique-activite')
+router.register(r'sessions-apprenant', SessionApprenantViewSet, basename='session-apprenant')
 router.register(r'plans-action', PlanActionViewSet, basename='plan-action')
 router.register(r'objectifs-plan-action', ObjectifPlanActionViewSet, basename='objectif-plan-action')
 

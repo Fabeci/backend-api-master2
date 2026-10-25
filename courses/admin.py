@@ -64,14 +64,14 @@ class SessionInline(admin.TabularInline):
 class CoursAdmin(admin.ModelAdmin):
     list_display = (
         'id', 'titre', 'matiere', 'groupe', 'enseignant',
-        'institution', 'annee_scolaire', 'statut', 'volume_horaire'
+        'institution', 'annee_scolaire', 'departement', 'statut', 'volume_horaire'
     )
-    list_filter = ('statut', 'institution', 'annee_scolaire', 'matiere')
+    list_filter = ('statut', 'institution', 'annee_scolaire', 'departement', 'matiere')
     search_fields = (
         'titre', 'matiere__nom', 'groupe__nom',
         'enseignant__nom', 'enseignant__prenom'
     )
-    autocomplete_fields = ['groupe', 'matiere', 'enseignant', 'institution', 'annee_scolaire']
+    autocomplete_fields = ['groupe', 'matiere', 'enseignant', 'institution', 'annee_scolaire', 'departement']
     inlines = [ModuleInline, SessionInline]
     date_hierarchy = 'date_debut'
     
@@ -80,15 +80,15 @@ class CoursAdmin(admin.ModelAdmin):
             'fields': ('titre', 'matiere', 'groupe', 'enseignant', 'statut')
         }),
         ('Contexte', {
-            'fields': ('institution', 'annee_scolaire'),
-            'description': 'Institution et année scolaire de rattachement'
+            'fields': ('institution', 'annee_scolaire', 'departement'),
+            'description': 'Institution, année scolaire et département de rattachement'
         }),
         ('Planification', {
             'fields': ('date_debut', 'date_fin', 'volume_horaire')
         }),
     )
 
-
+    
 @admin.register(Module)
 class ModuleAdmin(admin.ModelAdmin):
     list_display = (

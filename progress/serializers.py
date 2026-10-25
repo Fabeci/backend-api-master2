@@ -7,6 +7,7 @@ from .models import (
     ProgressionSequence,
     ProgressionQuiz,
     HistoriqueActivite,
+    SessionApprenant,
     PlanAction,
     ObjectifPlanAction,
 )
@@ -84,18 +85,23 @@ class HistoriqueActiviteSerializer(serializers.ModelSerializer):
         source='get_type_activite_display',
         read_only=True
     )
+    apprenant_nom = serializers.CharField(source='apprenant.nom', read_only=True)
+    apprenant_prenom = serializers.CharField(source='apprenant.prenom', read_only=True)
     
     class Meta:
         model = HistoriqueActivite
         fields = [
             'id',
             'apprenant',
+            'apprenant_nom',
+            'apprenant_prenom',
             'type_activite',
             'type_activite_display',
             'objet_type',
             'objet_id',
             'date_activite',
             'duree_minutes',
+            'duree_secondes',
             'description',
             'metadata',
         ]
@@ -371,3 +377,21 @@ class PlanActionCreateSerializer(serializers.ModelSerializer):
             ObjectifPlanAction.objects.create(plan_action=plan, **objectif_data)
         
         return plan
+
+class SessionApprenantSerializer(serializers.ModelSerializer):
+    """Session d'un apprenant (connexion → fin)."""
+    apprenant_nom    = serializers.CharField(source='apprenant.nom', read_only=True)
+    apprenant_prenom = serializers.CharField(source='apprenant.prenom', read_only=True)
+    fin_reason_display = serializers.CharField(source='get_fin_reason_display', read_only=True)
+    duree_effective_secondes = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = SessionApprenant
+        fields = [
+            'id', 'apprenant', 'apprenant_nom', 'apprenant_prenom',
+            'date_debut', 'derniere_activite', 'date_fin',
+            'duree_secondes', 'duree_effective_secondes',
+            'fin_reason', 'fin_reason_display',
+            'ip_address', 'user_agent', 'actif',
+        ]
+        read_only_fields = ['date_debut', 'derniere_activite', 'date_fin', 'duree_secondes', 'actif']

@@ -218,7 +218,7 @@ class IsAdminOrHigher(permissions.BasePermission):
             return True
         
         role_name = request.user.role.name if request.user.role else None
-        return role_name in ['Admin', 'Responsable']
+        return role_name in ['Admin', 'Responsable', 'ResponsableAcademique', 'Responsable Académique', 'Responsable académique']
 
 
 class IsFormateurOrHigher(permissions.BasePermission):

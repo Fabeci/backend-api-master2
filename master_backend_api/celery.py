@@ -17,15 +17,25 @@ app.autodiscover_tasks()
 # Ceci doit être APRÈS autodiscover_tasks()
 try:
     from . import tasks  # noqa: F401
-    print("✅ Module tasks importé avec succès")
+    print("[OK] Module tasks importe avec succes")
 except ImportError as e:
-    print(f"❌ Erreur import tasks: {e}")
+    print(f"[ERREUR] Import tasks: {e}")
 
 # Tâches planifiées
 app.conf.beat_schedule = {
     'analyse-quotidienne': {
         'task': 'analyser_progression_quotidienne',  # ← Utiliser le nom court
         'schedule': crontab(hour=22, minute=0),
+    },
+    # Rappels « séance à venir » — toutes les 5 minutes
+    'rappels-sessions': {
+        'task': 'rappels_sessions_a_venir',
+        'schedule': crontab(minute='*/5'),
+    },
+    # ✅ Publication progressive — toutes les minutes (idempotent)
+    'publier-contenus-programmes': {
+        'task': 'publier_contenus_programmes',
+        'schedule': crontab(minute='*/1'),
     },
 }
 

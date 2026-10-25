@@ -1,0 +1,64 @@
+{% extends "admin/dashboard/base.html" %}
+{% block dashboard_content %}
+
+{% if not formateur %}
+<div class="alert-custom alert-warning">Profil formateur non trouvé.</div>
+{% else %}
+
+<h2 class="section-title">Bonjour, {{ formateur.prenom }} {{ formateur.nom }}</h2>
+
+<div class="kpi-cards">
+  <div class="kpi-card">
+    <h3>Cours enseignés</h3>
+    <div class="value">{{ nb_courses }}</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Apprenants</h3>
+    <div class="value">{{ nb_apprenants }}</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Sessions</h3>
+    <div class="value">{{ nb_sessions }}</div>
+  </div>
+  <div class="kpi-card success">
+    <h3>Complétion moyenne</h3>
+    <div class="value">{{ avg_completion }}%</div>
+  </div>
+  <div class="kpi-card warning">
+    <h3>Note moyenne</h3>
+    <div class="value">{{ avg_notes }}/20</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Feedback moyen</h3>
+    <div class="value">{{ avg_feedback }}/5</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Questions créées</h3>
+    <div class="value">{{ nb_questions }}</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Évaluations</h3>
+    <div class="value">{{ nb_evaluations }}</div>
+    <div class="subtitle">{{ nb_quizzes }} quizzes</div>
+  </div>
+  <div class="kpi-card success">
+    <h3>Forums animés</h3>
+    <div class="value">{{ nb_forums }}</div>
+    <div class="subtitle">{{ nb_commentaires }} commentaires</div>
+  </div>
+  <div class="kpi-card danger">
+    <h3>Activité récente (7j)</h3>
+    <div class="value">{{ recent_progressions }}</div>
+    <div class="subtitle">progressions</div>
+  </div>
+</div>
+
+<div class="quick-actions">
+  <a href="{% url 'admin:courses_cours_changelist' %}" class="btn-custom btn-primary">Mes cours</a>
+  <a href="{% url 'admin:evaluations_evaluation_changelist' %}" class="btn-custom">Évaluations</a>
+  <a href="{% url 'admin:progress_progressionapprenant_changelist' %}" class="btn-custom">Suivi apprenants</a>
+  <a href="{% url 'admin:index' %}" class="btn-custom">Interface admin</a>
+</div>
+
+{% endif %}
+{% endblock %}

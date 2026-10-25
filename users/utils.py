@@ -31,28 +31,114 @@ def send_verification_email(user):
         [user.email],
         fail_silently=False,
     )
+    
+    
+_STATUS_CODES = {
+    400: "VALIDATION_ERROR",
+    401: "NOT_AUTHENTICATED",
+    403: "PERMISSION_DENIED",
+    404: "NOT_FOUND",
+    405: "METHOD_NOT_ALLOWED",
+    409: "CONFLICT",
+    429: "THROTTLED",
+}
+
+
+def _flatten_field_errors(data) -> dict:
+    """Normalise les erreurs (serializer.errors / DRF) en {champ: [messages]}."""
+    out = {}
+    if isinstance(data, dict):
+        for key, val in data.items():
+            if key in ("detail", "status", "message", "success", "code", "errors"):
+                continue
+            msgs = []
+            if isinstance(val, (list, tuple)):
+                for item in val:
+                    if isinstance(item, dict):
+                        for sub in item.values():
+                            msgs.extend(str(v) for v in (sub if isinstance(sub, list) else [sub]))
+                    else:
+                        msgs.append(str(item))
+            elif isinstance(val, dict):
+                for sub in val.values():
+                    msgs.extend(str(v) for v in (sub if isinstance(sub, list) else [sub]))
+            else:
+                msgs.append(str(val))
+            cleaned = [m for m in msgs if m]
+            if cleaned:
+                out[str(key)] = cleaned
+    return out
 
 
 def custom_exception_handler(exc, context):
     """
-    Gestionnaire personnalisé pour les exceptions.
+    Gestionnaire d'exceptions normalisé SOMAPRO.
+
+    Réponse uniforme :
+        { success:false, status, code, message, errors:{champ:[messages]}, detail? }
+    `message` exploite le détail DRF ou la 1re erreur de champ (jamais un texte
+    générique quand une information précise est disponible).
     """
+    from django.db.utils import IntegrityError as DjangoIntegrityError
+
     response = exception_handler(exc, context)
+
+    # Intégrité non gérée par DRF (unicité, FK…) → 409 plutôt que 500
+    if response is None and isinstance(exc, DjangoIntegrityError):
+        return Response(
+            {
+                "success": False,
+                "status": status.HTTP_409_CONFLICT,
+                "code": "CONFLICT",
+                "message": "Cette opération entre en conflit avec des données existantes.",
+                "errors": {},
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
 
     if isinstance(exc, NotAuthenticated):
         return Response(
             {
+                "success": False,
                 "status": status.HTTP_401_UNAUTHORIZED,
-                "message": "Les informations d'authentification n'ont pas été fournies."
+                "code": "NOT_AUTHENTICATED",
+                "message": "Vous devez être connecté pour effectuer cette action.",
+                "errors": {},
             },
-            status=status.HTTP_401_UNAUTHORIZED
+            status=status.HTTP_401_UNAUTHORIZED,
         )
 
-    if response is not None:
-        response.data['status'] = response.status_code
-        response.data['message'] = response.data.get('detail', 'Une erreur s’est produite.')
-        response.data.pop('detail', None)
+    if response is None:
+        # 500 / erreur non gérée : laissée à Django (jamais exposer de détails).
+        return None
 
+    data = response.data
+    code = _STATUS_CODES.get(response.status_code, "ERROR")
+    field_errors = _flatten_field_errors(data)
+    detail = data.get("detail") if isinstance(data, dict) else None
+
+    if detail:
+        message = str(detail)
+    elif field_errors:
+        first_field, msgs = next(iter(field_errors.items()))
+        label = "Champ" if first_field == "non_field_errors" else first_field
+        message = f"{label} : {msgs[0]}" if msgs else "Erreur de validation."
+    elif response.status_code >= 500:
+        message = "Une erreur interne est survenue. Veuillez réessayer plus tard."
+    else:
+        message = "La requête a échoué."
+
+    payload = {
+        "success": False,
+        "status": response.status_code,
+        "code": code,
+        "message": message,
+        "errors": field_errors,
+    }
+    if detail:
+        payload["detail"] = str(detail)
+
+    response.data = payload
     return response
 
 
@@ -78,18 +164,18 @@ class BaseModelViewSet(viewsets.ModelViewSet):
     - réponses uniformisées
     """
 
-    def _get_request_annee_scolaire_id(self):
-        request = self.request
+    # ---------------------------------------------------------------------
+    # Filtrage automatique par institution (si le modèle a institution_id)
+    # ---------------------------------------------------------------------
+    def get_queryset(self):
+        qs = super().get_queryset()
+        from core.tenant import default_institution_id
 
-        annee_obj = getattr(request, "annee_scolaire", None)
-        if annee_obj is not None:
-            annee_id = getattr(annee_obj, "id", None)
-            if annee_id:
-                return annee_id
-
-        annee_id = getattr(request, "annee_scolaire_id", None)
-        if annee_id:
-            return annee_id
+        if hasattr(qs.model, "institution_id"):
+            iid = default_institution_id()
+            if not iid:
+                return qs.none()
+            return qs.filter(institution_id=iid)
 
         header_val = (
             request.headers.get("x-annee-scolaire-id")
@@ -108,73 +194,33 @@ class BaseModelViewSet(viewsets.ModelViewSet):
         return None
 
     def _get_user_institution_id(self):
-        return getattr(self.request.user, "institution_id", None)
+        from core.tenant import default_institution_id
+        return default_institution_id()
 
-    def _serializer_model(self, serializer):
-        return getattr(getattr(serializer, "Meta", None), "model", None)
-
-    def _queryset_model(self, qs):
-        return getattr(qs, "model", None)
-
-    def _apply_scope_filters(self, qs):
-        user = self.request.user
-        model = self._queryset_model(qs)
-
-        if model is None:
-            return qs
-
-        if not getattr(user, "is_superuser", False):
-            if hasattr(model, "institution_id"):
-                institution_id = getattr(user, "institution_id", None)
-                if not institution_id:
-                    return qs.none()
-                qs = qs.filter(institution_id=institution_id)
-
-        annee_scolaire_id = self._get_request_annee_scolaire_id()
-        if annee_scolaire_id:
-            if hasattr(model, "annee_scolaire_id"):
-                qs = qs.filter(annee_scolaire_id=annee_scolaire_id)
-            elif hasattr(model, "annee_scolaire_active_id"):
-                qs = qs.filter(annee_scolaire_active_id=annee_scolaire_id)
-
-        return qs
-
-    def _build_save_kwargs(self, serializer):
-        user = self.request.user
-        model = self._serializer_model(serializer)
-        kwargs = {}
-
-        if model is None:
-            return kwargs
-
-        if not getattr(user, "is_superuser", False):
-            if hasattr(model, "institution_id"):
-                institution_id = getattr(user, "institution_id", None)
-                if not institution_id:
-                    raise ValidationError({"institution": ["Utilisateur sans institution."]})
-                kwargs["institution_id"] = institution_id
-
-        annee_scolaire_id = self._get_request_annee_scolaire_id()
-        if annee_scolaire_id:
-            if hasattr(model, "annee_scolaire_id"):
-                kwargs["annee_scolaire_id"] = annee_scolaire_id
-            elif hasattr(model, "annee_scolaire_active_id"):
-                kwargs["annee_scolaire_active_id"] = annee_scolaire_id
-
-        return kwargs
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        return self._apply_scope_filters(qs)
-
+    # ---------------------------------------------------------------------
+    # DRF hooks : c'est ici qu'on force institution
+    # ---------------------------------------------------------------------
     def perform_create(self, serializer):
-        kwargs = self._build_save_kwargs(serializer)
-        serializer.save(**kwargs)
+        if self._needs_institution(serializer):
+            institution_id = self._get_user_institution_id()
+            if not institution_id:
+                raise ValidationError({"institution": ["Institution par défaut introuvable."]})
+            serializer.save(institution_id=institution_id)
+            return
+        serializer.save()
 
     def perform_update(self, serializer):
-        kwargs = self._build_save_kwargs(serializer)
-        serializer.save(**kwargs)
+        if self._needs_institution(serializer):
+            institution_id = self._get_user_institution_id()
+            if not institution_id:
+                raise ValidationError({"institution": ["Institution par défaut introuvable."]})
+            serializer.save(institution_id=institution_id)
+            return
+        serializer.save()
 
+    # ---------------------------------------------------------------------
+    # Responses custom : on garde ton format api_success/api_error
+    # ---------------------------------------------------------------------
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         serializer = self.get_serializer(queryset, many=True)

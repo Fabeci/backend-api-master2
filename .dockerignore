@@ -1,0 +1,12 @@
+# Secrets et données locales : ne jamais embarquer dans l'image
+.env
+.env.*
+!.env.example
+db.sqlite3
+media/
+staticfiles/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.vscode/

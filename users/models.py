@@ -68,6 +68,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     activation_token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, blank=True)
     role = models.ForeignKey(UserRole, on_delete=models.SET_NULL, null=True, blank=True)
 
+    # Permissions ADDITIVES par utilisateur (au format "resource.action").
+    # Elles s'ajoutent aux permissions héritées du rôle (RBAC).
+    permissions = models.JSONField(
+        default=list, blank=True,
+        verbose_name="Permissions supplémentaires",
+        help_text='Liste additive de permissions, ex. ["cours.publish", "rapports.export"].',
+    )
+
     # renommer les related_name pour éviter tout conflit avec auth.User
     groups = models.ManyToManyField('auth.Group', related_name='somapro_user_groups', blank=True)
     user_permissions = models.ManyToManyField('auth.Permission', related_name='somapro_user_permissions', blank=True)
@@ -175,3 +183,25 @@ class VerificationCode(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.purpose} - {self.code}"
+
+
+# === Surcharges de permissions par rôle (RBAC pilotable) ===
+class RolePermissionOverride(models.Model):
+    """
+    Surcharge d'une permission (resource.action) pour un rôle.
+    Prioritaire sur la matrice par défaut `core/rbac.ROLE_PERMISSIONS`.
+    """
+    role = models.CharField(max_length=50, db_index=True)      # ex. "Formateur"
+    resource = models.CharField(max_length=64)                  # ex. "cours"
+    action = models.CharField(max_length=32)                    # ex. "publish"
+    allowed = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("role", "resource", "action")
+        verbose_name = "Surcharge de permission (rôle)"
+        verbose_name_plural = "Surcharges de permissions (rôles)"
+        indexes = [models.Index(fields=["role"])]
+
+    def __str__(self):
+        return f"{self.role}: {self.resource}.{self.action} = {self.allowed}"
