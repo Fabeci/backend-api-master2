@@ -1,0 +1,58 @@
+{% extends "admin/dashboard/base.html" %}
+{% block dashboard_content %}
+
+<h2 class="section-title">Tableau de bord - {{ institution.nom }}</h2>
+
+{% if not institution %}
+<div class="alert-custom alert-warning">
+  Aucune institution associée à ce compte.admin.
+</div>
+{% else %}
+
+<div class="kpi-cards">
+  <div class="kpi-card">
+    <h3>Apprenants</h3>
+    <div class="value">{{ nb_apprenants }}</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Formateurs</h3>
+    <div class="value">{{ nb_formateurs }}</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Parents</h3>
+    <div class="value">{{ nb_parents }}</div>
+  </div>
+  <div class="kpi-card success">
+    <h3>Complétion moyenne</h3>
+    <div class="value">{{ avg_completion }}%</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Cours</h3>
+    <div class="value">{{ nb_courses }}</div>
+    <div class="subtitle">{{ nb_inscriptions }} inscriptions</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Évaluations</h3>
+    <div class="value">{{ nb_evaluations }}</div>
+    <div class="subtitle">{{ nb_quizzes }} quizzes</div>
+  </div>
+  <div class="kpi-card warning">
+    <h3>Feedback moyen</h3>
+    <div class="value">{{ avg_feedback }}/5</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Classes</h3>
+    <div class="value">{{ nb_classes }}</div>
+    <div class="subtitle">{{ nb_annees }} années</div>
+  </div>
+</div>
+
+<div class="quick-actions">
+  <a href="{% url 'admin:users_apprenant_changelist' %}" class="btn-custom btn-primary">Gérer les apprenants</a>
+  <a href="{% url 'admin:courses_cours_changelist' %}" class="btn-custom">Cours</a>
+  <a href="{% url 'admin:progress_progressionapprenant_changelist' %}" class="btn-custom">Progressions</a>
+  <a href="{% url 'admin:index' %}" class="btn-custom">Interface admin</a>
+</div>
+
+{% endif %}
+{% endblock %}

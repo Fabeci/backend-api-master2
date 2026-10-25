@@ -9,6 +9,7 @@ from .models import (
     ProgressionSequence,
     ProgressionQuiz,
     HistoriqueActivite,
+    SessionApprenant,
     PlanAction,
     ObjectifPlanAction,
 )
@@ -647,3 +648,18 @@ class ObjectifPlanActionAdmin(admin.ModelAdmin):
 admin.site.site_header = "Administration - Progression des apprenants"
 admin.site.site_title = "Admin Progression"
 admin.site.index_title = "Gestion de la progression"
+
+# ============================================================================
+# SESSION APPRENANT
+# ============================================================================
+
+@admin.register(SessionApprenant)
+class SessionApprenantAdmin(admin.ModelAdmin):
+    list_display = [
+        'id', 'apprenant', 'date_debut', 'date_fin',
+        'duree_secondes', 'fin_reason', 'actif', 'ip_address',
+    ]
+    list_filter = ['actif', 'fin_reason', 'date_debut']
+    search_fields = ['apprenant__nom', 'apprenant__prenom', 'apprenant__email', 'ip_address']
+    readonly_fields = ['date_debut', 'derniere_activite']
+    date_hierarchy = 'date_debut'

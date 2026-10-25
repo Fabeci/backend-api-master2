@@ -1,17 +1,26 @@
 # evaluations/views.py
+import logging
+
+from core.rbac import RBACPermission
 from rest_framework.views import APIView
+
+logger = logging.getLogger(__name__)
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
 import csv
+from datetime import timedelta
 from io import BytesIO
 from django.http import HttpResponse
 from django.db.models import Prefetch
 from users.models import Apprenant, Parent as ParentModel
 from courses.models import InscriptionCours
+from courses.utils import INSCRIPTION_ACTIVE_STATUSES
 from .models import Evaluation, PassageEvaluation, ReponseQuestion
 from .models import (
     Quiz, Question, Reponse, Evaluation, PassageEvaluation,
@@ -19,7 +28,8 @@ from .models import (
 )
 from .serializers import (
     EvaluationAccessibiliteSerializer, QuizSerializer, QuizDetailSerializer,
-    QuestionSerializer, QuestionCreateSerializer, ReponseSerializer,
+    QuestionSerializer, QuestionApprenantSerializer, QuestionCreateSerializer,
+    ReponseSerializer,
     EvaluationSerializer, EvaluationDetailSerializer,
     PassageEvaluationSerializer, PassageEvaluationDetailSerializer,
     PassageEvaluationCreateSerializer, ReponseQuestionSerializer,
@@ -35,9 +45,51 @@ from .serializers import (
 
 def _get_role(user):
     if hasattr(user, 'role') and user.role:
-        return user.role.name
+        raw = str(user.role.name)
+        # ✅ Canonicalisation : « ResponsableAcademique » → « Responsable »
+        # (les contrôles ci-dessous comparent au libellé canonique).
+        return {
+            'responsableacademique': 'Responsable',
+            'responsableacad':       'Responsable',
+        }.get(raw.lower().replace(' ', '').replace('-', '').replace('_', ''), raw)
     return None
 
+
+
+
+def _passage_deadline(passage):
+    d = getattr(getattr(passage, "evaluation", None), "duree_minutes", 0) or 0
+    if d <= 0:
+        return None
+    return passage.date_debut + timedelta(minutes=d)
+
+
+def _passage_expired(passage) -> bool:
+    dl = _passage_deadline(passage)
+    return bool(dl and timezone.now() > dl)
+
+
+def _cours_scope_ok(user, cours) -> bool:
+    """Périmètre objet : institution de référence + département du Responsable."""
+    if cours is None:
+        return False
+    from core.tenant import default_institution_id
+    iid = getattr(user, "institution_id", None) or default_institution_id()
+    if iid and cours.institution_id != iid:
+        return False
+    if _get_role(user) == 'Responsable':
+        dept_id = getattr(user, 'departement_id', None)
+        if dept_id is None:
+            try:
+                from users.models import ResponsableAcademique
+                dept_id = ResponsableAcademique.objects.filter(pk=user.pk).values_list(
+                    'departement_id', flat=True
+                ).first()
+            except Exception:
+                dept_id = None
+        if dept_id and cours.departement_id not in (None, dept_id):
+            return False
+    return True
 
 def _is_super_admin(user):
     return getattr(user, 'is_superuser', False)
@@ -70,11 +122,21 @@ def _require_roles(user, *roles):
 
 
 def _formateur_owns_cours(user, cours):
-    institution_id = getattr(user, 'institution_id', None)
-    return (
-        getattr(cours, 'enseignant_id', None) == user.id and
-        getattr(cours, 'institution_id', None) == institution_id
-    )
+    """Le formateur « possède » un cours s'il l'enseigne réellement :
+    comme enseignant direct OU via l'un des groupes du cours.
+
+    (L'ancienne version comparait `user.institution_id` — FK — alors que le
+    périmètre pédagogique du projet repose sur le M2M `institutions`, ce qui
+    refusait à tort des formateurs légitimes.)
+    """
+    if cours is None:
+        return False
+    if getattr(cours, 'enseignant_id', None) == user.id:
+        return True
+    try:
+        return cours.groupes.filter(enseignants=user).exists()
+    except Exception:
+        return False
 
 
 def _filter_by_institution(qs, user):
@@ -84,6 +146,29 @@ def _filter_by_institution(qs, user):
         return qs.filter(cours__institution_id=institution_id)
     return qs.none()
 
+def _get_responsable_dept_id(user):
+    """Récupère le département du responsable académique."""
+    dept_id = getattr(user, 'departement_id', None)
+    if dept_id is None:
+        try:
+            from users.models import ResponsableAcademique
+            resp = ResponsableAcademique.objects.get(pk=user.pk)
+            dept_id = resp.departement_id
+        except Exception:
+            dept_id = None
+    return dept_id
+
+
+def _dept_q(prefix: str, dept_id):
+    """Département du responsable OU élément NON AFFECTÉ (NULL).
+
+    Les cours/évaluations importés sans département ne doivent pas être
+    invisibles pour le responsable.
+    """
+    return (
+        Q(**{f"{prefix}departement_id": dept_id})
+        | Q(**{f"{prefix}departement__isnull": True})
+    )
 
 def _filter_quiz_by_institution(qs, user):
     institution_id = getattr(user, 'institution_id', None)
@@ -148,7 +233,20 @@ def api_success(message: str, data=None, http_status=status.HTTP_200_OK):
 
 
 def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST, data=None):
+    # Message plus précis quand des erreurs de champ sont fournies
+    if errors and isinstance(errors, dict) and (not message or message == "Erreur de validation"):
+        for _field, _val in errors.items():
+            _msgs = _val if isinstance(_val, (list, tuple)) else [_val]
+            _first = next((str(m) for m in _msgs if m), None)
+            if _first:
+                message = f"{_field} : {_first}"
+                break
     payload = {"success": False, "status": http_status, "message": message, "data": data}
+    _code_map = {
+        400: "VALIDATION_ERROR", 401: "NOT_AUTHENTICATED", 403: "PERMISSION_DENIED",
+        404: "NOT_FOUND", 409: "CONFLICT", 429: "THROTTLED",
+    }
+    payload["code"] = _code_map.get(http_status, "SERVER_ERROR" if http_status >= 500 else "ERROR")
     if errors is not None:
         payload["errors"] = errors
     return Response(payload, status=http_status)
@@ -167,7 +265,7 @@ class QuizListCreateAPIView(APIView):
     - Apprenant    : Lecture seule (ses cours)
     - Parent       : BLOQUÉ
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request):
         err = _block_super_admin(request.user)
@@ -184,10 +282,15 @@ class QuizListCreateAPIView(APIView):
             sequence_id = request.query_params.get('sequence')
             qs = Quiz.objects.select_related('sequence').all()
 
-            if role in ('Admin', 'ResponsableAcademique'):
+            if role == 'Admin':
                 qs = _filter_quiz_by_institution(qs, request.user)
-                # ✅ Filtre par année scolaire
-                qs = _apply_annee_filter_quiz(qs, annee_scolaire_id)
+
+            elif role == 'Responsable':
+                institution_id = getattr(request.user, 'institution_id', None)
+                qs = qs.filter(sequence__module__cours__institution_id=institution_id)
+                dept_id = _get_responsable_dept_id(request.user)
+                if dept_id:
+                    qs = qs.filter(_dept_q("sequence__module__cours__", dept_id))
 
             elif role == 'Formateur':
                 institution_id = getattr(request.user, 'institution_id', None)
@@ -198,12 +301,22 @@ class QuizListCreateAPIView(APIView):
                 qs = _apply_annee_filter_quiz(qs, annee_scolaire_id)
 
             elif role == 'Apprenant':
-                cours_ids = InscriptionCours.objects.filter(
-                    apprenant=request.user, statut='inscrit'
-                ).values_list('cours_id', flat=True)
+                from django.db.models.functions import Lower
+                cours_ids = (
+                    InscriptionCours.objects
+                    .filter(apprenant=request.user)
+                    .annotate(statut_l=Lower('statut'))
+                    .filter(statut_l__in=['inscrit', 'en_cours', 'en cours', 'encours'])
+                    .values_list('cours_id', flat=True)
+                )
                 qs = qs.filter(sequence__module__cours_id__in=cours_ids)
-                # Apprenant : année forcée depuis son inscription, pas de filtre supplémentaire
 
+                # ✅ Le cours doit avoir commencé (même règle que les blocs).
+                today = timezone.localdate()
+                qs = qs.exclude(sequence__module__cours__statut="annule").filter(
+                    Q(sequence__module__cours__date_debut__isnull=True)
+                    | Q(sequence__module__cours__date_debut__lte=today)
+                )
             else:
                 qs = qs.none()
 
@@ -239,16 +352,45 @@ class QuizListCreateAPIView(APIView):
 
 class QuizDetailAPIView(APIView):
     """Détails d'un quiz avec permissions par rôle."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request, pk):
         err = _block_super_admin(request.user)
         if err:
             return err
-        if _get_role(request.user) == 'Parent':
+        role = _get_role(request.user)
+        if role == 'Parent':
             return api_error("Accès non autorisé.", http_status=status.HTTP_403_FORBIDDEN)
 
-        quiz = get_object_or_404(Quiz, pk=pk)
+        # ✅ PÉRIMÈTRE : un apprenant n'accède qu'aux quiz de SES cours inscrits
+        #    (auparavant le quiz était chargé sans aucun filtre → fuite
+        #    inter-apprenants ET inter-établissements, corrigés inclus).
+        from courses.models import InscriptionCours as _IC
+        qs = Quiz.objects.select_related('sequence__module__cours')
+        if role == 'Apprenant':
+            cours_ids = _IC.objects.filter(
+                apprenant=request.user, statut__in=INSCRIPTION_ACTIVE_STATUSES
+            ).values_list('cours_id', flat=True)
+            qs = qs.filter(sequence__module__cours_id__in=list(cours_ids))
+        elif role == 'Formateur':
+            from courses.utils import _formateur_cours_ids
+            ids = _formateur_cours_ids(request.user) or []
+            qs = qs.filter(sequence__module__cours_id__in=list(ids))
+        elif role in ('Admin', 'Responsable'):
+            inst = getattr(request.user, 'institution_id', None)
+            if inst:
+                qs = qs.filter(sequence__module__cours__institution_id=inst)
+
+        quiz = get_object_or_404(qs, pk=pk)
+        if role == 'Apprenant':
+            from courses.publication import cours_commence
+            if not cours_commence(quiz.sequence.module.cours):
+                return api_error("Ce cours n'a pas encore commencé.",
+                                 http_status=status.HTTP_403_FORBIDDEN)
+        # ✅ Jamais de corrigés pour un apprenant
+        if role == 'Apprenant':
+            from .serializers import QuizDetailApprenantSerializer
+            return api_success("Quiz trouvé.", QuizDetailApprenantSerializer(quiz).data)
         return api_success("Quiz trouvé.", QuizDetailSerializer(quiz).data)
 
     def put(self, request, pk):
@@ -289,7 +431,7 @@ class QuestionListCreateAPIView(APIView):
     - Apprenant    : Lecture seule SANS champ est_correcte
     - Parent       : BLOQUÉ
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request):
         err = _block_super_admin(request.user)
@@ -306,19 +448,28 @@ class QuestionListCreateAPIView(APIView):
             evaluation_id = request.query_params.get('evaluation')
             qs = Question.objects.prefetch_related('reponses_predefinies').all()
 
-            if role in ('Admin', 'ResponsableAcademique'):
+            if role == 'Admin':
                 institution_id = getattr(request.user, 'institution_id', None)
                 qs = qs.filter(
                     Q(quiz__sequence__institution_id=institution_id) |
                     Q(evaluation__cours__institution_id=institution_id)
                 )
-                # ✅ Filtre par année
-                if annee_scolaire_id:
-                    qs = qs.filter(
-                        Q(quiz__sequence__module__cours__annee_scolaire_id=annee_scolaire_id) |
-                        Q(evaluation__cours__annee_scolaire_id=annee_scolaire_id)
-                    )
 
+            elif role == 'Responsable':
+                institution_id = getattr(request.user, 'institution_id', None)
+                dept_id = _get_responsable_dept_id(request.user)
+                if dept_id:
+                    qs = qs.filter(
+                        (Q(quiz__sequence__module__cours__institution_id=institution_id)
+                         & _dept_q("quiz__sequence__module__cours__", dept_id)) |
+                        (Q(evaluation__cours__institution_id=institution_id)
+                         & _dept_q("evaluation__cours__", dept_id))
+                    )
+                else:
+                    qs = qs.filter(
+                        Q(quiz__sequence__institution_id=institution_id) |
+                        Q(evaluation__cours__institution_id=institution_id)
+                    )
             elif role == 'Formateur':
                 qs = qs.filter(
                     Q(quiz__sequence__module__cours__enseignant=request.user) |
@@ -332,7 +483,7 @@ class QuestionListCreateAPIView(APIView):
 
             elif role == 'Apprenant':
                 cours_ids = InscriptionCours.objects.filter(
-                    apprenant=request.user, statut='inscrit'
+                    apprenant=request.user, statut__in=INSCRIPTION_ACTIVE_STATUSES
                 ).values_list('cours_id', flat=True)
                 qs = qs.filter(
                     Q(quiz__sequence__module__cours_id__in=cours_ids) |
@@ -346,10 +497,9 @@ class QuestionListCreateAPIView(APIView):
             elif evaluation_id:
                 qs = qs.filter(evaluation_id=evaluation_id)
 
-            data = QuestionSerializer(qs, many=True).data
-
-            if role == 'Apprenant':
-                data = _mask_correct_answers(data)
+            # Choix du serializer selon le rôle : est_correcte jamais envoyé à un apprenant
+            serializer_class = QuestionApprenantSerializer if role == 'Apprenant' else QuestionSerializer
+            data = serializer_class(qs, many=True).data
 
             return api_success("Liste des questions récupérée.", data)
         except Exception as e:
@@ -368,8 +518,48 @@ class QuestionListCreateAPIView(APIView):
         return api_error("Erreur de validation.", errors=serializer.errors)
 
 
+def _scope_questions(request, qs, prefix=""):
+    """✅ PÉRIMÈTRE : restreint un queryset Question / Reponse selon le rôle.
+
+    `prefix` = "" pour Question, "question__" pour Reponse.
+    - Apprenant : uniquement ses cours inscrits ;
+    - Formateur : ses cours (enseignant direct OU via groupe) ;
+    - Admin / Responsable : son établissement.
+    """
+    role = _get_role(request.user)
+
+    if role == 'Apprenant':
+        ids = list(InscriptionCours.objects.filter(
+            apprenant=request.user, statut__in=INSCRIPTION_ACTIVE_STATUSES
+        ).values_list('cours_id', flat=True))
+        return qs.filter(
+            Q(**{f"{prefix}quiz__sequence__module__cours_id__in": ids}) |
+            Q(**{f"{prefix}evaluation__cours_id__in": ids})
+        )
+
+    if role == 'Formateur':
+        cours_ids = list(
+            Cours.objects.filter(
+                Q(enseignant=request.user) | Q(groupe__enseignants=request.user)
+            ).distinct().values_list('id', flat=True)
+        )
+        return qs.filter(
+            Q(**{f"{prefix}quiz__sequence__module__cours_id__in": cours_ids}) |
+            Q(**{f"{prefix}evaluation__cours_id__in": cours_ids})
+        )
+
+    if role in ('Admin', 'Responsable'):
+        inst = getattr(request.user, 'institution_id', None)
+        if inst:
+            return qs.filter(
+                Q(**{f"{prefix}quiz__sequence__institution_id": inst}) |
+                Q(**{f"{prefix}evaluation__cours__institution_id": inst})
+            )
+    return qs
+
+
 class QuestionDetailAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request, pk):
         err = _block_super_admin(request.user)
@@ -379,7 +569,9 @@ class QuestionDetailAPIView(APIView):
         if role == 'Parent':
             return api_error("Accès non autorisé.", http_status=status.HTTP_403_FORBIDDEN)
 
-        question = get_object_or_404(Question, pk=pk)
+        # ✅ PÉRIMÈTRE : plus de lecture inter-établissements par énumération d'id
+        qs = _scope_questions(request, Question.objects.prefetch_related('reponses_predefinies').all())
+        question = get_object_or_404(qs, pk=pk)
         data = QuestionSerializer(question).data
         if role == 'Apprenant':
             data = _mask_correct_answers_single(data)
@@ -393,10 +585,24 @@ class QuestionDetailAPIView(APIView):
         if _get_role(request.user) == 'Formateur':
             if not _formateur_owns_question(request.user, question):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        # ✅ Préserver l'historique : type/points figés dès qu'une réponse existe.
+        if question.reponses_apprenants.exists() or question.reponses_quiz.exists():
+            if 'type_question' in request.data and str(request.data.get('type_question')) != str(question.type_question):
+                return api_error("Question déjà répondue : le type n'est plus modifiable.",
+                                 http_status=status.HTTP_400_BAD_REQUEST)
+            try:
+                if 'points' in request.data and float(request.data.get('points')) != float(question.points):
+                    return api_error("Question déjà répondue : les points ne sont plus modifiables.",
+                                     http_status=status.HTTP_400_BAD_REQUEST)
+            except (TypeError, ValueError):
+                return api_error("Points invalides.", http_status=status.HTTP_400_BAD_REQUEST)
         serializer = QuestionSerializer(question, data=request.data, partial=True)
         if serializer.is_valid():
             return api_success("Question mise à jour.", QuestionSerializer(serializer.save()).data)
         return api_error("Erreur de validation.", errors=serializer.errors)
+
+    def patch(self, request, pk):
+        return self.put(request, pk)
 
     def delete(self, request, pk):
         err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')
@@ -406,6 +612,12 @@ class QuestionDetailAPIView(APIView):
         if _get_role(request.user) == 'Formateur':
             if not _formateur_owns_question(request.user, question):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        # ✅ Préserver l'historique : une question déjà répondue ne peut être supprimée.
+        if question.reponses_apprenants.exists() or question.reponses_quiz.exists():
+            return api_error(
+                "Des réponses d'apprenants existent pour cette question : suppression impossible.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
         question.delete()
         return api_success("Question supprimée.", None, status.HTTP_204_NO_CONTENT)
 
@@ -416,7 +628,7 @@ class ReponseListCreateAPIView(APIView):
     - Apprenant : lecture SANS est_correcte
     - Parent : BLOQUÉ
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request):
         err = _block_super_admin(request.user)
@@ -429,6 +641,8 @@ class ReponseListCreateAPIView(APIView):
         try:
             question_id = request.query_params.get('question')
             qs = Reponse.objects.select_related('question').all()
+            # ✅ PÉRIMÈTRE
+            qs = _scope_questions(request, qs, prefix='question__')
             if question_id:
                 qs = qs.filter(question_id=question_id)
 
@@ -455,7 +669,7 @@ class ReponseListCreateAPIView(APIView):
 
 
 class ReponseDetailAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request, pk):
         err = _block_super_admin(request.user)
@@ -464,7 +678,8 @@ class ReponseDetailAPIView(APIView):
         role = _get_role(request.user)
         if role == 'Parent':
             return api_error("Accès non autorisé.", http_status=status.HTTP_403_FORBIDDEN)
-        reponse = get_object_or_404(Reponse, pk=pk)
+        qs = _scope_questions(request, Reponse.objects.select_related('question').all(), prefix='question__')
+        reponse = get_object_or_404(qs, pk=pk)
         data = ReponseSerializer(reponse).data
         if role == 'Apprenant':
             data.pop('est_correcte', None)
@@ -478,10 +693,19 @@ class ReponseDetailAPIView(APIView):
         if _get_role(request.user) == 'Formateur':
             if not _formateur_owns_question(request.user, reponse.question):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        from .models import ReponseQuestion, ReponseQuiz
+        if (ReponseQuestion.objects.filter(choix_selectionnes=reponse).exists()
+                or ReponseQuiz.objects.filter(choix_selectionnes=reponse).exists()):
+            if 'est_correcte' in request.data and bool(request.data.get('est_correcte')) != bool(reponse.est_correcte):
+                return api_error("Réponse déjà sélectionnée : la correction n'est plus modifiable.",
+                                 http_status=status.HTTP_400_BAD_REQUEST)
         serializer = ReponseSerializer(reponse, data=request.data, partial=True)
         if serializer.is_valid():
             return api_success("Réponse mise à jour.", ReponseSerializer(serializer.save()).data)
         return api_error("Erreur de validation.", errors=serializer.errors)
+
+    def patch(self, request, pk):
+        return self.put(request, pk)
 
     def delete(self, request, pk):
         err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')
@@ -491,6 +715,13 @@ class ReponseDetailAPIView(APIView):
         if _get_role(request.user) == 'Formateur':
             if not _formateur_owns_question(request.user, reponse.question):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        from .models import ReponseQuestion, ReponseQuiz
+        if (ReponseQuestion.objects.filter(choix_selectionnes=reponse).exists()
+                or ReponseQuiz.objects.filter(choix_selectionnes=reponse).exists()):
+            return api_error(
+                "Cette réponse a déjà été sélectionnée par un apprenant : suppression impossible.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
         reponse.delete()
         return api_success("Réponse supprimée.", None, status.HTTP_204_NO_CONTENT)
 
@@ -500,7 +731,7 @@ class ReponseDetailAPIView(APIView):
 # ============================================================================
 
 class EvaluationListCreateAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request):
         err = _block_super_admin(request.user)
@@ -521,10 +752,30 @@ class EvaluationListCreateAPIView(APIView):
 
             qs = Evaluation.objects.select_related('cours', 'enseignant').prefetch_related('questions').all()
 
-            if role in ('Admin', 'ResponsableAcademique'):
+            # --- 3. Filtrage par rôle ---
+            if role == 'Admin':
                 qs = _filter_by_institution(qs, request.user)
                 # ✅ Filtre par année scolaire
                 qs = _apply_annee_filter_eval(qs, annee_scolaire_id)
+
+            elif role == 'Responsable':
+                institution_id = getattr(request.user, 'institution_id', None)
+                if not institution_id:
+                    qs = qs.none()
+                else:
+                    # Récupérer le département du responsable
+                    dept_id = getattr(request.user, 'departement_id', None)
+                    if dept_id is None:
+                        try:
+                            from users.models import ResponsableAcademique
+                            resp = ResponsableAcademique.objects.get(pk=request.user.pk)
+                            dept_id = resp.departement_id
+                        except Exception:
+                            dept_id = None
+
+                    qs = qs.filter(cours__institution_id=institution_id)
+                    if dept_id:
+                        qs = qs.filter(_dept_q("cours__", dept_id))
 
             elif role == 'Formateur':
                 institution_id = getattr(request.user, 'institution_id', None)
@@ -539,18 +790,27 @@ class EvaluationListCreateAPIView(APIView):
                     qs = _apply_annee_filter_eval(qs, annee_scolaire_id)
 
             elif role == 'Apprenant':
-                cours_ids = InscriptionCours.objects.filter(
-                    apprenant=request.user, statut='inscrit'
-                ).values_list('cours_id', flat=True)
+                from django.db.models.functions import Lower
+                cours_ids = (
+                    InscriptionCours.objects
+                    .filter(apprenant=request.user)
+                    .annotate(statut_l=Lower('statut'))
+                    .filter(statut_l__in=['inscrit', 'en_cours', 'en cours', 'encours'])
+                    .values_list('cours_id', flat=True)
+                )
+                # ✅ Evaluation a un FK direct vers cours
                 qs = qs.filter(cours_id__in=cours_ids, est_publiee=True)
                 # Apprenant : année fixée par son inscription, pas de filtre supplémentaire
 
             elif role == 'Parent':
                 try:
                     parent_obj = ParentModel.objects.get(pk=request.user.pk)
-                    enfant_ids = Apprenant.objects.filter(
-                        tuteur=parent_obj
-                    ).values_list('id', flat=True)
+                    enfant_qs = Apprenant.objects.filter(tuteur=parent_obj)
+                    # ✅ Filtre par enfant : ?apprenant=<id> (sinon tous les enfants)
+                    apprenant_param = request.query_params.get('apprenant')
+                    if apprenant_param:
+                        enfant_qs = enfant_qs.filter(id=apprenant_param)
+                    enfant_ids = enfant_qs.values_list('id', flat=True)
                     cours_ids = InscriptionCours.objects.filter(
                         apprenant_id__in=enfant_ids
                     ).values_list('cours_id', flat=True).distinct()
@@ -594,15 +854,22 @@ class EvaluationListCreateAPIView(APIView):
                         "Vous ne pouvez créer des évaluations que dans vos propres cours.",
                         http_status=status.HTTP_403_FORBIDDEN
                     )
-        serializer = EvaluationSerializer(data=request.data)
+        # ✅ L'enseignant est DÉDUIT de la requête : `Evaluation.enseignant` a un
+        #    `default=1` qui ne correspond à aucun Formateur → IntegrityError
+        #    (FOREIGN KEY constraint failed) sans ce forçage.
+        extra = {}
+        if _get_role(request.user) == 'Formateur':
+            extra['enseignant_id'] = request.user.pk
+        serializer = EvaluationSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-            return api_success("Évaluation créée.", EvaluationSerializer(serializer.save()).data,
+            obj = serializer.save(**extra)
+            return api_success("Évaluation créée.", EvaluationSerializer(obj).data,
                                status.HTTP_201_CREATED)
         return api_error("Erreur de validation.", errors=serializer.errors)
 
 
 class EvaluationDetailAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request, pk):
         err = _block_super_admin(request.user)
@@ -612,10 +879,23 @@ class EvaluationDetailAPIView(APIView):
         role = _get_role(request.user)
         evaluation = get_object_or_404(Evaluation, pk=pk)
 
-        if role in ('Admin', 'ResponsableAcademique'):
+        if role in ('Admin', 'Responsable'):
             institution_id = getattr(request.user, 'institution_id', None)
             if evaluation.cours.institution_id != institution_id:
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+
+            # ✅ Vérification département pour ResponsableAcademique
+            if role == 'Responsable':
+                dept_id = getattr(request.user, 'departement_id', None)
+                if dept_id is None:
+                    try:
+                        from users.models import ResponsableAcademique
+                        resp = ResponsableAcademique.objects.get(pk=request.user.pk)
+                        dept_id = resp.departement_id
+                    except Exception:
+                        dept_id = None
+                if dept_id and evaluation.cours.departement_id != dept_id:
+                    return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
 
         elif role == 'Formateur':
             if not _formateur_owns_cours(request.user, evaluation.cours):
@@ -625,7 +905,7 @@ class EvaluationDetailAPIView(APIView):
             is_inscrit = InscriptionCours.objects.filter(
                 apprenant=request.user,
                 cours=evaluation.cours,
-                statut='inscrit'
+                statut__in=INSCRIPTION_ACTIVE_STATUSES
             ).exists()
             if not is_inscrit or not evaluation.est_publiee:
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
@@ -648,6 +928,11 @@ class EvaluationDetailAPIView(APIView):
         else:
             return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
 
+        # ✅ Corrigés JAMAIS exposés à l'apprenant (masquage ORM)
+        if role == 'Apprenant':
+            from .serializers import EvaluationDetailApprenantSerializer
+            return api_success("Évaluation trouvée.",
+                               EvaluationDetailApprenantSerializer(evaluation).data)
         return api_success("Évaluation trouvée.", EvaluationDetailSerializer(evaluation).data)
 
     def put(self, request, pk):
@@ -658,6 +943,8 @@ class EvaluationDetailAPIView(APIView):
         if _get_role(request.user) == 'Formateur':
             if not _formateur_owns_cours(request.user, evaluation.cours):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        if _get_role(request.user) in ('Admin', 'Responsable') and not _cours_scope_ok(request.user, evaluation.cours):
+            return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         serializer = EvaluationSerializer(evaluation, data=request.data, partial=True)
         if serializer.is_valid():
             return api_success("Évaluation mise à jour.", EvaluationSerializer(serializer.save()).data)
@@ -671,16 +958,18 @@ class EvaluationDetailAPIView(APIView):
         if _get_role(request.user) == 'Formateur':
             if not _formateur_owns_cours(request.user, evaluation.cours):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        if _get_role(request.user) in ('Admin', 'Responsable') and not _cours_scope_ok(request.user, evaluation.cours):
+            return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         evaluation.delete()
         return api_success("Évaluation supprimée.", None, status.HTTP_204_NO_CONTENT)
 
 
 class EvaluationPublierAPIView(APIView):
     """Publier/dépublier : Admin, Responsable, Formateur (propriétaire)."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def post(self, request, pk):
-        err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')
+        err = _require_roles(request.user, 'Admin', 'Formateur')
         if err:
             return err
         try:
@@ -688,6 +977,8 @@ class EvaluationPublierAPIView(APIView):
             if _get_role(request.user) == 'Formateur':
                 if not _formateur_owns_cours(request.user, evaluation.cours):
                     return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+            if _get_role(request.user) == 'Admin' and not _cours_scope_ok(request.user, evaluation.cours):
+                return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
 
             action = request.data.get('action', 'publier')
             if action not in ['publier', 'depublier']:
@@ -710,7 +1001,7 @@ class EvaluationPublierAPIView(APIView):
 
 
 class EvaluationAccessibiliteAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request, pk):
         err = _block_super_admin(request.user)
@@ -724,6 +1015,23 @@ class EvaluationAccessibiliteAPIView(APIView):
             apprenant_id = request.query_params.get('apprenant')
             if not apprenant_id:
                 return api_error("Le paramètre 'apprenant' est requis.")
+
+            # ✅ SÉCURITÉ (IDOR) : un apprenant ne consulte QUE ses propres
+            #    statuts/notes de passage. L'identifiant fourni par le client
+            #    n'est jamais considéré comme une autorisation.
+            if role == 'Apprenant':
+                from users.access_control import get_own_apprenant
+                own = get_own_apprenant(request.user)
+                if own is None or str(own.pk) != str(apprenant_id):
+                    return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+                if not InscriptionCours.objects.filter(
+                    apprenant=request.user, cours=evaluation.cours
+                ).exists():
+                    return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+            elif role in ('Admin', 'Responsable', 'Formateur'):
+                inst = getattr(request.user, 'institution_id', None)
+                if inst and getattr(evaluation.cours, 'institution_id', None) != inst:
+                    return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
 
             if role == 'Parent':
                 try:
@@ -787,7 +1095,7 @@ class EvaluationAccessibiliteAPIView(APIView):
 
 class PassageEvaluationDemarrerAPIView(APIView):
     """Démarrer un passage : Apprenant uniquement."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def post(self, request):
         err = _require_roles(request.user, 'Apprenant')
@@ -804,25 +1112,43 @@ class PassageEvaluationDemarrerAPIView(APIView):
                                  http_status=status.HTTP_403_FORBIDDEN)
 
             evaluation = get_object_or_404(Evaluation, pk=evaluation_id)
-            passage_existant = PassageEvaluation.objects.filter(
+            passages = PassageEvaluation.objects.filter(
                 apprenant_id=apprenant_id, evaluation=evaluation
-            ).first()
+            ).order_by('numero_tentative')
 
-            if passage_existant:
-                if passage_existant.statut == 'en_cours':
-                    return api_success("Passage en cours récupéré.",
-                                       PassageEvaluationDetailSerializer(passage_existant).data)
+            # Reprise d'une tentative déjà en cours
+            en_cours = passages.filter(statut='en_cours').first()
+            if en_cours:
+                return api_success("Passage en cours récupéré.",
+                                   PassageEvaluationDetailSerializer(en_cours, context={'request': request}).data)
+
+            # Nombre de tentatives max (paramètre effectif : établissement > global)
+            from parametres.services import evaluation_tentatives_max
+            institution = getattr(getattr(evaluation, 'cours', None), 'institution', None)
+            maxi = int(evaluation_tentatives_max(institution) or 1)
+            nb = passages.count()
+
+            if nb >= maxi:
+                dernier = passages.last()
                 return api_error(
-                    f"Évaluation déjà soumise (statut: {passage_existant.statut}).",
-                    data={'passage_id': passage_existant.id, 'statut': passage_existant.statut}
+                    f"Nombre maximal de tentatives atteint ({nb}/{maxi}).",
+                    data={'passage_id': getattr(dernier, 'id', None),
+                          'statut': getattr(dernier, 'statut', None),
+                          'tentatives': nb, 'max': maxi},
                 )
+
+            from courses.publication import cours_commence
+            if evaluation.cours_id and not cours_commence(evaluation.cours):
+                return api_error("Ce cours n'a pas encore commencé.",
+                                 http_status=status.HTTP_403_FORBIDDEN)
 
             if not evaluation.est_accessible():
                 return api_error("Cette évaluation n'est pas accessible actuellement.",
                                  http_status=status.HTTP_403_FORBIDDEN)
 
             passage = PassageEvaluation.objects.create(
-                apprenant_id=apprenant_id, evaluation=evaluation, statut='en_cours'
+                apprenant_id=apprenant_id, evaluation=evaluation, statut='en_cours',
+                numero_tentative=nb + 1,
             )
             if evaluation.type_evaluation in ('structuree', 'mixte'):
                 for question in evaluation.questions.all():
@@ -831,18 +1157,16 @@ class PassageEvaluationDemarrerAPIView(APIView):
                     )
 
             return api_success("Évaluation démarrée.",
-                               PassageEvaluationDetailSerializer(passage).data,
+                               PassageEvaluationDetailSerializer(passage, context={'request': request}).data,
                                status.HTTP_201_CREATED)
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return api_error("Erreur serveur.", errors={'detail': str(e)},
-                             http_status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception:
+            logger.exception("Erreur demarrage evaluation")
+            return api_error("Erreur serveur.", http_status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class PassageEvaluationReprendreAPIView(APIView):
     """Reprendre : Apprenant (le sien) uniquement."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request, pk):
         err = _require_roles(request.user, 'Apprenant')
@@ -856,7 +1180,7 @@ class PassageEvaluationReprendreAPIView(APIView):
                 return api_error(f"Ce passage ne peut pas être repris (statut: {passage.statut}).")
             if not passage.peut_etre_repris():
                 return api_error("La date limite est dépassée.", http_status=status.HTTP_403_FORBIDDEN)
-            return api_success("Passage récupéré.", PassageEvaluationDetailSerializer(passage).data)
+            return api_success("Passage récupéré.", PassageEvaluationDetailSerializer(passage, context={'request': request}).data)
         except Exception as e:
             return api_error("Erreur serveur.", errors={'detail': str(e)},
                              http_status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -864,7 +1188,7 @@ class PassageEvaluationReprendreAPIView(APIView):
 
 class PassageEvaluationSauvegarderAPIView(APIView):
     """Sauvegarder : Apprenant (le sien) uniquement."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def put(self, request, pk):
         err = _require_roles(request.user, 'Apprenant')
@@ -876,8 +1200,11 @@ class PassageEvaluationSauvegarderAPIView(APIView):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
             if passage.statut != 'en_cours':
                 return api_error("Impossible de sauvegarder après soumission.")
-            if passage.evaluation.type_evaluation != 'simple':
-                return api_error("Route uniquement pour les évaluations simples.")
+            if _passage_expired(passage):
+                return api_error("Temps écoulé : la sauvegarde est close.",
+                                 http_status=status.HTTP_403_FORBIDDEN)
+            if passage.evaluation.type_evaluation not in ('simple', 'mixte'):
+                return api_error("Route réservée aux évaluations simples ou mixtes.")
             serializer = PassageEvaluationSerializer(passage, data=request.data, partial=True)
             if serializer.is_valid():
                 return api_success("Progression sauvegardée.",
@@ -890,7 +1217,7 @@ class PassageEvaluationSauvegarderAPIView(APIView):
 
 class PassageEvaluationSoumettreAPIView(APIView):
     """Soumettre : Apprenant (le sien) uniquement."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def post(self, request, pk):
         err = _require_roles(request.user, 'Apprenant')
@@ -905,18 +1232,24 @@ class PassageEvaluationSoumettreAPIView(APIView):
             if not passage.peut_etre_soumis():
                 return api_error("Date limite dépassée.", http_status=status.HTTP_403_FORBIDDEN)
 
-            if passage.evaluation.type_evaluation == 'structuree':
-                if not passage.reponses_questions.exclude(statut='non_repondu').exists():
-                    return api_error("Aucune question répondue.")
-            elif passage.evaluation.type_evaluation == 'simple':
-                if not passage.reponse_texte and not passage.fichier_reponse:
-                    return api_error("Aucune réponse fournie.")
+            auto = str(request.data.get('auto', '')).lower() in ('1', 'true', 'yes')
+            if not auto:
+                if passage.evaluation.type_evaluation in ('structuree', 'mixte'):
+                    has_question = passage.reponses_questions.exclude(statut='non_repondu').exists()
+                    has_simple = bool(passage.reponse_texte or passage.fichier_reponse)
+                    if not has_question and not (
+                        passage.evaluation.type_evaluation == 'mixte' and has_simple
+                    ):
+                        return api_error("Aucune question répondue.")
+                elif passage.evaluation.type_evaluation == 'simple':
+                    if not passage.reponse_texte and not passage.fichier_reponse:
+                        return api_error("Aucune réponse fournie.")
 
             passage.statut = 'soumis'
             passage.date_soumission = timezone.now()
             passage.save()
 
-            if passage.evaluation.type_evaluation == 'structuree':
+            if passage.evaluation.type_evaluation in ('structuree', 'mixte'):
                 if passage.evaluation.est_auto_corrigeable():
                     passage.auto_corriger()
                     msg = "Évaluation soumise et corrigée automatiquement."
@@ -926,7 +1259,7 @@ class PassageEvaluationSoumettreAPIView(APIView):
             else:
                 msg = "Évaluation soumise, en attente de correction."
 
-            return api_success(msg, PassageEvaluationDetailSerializer(passage).data)
+            return api_success(msg, PassageEvaluationDetailSerializer(passage, context={'request': request}).data)
         except Exception as e:
             return api_error("Erreur serveur.", errors={'detail': str(e)},
                              http_status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -940,7 +1273,7 @@ class PassageEvaluationListAPIView(APIView):
     - Apprenant : ses propres passages
     - Parent : passages de ses enfants
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request):
         err = _block_super_admin(request.user)
@@ -956,12 +1289,16 @@ class PassageEvaluationListAPIView(APIView):
 
             qs = PassageEvaluation.objects.select_related('apprenant', 'evaluation').all()
 
-            if role in ('Admin', 'ResponsableAcademique'):
+            if role == 'Admin':
                 institution_id = getattr(request.user, 'institution_id', None)
                 qs = qs.filter(evaluation__cours__institution_id=institution_id)
-                # ✅ Filtre par année scolaire
-                if annee_scolaire_id:
-                    qs = qs.filter(evaluation__cours__annee_scolaire_id=annee_scolaire_id)
+
+            elif role == 'Responsable':
+                institution_id = getattr(request.user, 'institution_id', None)
+                qs = qs.filter(evaluation__cours__institution_id=institution_id)
+                dept_id = _get_responsable_dept_id(request.user)
+                if dept_id:
+                    qs = qs.filter(_dept_q("evaluation__cours__", dept_id))
 
             elif role == 'Formateur':
                 qs = qs.filter(evaluation__cours__enseignant=request.user)
@@ -992,7 +1329,7 @@ class PassageEvaluationListAPIView(APIView):
 
 class PassageEvaluationDetailAPIView(APIView):
     """Détail d'un passage selon rôle."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request, pk):
         err = _block_super_admin(request.user)
@@ -1002,6 +1339,8 @@ class PassageEvaluationDetailAPIView(APIView):
 
         passage = get_object_or_404(PassageEvaluation, pk=pk)
 
+        if role in ('Admin', 'Responsable') and not _cours_scope_ok(request.user, passage.evaluation.cours):
+            return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         if role == 'Apprenant' and passage.apprenant_id != request.user.id:
             return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         if role == 'Parent':
@@ -1012,7 +1351,7 @@ class PassageEvaluationDetailAPIView(APIView):
             if not _formateur_owns_cours(request.user, passage.evaluation.cours):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
 
-        return api_success("Passage trouvé.", PassageEvaluationDetailSerializer(passage).data)
+        return api_success("Passage trouvé.", PassageEvaluationDetailSerializer(passage, context={'request': request}).data)
 
 
 # ============================================================================
@@ -1021,7 +1360,7 @@ class PassageEvaluationDetailAPIView(APIView):
 
 class ReponseQuestionSauvegarderAPIView(APIView):
     """Sauvegarder une réponse : Apprenant uniquement."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def post(self, request):
         err = _require_roles(request.user, 'Apprenant')
@@ -1038,6 +1377,9 @@ class ReponseQuestionSauvegarderAPIView(APIView):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
             if passage.statut != 'en_cours':
                 return api_error("Impossible de modifier après soumission.")
+            if _passage_expired(passage):
+                return api_error("Temps écoulé : la sauvegarde est close.",
+                                 http_status=status.HTTP_403_FORBIDDEN)
 
             reponse, _ = ReponseQuestion.objects.get_or_create(
                 passage_evaluation_id=passage_evaluation_id,
@@ -1048,7 +1390,16 @@ class ReponseQuestionSauvegarderAPIView(APIView):
             if 'reponse_texte' in request.data:
                 reponse.reponse_texte = request.data['reponse_texte']
             if 'fichier_reponse' in request.FILES:
-                reponse.fichier_reponse = request.FILES['fichier_reponse']
+                f = request.FILES['fichier_reponse']
+                import os as _os
+                _ext = _os.path.splitext(f.name or '')[1].lower()
+                if _ext not in {'.pdf', '.docx', '.doc', '.jpg', '.jpeg', '.png', '.gif', '.txt'}:
+                    return api_error("Extension de fichier non autorisée.",
+                                     http_status=status.HTTP_400_BAD_REQUEST)
+                if f.size > 20 * 1024 * 1024:
+                    return api_error("Fichier trop volumineux (max 20 Mo).",
+                                     http_status=status.HTTP_400_BAD_REQUEST)
+                reponse.fichier_reponse = f
 
             reponse.statut = 'repondu' if (
                 reponse.choix_selectionnes.exists() or reponse.reponse_texte or reponse.fichier_reponse
@@ -1062,7 +1413,7 @@ class ReponseQuestionSauvegarderAPIView(APIView):
 
 
 class ReponseQuestionDetailAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request, pk):
         err = _block_super_admin(request.user)
@@ -1070,6 +1421,10 @@ class ReponseQuestionDetailAPIView(APIView):
             return err
         role = _get_role(request.user)
         reponse = get_object_or_404(ReponseQuestion, pk=pk)
+        if role in ('Admin', 'Responsable') and not _cours_scope_ok(
+            request.user, reponse.passage_evaluation.evaluation.cours
+        ):
+            return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         if role == 'Apprenant' and reponse.passage_evaluation.apprenant_id != request.user.id:
             return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
         if role == 'Parent':
@@ -1085,10 +1440,10 @@ class ReponseQuestionDetailAPIView(APIView):
 
 class CorrectionReponseAPIView(APIView):
     """Corriger une réponse manuelle : Admin, Responsable, Formateur."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def post(self, request, pk):
-        err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')
+        err = _require_roles(request.user, 'Admin', 'Formateur')
         if err:
             return err
         try:
@@ -1096,6 +1451,10 @@ class CorrectionReponseAPIView(APIView):
             if _get_role(request.user) == 'Formateur':
                 if not _formateur_owns_cours(request.user, reponse.passage_evaluation.evaluation.cours):
                     return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+            if _get_role(request.user) == 'Admin' and not _cours_scope_ok(
+                request.user, reponse.passage_evaluation.evaluation.cours
+            ):
+                return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
             if reponse.question.mode_correction == 'automatique':
                 return api_error("Cette question est corrigée automatiquement.")
             if reponse.passage_evaluation.statut not in ('soumis', 'corrige'):
@@ -1116,10 +1475,10 @@ class CorrectionReponseAPIView(APIView):
 
 class CorrectionEvaluationAPIView(APIView):
     """Corriger une évaluation : Admin, Responsable, Formateur."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def post(self, request, pk):
-        err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')
+        err = _require_roles(request.user, 'Admin', 'Formateur')
         if err:
             return err
         try:
@@ -1127,6 +1486,8 @@ class CorrectionEvaluationAPIView(APIView):
             if _get_role(request.user) == 'Formateur':
                 if not _formateur_owns_cours(request.user, passage.evaluation.cours):
                     return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+            if _get_role(request.user) == 'Admin' and not _cours_scope_ok(request.user, passage.evaluation.cours):
+                return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
             if passage.statut not in ('soumis', 'corrige'):
                 return api_error("Le passage doit être soumis pour être corrigé.")
 
@@ -1145,12 +1506,23 @@ class CorrectionEvaluationAPIView(APIView):
                 if note_finale is None:
                     return api_error("La note est requise pour les évaluations simples.")
 
+            try:
+                note_finale = float(note_finale)
+            except (TypeError, ValueError):
+                return api_error("Note invalide.", http_status=status.HTTP_400_BAD_REQUEST)
+            bareme = float(passage.evaluation.bareme or 0)
+            if note_finale < 0 or (bareme and note_finale > bareme):
+                return api_error(
+                    f"La note doit être comprise entre 0 et {bareme:g}.",
+                    http_status=status.HTTP_400_BAD_REQUEST,
+                )
+
             passage.note = note_finale
             passage.commentaire_enseignant = request.data.get('commentaire_enseignant', '')
             passage.statut = 'corrige'
             passage.date_correction = timezone.now()
             passage.save()
-            return api_success("Évaluation corrigée.", PassageEvaluationDetailSerializer(passage).data)
+            return api_success("Évaluation corrigée.", PassageEvaluationDetailSerializer(passage, context={'request': request}).data)
         except Exception as e:
             return api_error("Erreur serveur.", errors={'detail': str(e)},
                              http_status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1158,10 +1530,10 @@ class CorrectionEvaluationAPIView(APIView):
 
 class EvaluationsACorrigerAPIView(APIView):
     """Liste des évaluations à corriger : Formateur/Admin/Responsable."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request):
-        err = _require_roles(request.user, 'Admin', 'ResponsableAcademique', 'Formateur')
+        err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')
         if err:
             return err
         try:
@@ -1169,13 +1541,16 @@ class EvaluationsACorrigerAPIView(APIView):
             annee_scolaire_id = _get_annee_scolaire_id(request)
             qs = PassageEvaluation.objects.select_related('apprenant', 'evaluation').filter(statut='soumis')
 
-            if role in ('Admin', 'ResponsableAcademique'):
+            if role == 'Admin':
                 institution_id = getattr(request.user, 'institution_id', None)
                 qs = qs.filter(evaluation__cours__institution_id=institution_id)
-                # ✅ Filtre par année scolaire
-                if annee_scolaire_id:
-                    qs = qs.filter(evaluation__cours__annee_scolaire_id=annee_scolaire_id)
 
+            elif role == 'Responsable':
+                institution_id = getattr(request.user, 'institution_id', None)
+                qs = qs.filter(evaluation__cours__institution_id=institution_id)
+                dept_id = _get_responsable_dept_id(request.user)
+                if dept_id:
+                    qs = qs.filter(_dept_q("evaluation__cours__", dept_id))
             elif role == 'Formateur':
                 qs = qs.filter(evaluation__cours__enseignant=request.user)
                 if annee_scolaire_id:
@@ -1197,7 +1572,7 @@ class EvaluationsACorrigerAPIView(APIView):
 # ============================================================================
 
 class PassageQuizListCreateAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request):
         err = _block_super_admin(request.user)
@@ -1211,12 +1586,16 @@ class PassageQuizListCreateAPIView(APIView):
             quiz_id = request.query_params.get('quiz')
             qs = PassageQuiz.objects.select_related('apprenant', 'quiz').all()
 
-            if role in ('Admin', 'ResponsableAcademique'):
+            if role == 'Admin':
                 institution_id = getattr(request.user, 'institution_id', None)
-                qs = qs.filter(quiz__sequence__institution_id=institution_id)
-                # ✅ Filtre par année scolaire
-                if annee_scolaire_id:
-                    qs = qs.filter(quiz__sequence__module__cours__annee_scolaire_id=annee_scolaire_id)
+                qs = qs.filter(quiz__sequence__module__cours__institution_id=institution_id)
+
+            elif role == 'Responsable':
+                institution_id = getattr(request.user, 'institution_id', None)
+                qs = qs.filter(quiz__sequence__module__cours__institution_id=institution_id)
+                dept_id = _get_responsable_dept_id(request.user)
+                if dept_id:
+                    qs = qs.filter(_dept_q("quiz__sequence__module__cours__", dept_id))
 
             elif role == 'Formateur':
                 qs = qs.filter(quiz__sequence__module__cours__enseignant=request.user)
@@ -1252,16 +1631,44 @@ class PassageQuizListCreateAPIView(APIView):
                     serializer.validated_data.get('apprenant'), 'id') else '') != str(request.user.id):
                 return api_error("Vous ne pouvez passer que vos propres quiz.",
                                  http_status=status.HTTP_403_FORBIDDEN)
-            passage = serializer.save()
-            for question in passage.quiz.questions.all():
-                ReponseQuiz.objects.create(passage_quiz=passage, question=question)
+
+            # ✅ Le cours doit avoir commencé et l'apprenant doit y être inscrit.
+            quiz = serializer.validated_data.get('quiz')
+            cours = getattr(getattr(getattr(quiz, 'sequence', None), 'module', None), 'cours', None)
+            if cours is not None:
+                from courses.models import InscriptionCours
+                from courses.publication import cours_commence
+
+                if not InscriptionCours.objects.filter(
+                    apprenant=request.user, cours=cours,
+                    statut__in=INSCRIPTION_ACTIVE_STATUSES,
+                ).exists():
+                    return api_error("Accès refusé à ce cours.",
+                                     http_status=status.HTTP_403_FORBIDDEN)
+                if not cours_commence(cours):
+                    return api_error("Ce cours n'a pas encore commencé.",
+                                     http_status=status.HTTP_403_FORBIDDEN)
+
+            # ✅ Limite de tentatives (3 par défaut)
+            maxi = 3
+            nb = PassageQuiz.objects.filter(apprenant=request.user, quiz=quiz).count()
+            if nb >= maxi:
+                return api_error(
+                    f"Nombre maximal de tentatives atteint ({nb}/{maxi}).",
+                    http_status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            with transaction.atomic():
+                passage = serializer.save()
+                for question in passage.quiz.questions.all():
+                    ReponseQuiz.objects.create(passage_quiz=passage, question=question)
             return api_success("Passage créé.", PassageQuizDetailSerializer(passage).data,
                                status.HTTP_201_CREATED)
         return api_error("Erreur de validation.", errors=serializer.errors)
 
 
 class PassageQuizDetailAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request, pk):
         err = _block_super_admin(request.user)
@@ -1280,7 +1687,7 @@ class PassageQuizDetailAPIView(APIView):
 
 class ReponseQuizSubmitAPIView(APIView):
     """Soumettre une réponse quiz : Apprenant uniquement."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def post(self, request):
         err = _require_roles(request.user, 'Apprenant')
@@ -1302,6 +1709,15 @@ class ReponseQuizSubmitAPIView(APIView):
             )
             reponse.choix_selectionnes.set(choix_ids)
             reponse.calculer_points_automatique()
+            # ✅ Pas d'oracle : tant que le passage n'est pas TERMINÉ, on ne
+            #    renvoie ni points ni pourcentage (sinon l'apprenant pourrait
+            #    tester ses réponses question par question).
+            if not getattr(passage, 'termine', False):
+                return api_success("Réponse enregistrée.", {
+                    'id': reponse.id,
+                    'question': reponse.question_id,
+                    'choix_selectionnes': list(reponse.choix_selectionnes.values_list('id', flat=True)),
+                })
             return api_success("Réponse enregistrée.", ReponseQuizSerializer(reponse).data)
         except Exception as e:
             return api_error("Erreur serveur.", errors={'detail': str(e)},
@@ -1310,7 +1726,7 @@ class ReponseQuizSubmitAPIView(APIView):
 
 class PassageQuizTerminerAPIView(APIView):
     """Terminer un quiz : Apprenant (le sien) uniquement."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def post(self, request, pk):
         err = _require_roles(request.user, 'Apprenant')
@@ -1321,7 +1737,7 @@ class PassageQuizTerminerAPIView(APIView):
             if passage.apprenant_id != request.user.id:
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
             if passage.termine:
-                return api_error("Ce quiz a déjà été terminé.")
+                return api_success("Quiz terminé.", PassageQuizDetailSerializer(passage).data)
             passage.calculer_score()
             passage.termine = True
             passage.save()
@@ -1342,7 +1758,7 @@ class StatistiquesApprenantAPIView(APIView):
     - Admin/Responsable/Formateur : stats de tout apprenant de leur institution
     - Parent : stats de ses enfants
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request, apprenant_id):
         err = _block_super_admin(request.user)
@@ -1357,6 +1773,13 @@ class StatistiquesApprenantAPIView(APIView):
             enfants_ids = list(Apprenant.objects.filter(tuteur=request.user).values_list('id', flat=True))
             if int(apprenant_id) not in enfants_ids:
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        if role == 'Formateur':
+            # ✅ PÉRIMÈTRE : uniquement les apprenants de SES cours
+            from users.access_control import user_can_access_apprenant
+            cible = Apprenant.objects.filter(pk=apprenant_id).first()
+            if cible is None or not user_can_access_apprenant(request.user, cible):
+                return api_error("Apprenant hors de votre périmètre.",
+                                 http_status=status.HTTP_403_FORBIDDEN)
 
         annee_scolaire_id = _get_annee_scolaire_id(request)
 
@@ -1397,7 +1820,7 @@ class StatistiquesApprenantAPIView(APIView):
 
 class StatistiquesEvaluationAPIView(APIView):
     """Stats évaluation : Admin, Responsable, Formateur uniquement."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request, evaluation_id):
         err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')
@@ -1480,7 +1903,7 @@ class StatistiquesEvaluationAPIView(APIView):
 
 class EvaluationExportAPIView(APIView):
     """Export : Admin, Responsable, Formateur (propriétaire)."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request, pk):
         err = _require_roles(request.user, 'Admin', 'Responsable', 'Formateur')
@@ -1490,6 +1913,8 @@ class EvaluationExportAPIView(APIView):
         if _get_role(request.user) == 'Formateur':
             if not _formateur_owns_cours(request.user, evaluation.cours):
                 return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+        if _get_role(request.user) in ('Admin', 'Responsable') and not _cours_scope_ok(request.user, evaluation.cours):
+            return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
 
         export_format = request.query_params.get("format", "csv").lower()
         detail = request.query_params.get("detail", "false").lower() == "true"
@@ -1665,3 +2090,70 @@ def _mask_correct_answers_single(question_data):
     for rep in question_data.get('reponses_predefinies', []):
         rep.pop('est_correcte', None)
     return question_data
+
+
+class EvaluationImportQuestionsAPIView(APIView):
+    """
+    Importe des questions depuis un fichier (xlsx, csv, docx, pdf, txt)
+    pour pré-remplir la création d'une évaluation / d'un quiz.
+    """
+    permission_classes = [IsAuthenticated, RBACPermission]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        from .import_questions import extract_questions
+
+        if _get_role(request.user) != "Formateur":
+            return api_error("Import réservé aux formateurs.",
+                             http_status=status.HTTP_403_FORBIDDEN)
+
+        f = request.FILES.get("file")
+        if not f:
+            return api_error("Aucun fichier fourni.", http_status=status.HTTP_400_BAD_REQUEST)
+        if f.size > 10 * 1024 * 1024:
+            return api_error("Fichier trop volumineux (max 10 Mo).", http_status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            result = extract_questions(f.name, f.read())
+        except Exception as exc:
+            logger.exception("Import questions echoue (%s)", getattr(f, "name", "?"))
+            return api_error(
+                "Impossible d'extraire les questions du fichier.",
+                errors={"detail": str(exc)},
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return api_success(f"{result['nb']} question(s) extraite(s).", result, status.HTTP_200_OK)
+
+
+class PassageEvaluationRattrapageAPIView(APIView):
+    """Crée une session de rattrapage (par EC → par évaluation) pour un apprenant."""
+
+    permission_classes = [IsAuthenticated, RBACPermission]
+    rbac_resource = "evaluations"
+
+    def post(self, request, pk):
+        err = _require_roles(request.user, "Admin", "Formateur")
+        if err:
+            return err
+
+        original = get_object_or_404(PassageEvaluation, pk=pk)
+        if _get_role(request.user) == "Formateur":
+            if not _formateur_owns_cours(request.user, original.evaluation.cours):
+                return api_error("Accès refusé.", http_status=status.HTTP_403_FORBIDDEN)
+
+        dernier = (PassageEvaluation.objects
+                   .filter(apprenant=original.apprenant, evaluation=original.evaluation)
+                   .order_by("-numero_tentative").first())
+        numero = (dernier.numero_tentative if dernier else 0) + 1
+
+        passage = PassageEvaluation.objects.create(
+            apprenant=original.apprenant,
+            evaluation=original.evaluation,
+            numero_tentative=numero,
+            session="rattrapage",
+            statut="en_cours",
+        )
+        return api_success("Session de rattrapage créée.",
+                           PassageEvaluationSerializer(passage).data,
+                           status.HTTP_201_CREATED)

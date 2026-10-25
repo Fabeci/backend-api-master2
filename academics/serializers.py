@@ -9,6 +9,7 @@ from users.models import Admin, Apprenant, Formateur, Parent, ResponsableAcademi
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 from django.core.mail import send_mail
+from core.mailer import safe_send_mail
 from django.conf import settings
 
 from users.serializers import ApprenantSerializer
@@ -295,19 +296,19 @@ class InstitutionSerializer(serializers.ModelSerializer):
 
                 # Code d'activation + email
                 v = VerificationCode.create_activation_code(admin)
-                send_mail(
+                safe_send_mail(
                     subject="Somapro - Compte administrateur : code d'activation",
                     message=(
                         f"Bonjour {admin.prenom},\n\n"
                         f"Votre compte administrateur pour l'institution « {institution.nom} » a été créé.\n"
                         f"Code d'activation : {v.code} (valide 15 minutes).\n\n"
-                        f"Identifiant : {admin.email}\n"
-                        f"Mot de passe provisoire : {password}\n\n"
-                        f"Merci de valider votre compte et de modifier votre mot de passe après connexion."
+                        f"Identifiant : {admin.email}\n\n"
+                        f"Pour définir votre mot de passe, utilisez « Mot de passe oublié » sur la page de connexion.\n"
+                        f"Merci de valider votre compte puis de définir votre mot de passe."
                     ),
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[admin.email],
-                    fail_silently=False,
+                    fail_silently=None,
                 )
 
             # Lier l'admin à l'institution (si le champ existe)
@@ -384,18 +385,18 @@ class InstitutionSerializer(serializers.ModelSerializer):
                 admin.save()
 
                 v = VerificationCode.create_activation_code(admin)
-                send_mail(
+                safe_send_mail(
                     subject="Somapro - Nouveau compte administrateur",
                     message=(
                         f"Bonjour {admin.prenom},\n\n"
                         f"Un nouveau compte administrateur pour l'institution « {instance.nom} » a été créé.\n"
                         f"Code d'activation : {v.code} (valide 15 minutes).\n\n"
                         f"Identifiant : {admin.email}\n"
-                        f"Mot de passe provisoire : {password}\n"
+                        f"Pour définir votre mot de passe, utilisez « Mot de passe oublié » sur la page de connexion.\n"
                     ),
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[admin.email],
-                    fail_silently=False,
+                    fail_silently=None,
                 )
 
                 if hasattr(instance, "admin"):
@@ -406,6 +407,9 @@ class InstitutionSerializer(serializers.ModelSerializer):
     
     
 class DomaineEtudeSerializer(serializers.ModelSerializer):
+    departement_label = serializers.StringRelatedField(
+        source="departement.nom", read_only=True
+    )
     class Meta:
         model = DomaineEtude
         fields = '__all__'
@@ -476,30 +480,29 @@ class DepartementSerializer(serializers.ModelSerializer):
         
 
 class FiliereSerializer(serializers.ModelSerializer):
-    # Lecture : nom du domaine
-    domaine_etude_label = serializers.StringRelatedField(source="domaine_etude", read_only=True)
-
-    # Écriture : ID du domaine
-    domaine_etude = serializers.PrimaryKeyRelatedField(queryset=DomaineEtude.objects.all(), write_only=True)
-
-    # class Meta:
-    #     model = Filiere
-    #     fields = [
-    #         "id",
-    #         "nom",
-    #         "domaine_etude",        # write-only (ID)
-    #         "domaine_etude_label",  # read-only (nom)
-    #         "description",
-    #         "date_creation",
-    #         "statut",
-    #     ]
-    #     read_only_fields = ["id", "date_creation"]
+    domaine_etude_label = serializers.StringRelatedField(
+        source="domaine_etude", read_only=True
+    )
+    domaine_etude = serializers.PrimaryKeyRelatedField(
+        queryset=DomaineEtude.objects.all()
+    )
+    institution = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
-            model = Matiere
-            fields = "__all__"
+        model = Filiere
+        fields = [
+            "id", "nom", "domaine_etude", "domaine_etude_label",
+            "institution", "description", "date_creation", "statut",
+        ]
+        read_only_fields = ["id", "date_creation"]
 
-
+    def create(self, validated_data):
+        request = self.context["request"]
+        user = request.user
+        if not user.is_superuser:
+            validated_data["institution_id"] = user.institution_id
+        return super().create(validated_data)
+    
 class GroupeSerializer(serializers.ModelSerializer):
     enseignants = serializers.PrimaryKeyRelatedField(
         queryset=Formateur.objects.all(),
@@ -572,4 +575,63 @@ class InscriptionSerializer(serializers.ModelSerializer):
             'apprenant_display', 'institution_display',
             'annee_scolaire_display', 'classe_display',
             'statut', 'statut_paiement',
+        ]
+
+class AffectationEnseignementSerializer(serializers.ModelSerializer):
+    """Affectation (formateur, groupe, matière, année) — lue par les 3 rôles."""
+    formateur_nom = serializers.SerializerMethodField()
+    groupe_nom = serializers.CharField(source='groupe.nom', read_only=True)
+    matiere_nom = serializers.CharField(source='matiere.nom', read_only=True)
+    annee_libelle = serializers.CharField(source='annee_scolaire.annee_format_classique', read_only=True)
+
+    class Meta:
+        model = __import__('academics.models', fromlist=['AffectationEnseignement']).AffectationEnseignement
+        fields = [
+            'id', 'formateur', 'formateur_nom', 'groupe', 'groupe_nom',
+            'matiere', 'matiere_nom', 'annee_scolaire', 'annee_libelle',
+            'institution', 'est_actif', 'date_creation',
+        ]
+        read_only_fields = ['institution', 'date_creation']
+
+    def get_formateur_nom(self, obj):
+        u = getattr(obj, 'formateur', None)
+        if not u:
+            return None
+        nom = f"{getattr(u, 'prenom', '') or ''} {getattr(u, 'nom', '') or ''}".strip()
+        return nom or getattr(u, 'email', None)
+
+    def create(self, validated_data):
+        groupe = validated_data.get('groupe')
+        if groupe is not None and not validated_data.get('institution_id'):
+            validated_data['institution_id'] = getattr(groupe, 'institution_id', None)
+        return super().create(validated_data)
+
+
+class SemestreSerializer(serializers.ModelSerializer):
+    classe_nom = serializers.CharField(source='classe.nom', read_only=True)
+    annee_libelle = serializers.CharField(source='annee_scolaire.annee_format_classique', read_only=True)
+
+    class Meta:
+        model = __import__('academics.models', fromlist=['Semestre']).Semestre
+        fields = '__all__'
+        read_only_fields = ['institution']
+
+
+class UESerializer(serializers.ModelSerializer):
+    semestre_numero = serializers.IntegerField(source='semestre.numero', read_only=True)
+    semestre_libelle = serializers.SerializerMethodField()
+    ecs = serializers.SerializerMethodField()
+
+    class Meta:
+        model = __import__('academics.models', fromlist=['UE']).UE
+        fields = '__all__'
+        read_only_fields = ['institution']
+
+    def get_semestre_libelle(self, obj):
+        return str(obj.semestre) if obj.semestre else None
+
+    def get_ecs(self, obj):
+        return [
+            {'id': m.id, 'nom': m.nom, 'credits': m.credits, 'coefficient': m.coefficient}
+            for m in obj.matieres.all()
         ]

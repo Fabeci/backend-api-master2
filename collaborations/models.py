@@ -20,7 +20,7 @@ class Participant(models.Model):
         'user', 'conversation')  # Un utilisateur ne peut participer qu'une fois par conversation
 
     def __str__(self):
-        return f"{self.user.username} - {self.conversation}"
+        return f"{self.user.email} - {self.conversation}"
 
 
 class Message(models.Model):
@@ -30,7 +30,7 @@ class Message(models.Model):
     date_envoi = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Message de {self.envoyeur.username} - Conversation {self.conversation.id}"
+        return f"Message de {self.envoyeur.email} - Conversation {self.conversation.id}"
 
 
 class Forum(models.Model):
@@ -54,4 +54,4 @@ class Commentaire(models.Model):
     parent = models.ForeignKey('self', on_delete=models.CASCADE, related_name='reponses', null=True, blank=True)
 
     def __str__(self):
-        return f"Commentaire de {self.auteur.username} sur {self.forum.titre}"
+        return f"Commentaire de {self.auteur.email} sur {self.forum.titre}"

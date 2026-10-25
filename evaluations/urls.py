@@ -1,6 +1,11 @@
 from django.urls import path
+from .import_create_views import (
+    EvaluationImportCreateAPIView,
+    QuizImportCreateAPIView,
+)
 from .views import (
-    # Quiz
+    PassageEvaluationRattrapageAPIView,
+    EvaluationImportQuestionsAPIView,    # Quiz
     EvaluationExportAPIView,
     QuizListCreateAPIView,
     QuizDetailAPIView,
@@ -28,6 +33,7 @@ from .views import (
     PassageEvaluationSoumettreAPIView,
     PassageEvaluationListAPIView,
     PassageEvaluationDetailAPIView,
+    PassageEvaluationRattrapageAPIView,
     
     # Réponses aux questions
     ReponseQuestionSauvegarderAPIView,
@@ -125,6 +131,7 @@ urlpatterns = [
          name='passage-evaluation-demarrer'),
     
     # Reprendre une évaluation en cours
+    path('passages-evaluations/<int:pk>/rattrapage/', PassageEvaluationRattrapageAPIView.as_view(), name='passage-evaluation-rattrapage'),
     path('passages-evaluations/<int:pk>/reprendre/', 
          PassageEvaluationReprendreAPIView.as_view(), 
          name='passage-evaluation-reprendre'),
@@ -197,4 +204,7 @@ urlpatterns = [
          StatistiquesEvaluationAPIView.as_view(), 
          name='stats-evaluation'),
      path("evaluations/<int:pk>/export/", EvaluationExportAPIView.as_view(), name="evaluation-export"),
+     path("evaluations/importer-questions/", EvaluationImportQuestionsAPIView.as_view(), name="evaluation-import-questions"),
+     path("evaluations/importer/", EvaluationImportCreateAPIView.as_view(), name="evaluation-import-create"),
+     path("quiz/importer/", QuizImportCreateAPIView.as_view(), name="quiz-import-create"),
 ] 

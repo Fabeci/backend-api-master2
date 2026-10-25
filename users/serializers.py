@@ -10,10 +10,9 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.authtoken.models import Token
 
 from django.core.mail import send_mail
+from core.mailer import safe_send_mail
 from django.conf import settings
-from academics.models import AnneeScolaire
-
-from academics.models import Groupe, Institution, Specialite, Departement, Classe
+from academics.models import AnneeScolaire, Groupe, Institution, Specialite, Departement, Classe, Inscription
 # ❌ NE PAS importer les serializers d'academics ici (import circulaire)
 # Les imports se feront dans les méthodes via _get_academic_serializers()
 
@@ -31,11 +30,39 @@ from .models import (
     SuperAdmin,
     VerificationCode,
 )
+from .security import validate_password_strength
 
 
 # =============================================================================
 # Helpers
 # =============================================================================
+
+
+
+def _envoyer_code_activation(user):
+    """Génère un code d'activation et l'envoie par e-mail (best-effort).
+
+    Utilisé par les créations de comptes côté admin : sans code, un compte
+    créé inactif n'était activable par AUCUN écran.
+    """
+    try:
+        from users.models import VerificationCode
+        from core.mailer import safe_send_mail
+        from django.conf import settings
+        v = VerificationCode.create_activation_code(user)
+        safe_send_mail(
+            subject="Somapro - Code d'activation de votre compte",
+            message=(
+                f"Bonjour,\n\nVotre compte a été créé.\n"
+                f"Code d'activation : {v.code} (valide 15 minutes).\n\n"
+                f"Utilisez la page « Confirmer mon e-mail » pour activer votre compte."
+            ),
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+            recipient_list=[user.email],
+        )
+    except Exception:
+        pass
+
 
 def _get_or_create_role(role_name: str) -> UserRole:
     """Récupère ou crée un rôle utilisateur"""
@@ -65,7 +92,6 @@ def _normalize_or_generate_matricule(validated):
 def _get_academic_serializers():
     """
     Import lazy des serializers d'academics pour éviter l'import circulaire.
-    Cette fonction est appelée uniquement quand nécessaire.
     """
     from academics.serializers import (
         InstitutionSerializer,
@@ -88,45 +114,48 @@ def _get_academic_serializers():
 # =============================================================================
 
 class RegisterSerializer(serializers.Serializer):
+    # ✅ SÉCURITÉ : l'inscription publique ne doit JAMAIS permettre de choisir un
+    # rôle privilégié (Admin, ResponsableAcademique, SuperAdmin) — cela
+    # permettait une escalade de privilèges. Les comptes Admin sont créés via
+    # l'onboarding institution (InstitutionSerializer) ou par un admin existant.
     role = serializers.ChoiceField(choices=[
-        ("Admin", "Admin"),
         ("Parent", "Parent"),
         ("Apprenant", "Apprenant"),
         ("Formateur", "Formateur"),
-        ("ResponsableAcademique", "ResponsableAcademique"),
-        ("SuperAdmin", "SuperAdmin"),
     ])
-    email = serializers.EmailField()
+    email    = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
-    nom = serializers.CharField(max_length=30)
-    prenom = serializers.CharField(max_length=30)
+    nom      = serializers.CharField(max_length=30)
+    prenom   = serializers.CharField(max_length=30)
     telephone = serializers.CharField(max_length=15, required=False, allow_blank=True, allow_null=True)
 
     pays_residence = serializers.PrimaryKeyRelatedField(
-        queryset=Pays.objects.all(),
-        required=False,
-        allow_null=True,
+        queryset=Pays.objects.all(), required=False, allow_null=True,
     )
 
     # Admin / Parent / Responsable
     institution = serializers.PrimaryKeyRelatedField(
-        queryset=Institution.objects.all(),
-        required=False,
-        allow_null=True,
+        queryset=Institution.objects.all(), required=False, allow_null=True,
     )
     date_entree = serializers.DateField(required=False)
 
     # Apprenant
-    matricule = serializers.CharField(max_length=20, required=False, allow_null=True, allow_blank=True)
+    matricule      = serializers.CharField(max_length=20, required=False, allow_null=True, allow_blank=True)
     date_naissance = serializers.DateField(required=False, allow_null=True)
-    groupe = serializers.PrimaryKeyRelatedField(queryset=Groupe.objects.all(), required=False, allow_null=True)
     tuteur = serializers.PrimaryKeyRelatedField(queryset=Parent.objects.all(), required=False, allow_null=True)
-    classe = serializers.PrimaryKeyRelatedField(queryset=Classe.objects.all(), required=False, allow_null=True)
+
+    # Inscription
+    inscription_annee_scolaire = serializers.PrimaryKeyRelatedField(
+        queryset=AnneeScolaire.objects.all(), required=False, allow_null=True,
+    )
+    inscription_classe = serializers.PrimaryKeyRelatedField(
+        queryset=Classe.objects.all(), required=False, allow_null=True,
+    )
 
     # Formateur
     institutions = serializers.PrimaryKeyRelatedField(queryset=Institution.objects.all(), many=True, required=False)
-    specialites = serializers.PrimaryKeyRelatedField(queryset=Specialite.objects.all(), many=True, required=False)
-    groupes = serializers.PrimaryKeyRelatedField(queryset=Groupe.objects.all(), many=True, required=False)
+    specialites  = serializers.PrimaryKeyRelatedField(queryset=Specialite.objects.all(), many=True, required=False)
+    groupes      = serializers.PrimaryKeyRelatedField(queryset=Groupe.objects.all(), many=True, required=False)
 
     # ResponsableAcademique
     departement = serializers.PrimaryKeyRelatedField(queryset=Departement.objects.all(), required=False, allow_null=True)
@@ -135,6 +164,11 @@ class RegisterSerializer(serializers.Serializer):
         if get_user_model().objects.filter(email=value).exists():
             raise serializers.ValidationError("Un utilisateur avec cet email existe déjà.")
         return value
+
+    def validate_password(self, value):
+        # ✅ SÉCURITÉ : applique les validateurs Django (longueur, mot de passe
+        # commun, entièrement numérique, similarité avec l'utilisateur).
+        return validate_password_strength(value)
 
     def _attach_role_fk(self, user, role_name: str):
         user.role = _get_or_create_role(role_name)
@@ -145,34 +179,37 @@ class RegisterSerializer(serializers.Serializer):
         role = validated.pop("role")
 
         common = {
-            "email": validated.pop("email"),
-            "nom": validated.pop("nom"),
-            "prenom": validated.pop("prenom"),
-            "telephone": validated.pop("telephone", None),
+            "email":          validated.pop("email"),
+            "nom":            validated.pop("nom"),
+            "prenom":         validated.pop("prenom"),
+            "telephone":      validated.pop("telephone", None),
             "pays_residence": validated.pop("pays_residence", None),
         }
         password = validated.pop("password")
 
+        from core.tenant import default_institution, default_annee_scolaire
+        inst = default_institution()
+        annee = default_annee_scolaire()
+        validated.pop("institution", None)
+
         if role == "Admin":
-            user = Admin(**common, institution=validated.pop("institution", None))
+            user = Admin(**common, institution=inst)
         elif role == "Parent":
-            user = Parent(**common, institution=validated.pop("institution", None))
+            user = Parent(**common, institution=inst)
         elif role == "Apprenant":
             matricule = _normalize_or_generate_matricule(validated)
             user = Apprenant(
                 **common,
                 matricule=matricule,
                 date_naissance=validated.pop("date_naissance", None),
-                groupe=validated.pop("groupe", None),
                 tuteur=validated.pop("tuteur", None),
-                classe=validated.pop("classe", None),
             )
         elif role == "Formateur":
             user = Formateur(**common)
         elif role == "ResponsableAcademique":
             user = ResponsableAcademique(
                 **common,
-                institution=validated.pop("institution", None),
+                institution=inst,
                 departement=validated.pop("departement", None),
             )
         elif role == "SuperAdmin":
@@ -180,35 +217,64 @@ class RegisterSerializer(serializers.Serializer):
         else:
             raise serializers.ValidationError({"role": "Rôle non supporté."})
 
+        # ✅ MONO-ÉTABLISSEMENT : rattachement forcé
+        if inst:
+            user.institution = inst
+        if annee:
+            user.annee_scolaire_active = annee
+
+        # ✅ set_password() TOUJOURS appelé ici
         user.set_password(password)
         user.is_active = False
         user.save()
 
         if isinstance(user, Formateur):
-            user.institutions.set(validated.pop("institutions", []))
+            validated.pop("institutions", None)
+            user.institutions.set([inst] if inst else [])
             user.specialites.set(validated.pop("specialites", []))
             user.groupes.set(validated.pop("groupes", []))
+
+        if isinstance(user, Apprenant):
+            annee_scolaire = validated.pop("inscription_annee_scolaire", None)
+            classe = validated.pop("inscription_classe", None)
+            if classe and inst and getattr(classe, "institution_id", None) != inst.id:
+                raise serializers.ValidationError(
+                    {"inscription_classe": "La classe doit appartenir à l'établissement."}
+                )
+            if annee_scolaire and inst and getattr(annee_scolaire, "institution_id", None) != inst.id:
+                raise serializers.ValidationError(
+                    {"inscription_annee_scolaire": "L'année doit appartenir à l'établissement."}
+                )
+            if annee_scolaire or classe:
+                Inscription.objects.create(
+                    apprenant=user,
+                    institution=inst,
+                    annee_scolaire=annee or annee_scolaire,
+                    classe=classe,
+                    statut="actif",
+                    statut_paiement="en_attente",
+                )
 
         self._attach_role_fk(user, role)
 
         v = VerificationCode.create_activation_code(user)
-        send_mail(
+        safe_send_mail(
             subject="Somapro - Code d'activation",
             message=f"Votre code d'activation est : {v.code} (valide 15 minutes).",
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[user.email],
-            fail_silently=False,
+            fail_silently=None,
         )
 
         return {"message": "Compte créé. Un code d'activation à 6 chiffres a été envoyé par email."}
 
 
 class UserLoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    email    = serializers.EmailField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)
 
     def validate(self, attrs):
-        email = attrs.get("email")
+        email    = attrs.get("email")
         password = attrs.get("password")
 
         user = User.objects.filter(email=email).first()
@@ -218,16 +284,19 @@ class UserLoginSerializer(serializers.Serializer):
         if not user.is_active:
             raise AuthenticationFailed("Votre compte n'est pas actif ou est bloqué.")
 
+        # ✅ SESSION STABLE — on RÉUTILISE le token existant.
+        #    DRF n'autorise qu'un seul token par utilisateur (OneToOne) :
+        #    le recréer à chaque connexion déconnectait instantanément les
+        #    autres onglets / appareils et toute session en cours.
         token, _ = Token.objects.get_or_create(user=user)
-
-        attrs["user"] = user
+        attrs["user"]  = user
         attrs["token"] = token.key
         return attrs
 
 
 class VerifyEmailSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    code = serializers.CharField(min_length=6, max_length=6)
+    code  = serializers.CharField(min_length=6, max_length=6)
 
     def validate(self, data):
         user = get_user_model().objects.filter(email=data["email"]).first()
@@ -244,12 +313,12 @@ class VerifyEmailSerializer(serializers.Serializer):
             raise serializers.ValidationError({"code": "Code invalide ou expiré."})
 
         data["user"] = user
-        data["vc"] = vc
+        data["vc"]   = vc
         return data
 
     def create(self, validated):
         user = validated["user"]
-        vc = validated["vc"]
+        vc   = validated["vc"]
         vc.is_used = True
         vc.save(update_fields=["is_used"])
         user.is_active = True
@@ -268,25 +337,25 @@ class ResendCodeSerializer(serializers.Serializer):
             return {"message": "Ce compte est déjà actif."}
 
         v = VerificationCode.create_activation_code(user)
-        send_mail(
+        safe_send_mail(
             subject="Somapro - Nouveau code d'activation",
             message=f"Votre nouveau code d'activation est : {v.code} (valide 15 minutes).",
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[user.email],
-            fail_silently=False,
+            fail_silently=None,
         )
         return {"message": "Nouveau code envoyé par email."}
 
 
 # =============================================================================
-# Mini serializers (utilisés pour les références simples)
+# Mini serializers
 # =============================================================================
 
 class ApprenantMiniSerializer(serializers.ModelSerializer):
     pays_residence = PaysSerializer(read_only=True)
 
     class Meta:
-        model = Apprenant
+        model  = Apprenant
         fields = ["id", "email", "nom", "prenom", "matricule", "pays_residence"]
 
 
@@ -294,33 +363,32 @@ class FormateurMiniSerializer(serializers.ModelSerializer):
     pays_residence = PaysSerializer(read_only=True)
 
     class Meta:
-        model = Formateur
+        model  = Formateur
         fields = ["id", "email", "nom", "prenom", "pays_residence"]
 
 
 # =============================================================================
-# Serializers utilisés par courses/evaluations (simples, sans objets imbriqués)
+# Serializers légers (courses / evaluations)
 # =============================================================================
 
 class ApprenantSerializer(serializers.ModelSerializer):
-    """Serializer simple pour Apprenant (utilisé par courses/evaluations)"""
     class Meta:
-        model = Apprenant
+        model  = Apprenant
         fields = ['id', 'email', 'nom', 'prenom', 'matricule']
 
 
 class FormateurSerializer(serializers.ModelSerializer):
-    """Serializer simple pour Formateur (utilisé par courses/evaluations)"""
     class Meta:
-        model = Formateur
+        model  = Formateur
         fields = ['id', 'email', 'nom', 'prenom']
 
 
 # =============================================================================
-# CRUD Serializers - Retournent des OBJETS COMPLETS en lecture
+# CRUD Serializers
 # =============================================================================
 
 class BaseUserCrudSerializer(serializers.ModelSerializer):
+    # ✅ write_only=True : DRF exclut ce champ de la sortie
     password = serializers.CharField(
         write_only=True, required=False, allow_blank=True, min_length=8
     )
@@ -332,33 +400,17 @@ class BaseUserCrudSerializer(serializers.ModelSerializer):
         write_only=True, required=False, allow_null=True,
     )
 
-    def get_pays_residence(self, obj):
-        pays = obj.pays_residence
-        if not pays:
-            return None
-        # ✅ Accès direct — correspond exactement à PaysSerializer {id, nom, code}
-        return {
-            "id":   pays.id,
-            "nom":  pays.nom,
-            "code": getattr(pays, "code", None),
-        }
-
-    annee_scolaire_active    = serializers.SerializerMethodField(read_only=True)
+    annee_scolaire_active = serializers.SerializerMethodField(read_only=True)
     annee_scolaire_active_id = serializers.PrimaryKeyRelatedField(
         source="annee_scolaire_active",
         queryset=AnneeScolaire.objects.all(),
         write_only=True, required=False, allow_null=True,
     )
 
-    # ✅ Déclaré explicitement → évite le KeyError DRF sur la FK
-    role = serializers.SerializerMethodField(read_only=True)
-
-    # ✅ Déclaré explicitement → date_modification n'est pas auto-détecté sans ça
+    role              = serializers.SerializerMethodField(read_only=True)
     date_joined       = serializers.DateTimeField(read_only=True)
     date_modification = serializers.DateTimeField(read_only=True)
-
-    # ✅ URL absolue photo
-    photo = serializers.SerializerMethodField(read_only=True)
+    photo             = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model  = User
@@ -367,36 +419,40 @@ class BaseUserCrudSerializer(serializers.ModelSerializer):
             "email", "nom", "prenom", "telephone",
             "photo",
             "role",
-            "pays_residence", "pays_residence_id",
-            "annee_scolaire_active", "annee_scolaire_active_id",
+            "permissions",
+            "pays_residence",         "pays_residence_id",
+            "annee_scolaire_active",  "annee_scolaire_active_id",
             "is_active", "is_staff", "is_superuser",
             "date_joined", "date_modification",
             "password",
         ]
         read_only_fields = [
-            "id",
-            "photo",
-            "role",
-            "pays_residence",
-            "annee_scolaire_active",
-            "date_joined",
-            "date_modification",
-            "is_staff",
-            "is_superuser",
+            "id", "photo", "role", "permissions",
+            "pays_residence", "annee_scolaire_active",
+            "date_joined", "date_modification",
+            "is_staff", "is_superuser",
         ]
 
+    # ✅ FIX PRINCIPAL : le mot de passe ne peut JAMAIS apparaître dans la réponse JSON
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data.pop('password', None)
+        return data
+
     def get_role(self, obj):
-        """Retourne le nom du rôle en string — jamais l'objet FK brut."""
         return getattr(obj.role, 'name', None) if obj.role else None
 
-    def get_annee_scolaire_active(self, obj):
-        if not obj.annee_scolaire_active:
+    def get_pays_residence(self, obj):
+        pays = obj.pays_residence
+        if not pays:
             return None
+        return {"id": pays.id, "nom": pays.nom, "code": getattr(pays, "code", None)}
+
+    def get_annee_scolaire_active(self, obj):
         a = obj.annee_scolaire_active
-        return {
-            "id":      a.id,
-            "libelle": getattr(a, 'libelle', str(a)),
-        }
+        if not a:
+            return None
+        return {"id": a.id, "libelle": getattr(a, 'libelle', str(a))}
 
     def get_photo(self, obj):
         if not obj.photo:
@@ -407,63 +463,67 @@ class BaseUserCrudSerializer(serializers.ModelSerializer):
         return obj.photo.url
 
     def _apply_password(self, instance, validated_data):
+        """Pop et applique le mot de passe s'il est fourni."""
         password = validated_data.pop("password", None)
         if password:
+            # ✅ SÉCURITÉ : refuse les mots de passe faibles (validateurs Django).
+            validate_password_strength(password)
             instance.set_password(password)
         return instance
-       
+
+
+# =============================================================================
+# Admin
+# =============================================================================
+
 class AdminCrudSerializer(BaseUserCrudSerializer):
-    # ✅ LECTURE : Objet institution complet via SerializerMethodField
     institution = serializers.SerializerMethodField(read_only=True)
-    
-    # ✅ ÉCRITURE : ID uniquement
     institution_id = serializers.PrimaryKeyRelatedField(
         source="institution",
         queryset=Institution.objects.all(),
-        write_only=True,
-        required=False,
-        allow_null=True,
+        write_only=True, required=False, allow_null=True,
     )
 
     class Meta(BaseUserCrudSerializer.Meta):
-        model = Admin
-        fields = BaseUserCrudSerializer.Meta.fields + [
-            "institution",      # objet complet en lecture
-            "institution_id",   # ID en écriture
-            "date_entree",
-        ]
+        model  = Admin
+        fields = BaseUserCrudSerializer.Meta.fields + ["institution", "institution_id", "date_entree"]
         read_only_fields = BaseUserCrudSerializer.Meta.read_only_fields + ["institution"]
 
     def get_institution(self, obj):
-        """Retourne l'objet institution complet"""
         if not obj.institution:
             return None
-        serializers_dict = _get_academic_serializers()
-        InstitutionSerializer = serializers_dict['InstitutionSerializer']
-        return InstitutionSerializer(obj.institution).data
+        return _get_academic_serializers()['InstitutionSerializer'](obj.institution).data
 
     @transaction.atomic
     def create(self, validated_data):
-        validated_data["role"] = _get_or_create_role("Admin")
         password = validated_data.pop("password", None)
-
-        admin = Admin(**validated_data)
+        admin    = Admin(**validated_data)
+        # ✅ Hachage garanti
         if password:
+            validate_password_strength(password)
             admin.set_password(password)
+        else:
+            admin.set_unusable_password()
+        admin.role     = _get_or_create_role("Admin")
         admin.is_staff = True
         admin.save()
+        _envoyer_code_activation(admin)
         return admin
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        instance = self._apply_password(instance, validated_data)
+        self._apply_password(instance, validated_data)
         for k, v in validated_data.items():
             setattr(instance, k, v)
-        instance.role = _get_or_create_role("Admin")
+        instance.role     = _get_or_create_role("Admin")
         instance.is_staff = True
         instance.save()
         return instance
 
+
+# =============================================================================
+# Parent
+# =============================================================================
 
 class ParentCrudSerializer(BaseUserCrudSerializer):
     institution = serializers.SerializerMethodField(read_only=True)
@@ -472,40 +532,27 @@ class ParentCrudSerializer(BaseUserCrudSerializer):
         queryset=Institution.objects.all(),
         write_only=True, required=False, allow_null=True,
     )
-
-    # ✅ Liste des enfants (Apprenant.tuteur = FK vers Parent)
     enfants = serializers.SerializerMethodField(read_only=True)
 
     class Meta(BaseUserCrudSerializer.Meta):
-        model = Parent
-        fields = BaseUserCrudSerializer.Meta.fields + [
-            "institution",
-            "institution_id",
-            "enfants",   # ✅
-        ]
-        read_only_fields = BaseUserCrudSerializer.Meta.read_only_fields + [
-            "institution", "enfants"
-        ]
+        model  = Parent
+        fields = BaseUserCrudSerializer.Meta.fields + ["institution", "institution_id", "enfants"]
+        read_only_fields = BaseUserCrudSerializer.Meta.read_only_fields + ["institution", "enfants"]
 
     def get_institution(self, obj):
         if not obj.institution:
             return None
-        serializers_dict = _get_academic_serializers()
-        InstitutionSerializer = serializers_dict['InstitutionSerializer']
-        return InstitutionSerializer(obj.institution).data
+        return _get_academic_serializers()['InstitutionSerializer'](obj.institution).data
 
     def get_enfants(self, obj):
-        # Apprenant.tuteur = ForeignKey(Parent) → related_name par défaut
-        enfants = Apprenant.objects.filter(tuteur=obj).select_related(
-            'annee_scolaire_active', 'groupe'
-        )
-        result = []
+        enfants = Apprenant.objects.filter(tuteur=obj).select_related('annee_scolaire_active', 'groupe')
+        result  = []
         for a in enfants:
             annee = a.annee_scolaire_active
             result.append({
-                "id":     a.id,
-                "prenom": a.prenom,
-                "nom":    a.nom,
+                "id":        a.id,
+                "prenom":    a.prenom,
+                "nom":       a.nom,
                 "matricule": a.matricule,
                 "annee_scolaire_active": {
                     "id":      annee.id,
@@ -516,157 +563,235 @@ class ParentCrudSerializer(BaseUserCrudSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        validated_data["role"] = _get_or_create_role("Parent")
         password = validated_data.pop("password", None)
-        parent = Parent(**validated_data)
+        parent   = Parent(**validated_data)
         if password:
+            validate_password_strength(password)
             parent.set_password(password)
+        else:
+            parent.set_unusable_password()
+        parent.role = _get_or_create_role("Parent")
         parent.save()
+        _envoyer_code_activation(parent)
         return parent
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        instance = self._apply_password(instance, validated_data)
+        self._apply_password(instance, validated_data)
         for k, v in validated_data.items():
             setattr(instance, k, v)
         instance.role = _get_or_create_role("Parent")
         instance.save()
         return instance
 
+
+# =============================================================================
+# Apprenant  ← ✅ FIX MAJEUR : create() et update() ajoutés
+# =============================================================================
+
 class ApprenantCrudSerializer(BaseUserCrudSerializer):
     matricule      = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     date_naissance = serializers.DateField(required=False, allow_null=True)
 
-    groupe = serializers.SerializerMethodField(read_only=True)
-    tuteur = serializers.SerializerMethodField(read_only=True)
-    # ✅ AJOUTER institution
-    institution = serializers.SerializerMethodField(read_only=True)
-
+    groupe    = serializers.SerializerMethodField(read_only=True)
     groupe_id = serializers.PrimaryKeyRelatedField(
         source="groupe", queryset=Groupe.objects.all(),
         write_only=True, required=False, allow_null=True,
     )
+
+    tuteur = serializers.SerializerMethodField(read_only=True)
+    institution = serializers.SerializerMethodField(read_only=True)
+
+    def get_groupe(self, obj):
+        g = getattr(obj, "groupe", None)
+        if not g:
+            return None
+        return {
+            "id": g.id, "nom": g.nom,
+            "classe_id": g.classe_id,
+            "classe_nom": getattr(g.classe, "nom", None),
+        }
+
+    inscription_annee_scolaire = serializers.PrimaryKeyRelatedField(
+        queryset=AnneeScolaire.objects.all(), required=False, allow_null=True,
+    )
+    inscription_classe = serializers.PrimaryKeyRelatedField(
+        queryset=Classe.objects.all(), required=False, allow_null=True,
+    )
+
     tuteur_id = serializers.PrimaryKeyRelatedField(
-        source="tuteur", queryset=Parent.objects.all(),
+        source="tuteur",
+        queryset=Parent.objects.all(),
         write_only=True, required=False, allow_null=True,
     )
 
     class Meta(BaseUserCrudSerializer.Meta):
-        model = Apprenant
+        model  = Apprenant
         fields = BaseUserCrudSerializer.Meta.fields + [
             "matricule", "date_naissance",
-            "groupe", "groupe_id",
-            "tuteur", "tuteur_id",
-            "institution",  # ✅ AJOUTER
+            "tuteur",    "tuteur_id",
+            "institution",
+            "groupe",    "groupe_id",
+            "inscription_annee_scolaire",
+            "inscription_classe",
         ]
         read_only_fields = BaseUserCrudSerializer.Meta.read_only_fields + [
-            "groupe", "tuteur", "institution"
+            "tuteur", "institution",
         ]
 
-    # ✅ AJOUTER cette méthode
     def get_institution(self, obj):
-        # Essaie le champ direct d'abord
         inst = getattr(obj, 'institution', None)
-        if not inst:
-            # Fallback : via le groupe
-            groupe = getattr(obj, 'groupe', None)
-            if groupe:
-                inst = getattr(groupe, 'institution', None)
         if not inst:
             return None
         return {"id": inst.id, "nom": inst.nom}
-
-    def get_groupe(self, obj):
-        if not hasattr(obj, 'groupe') or not obj.groupe:
-            return None
-        serializers_dict = _get_academic_serializers()
-        GroupeSerializer = serializers_dict['GroupeSerializer']
-        return GroupeSerializer(obj.groupe).data
 
     def get_tuteur(self, obj):
         t = getattr(obj, 'tuteur', None)
         if not t:
             return None
         return {
-            "id": t.id, "email": t.email,
-            "nom": t.nom, "prenom": t.prenom,
-            "telephone": t.telephone,
+            "id":             t.id,
+            "email":          t.email,
+            "nom":            t.nom,
+            "prenom":         t.prenom,
+            "telephone":      t.telephone,
             "pays_residence": PaysSerializer(t.pays_residence).data if t.pays_residence else None,
         }
-
-class FormateurCrudSerializer(BaseUserCrudSerializer):
-    # ✅ LECTURE : Objets complets (listes)
-    institutions = serializers.SerializerMethodField(read_only=True)
-    specialites = serializers.SerializerMethodField(read_only=True)
-    groupes = serializers.SerializerMethodField(read_only=True)
-
-    # ✅ ÉCRITURE : IDs uniquement
-    institution_ids = serializers.PrimaryKeyRelatedField(
-        source="institutions",
-        queryset=Institution.objects.all(),
-        many=True,
-        write_only=True,
-        required=False,
-    )
-    specialite_ids = serializers.PrimaryKeyRelatedField(
-        source="specialites",
-        queryset=Specialite.objects.all(),
-        many=True,
-        write_only=True,
-        required=False,
-    )
-    groupe_ids = serializers.PrimaryKeyRelatedField(
-        source="groupes",
-        queryset=Groupe.objects.all(),
-        many=True,
-        write_only=True,
-        required=False,
-    )
-
-    class Meta(BaseUserCrudSerializer.Meta):
-        model = Formateur
-        fields = BaseUserCrudSerializer.Meta.fields + [
-            "institutions",         # objets complets en lecture
-            "institution_ids",      # IDs en écriture
-            "specialites",          # objets complets en lecture
-            "specialite_ids",       # IDs en écriture
-            "groupes",              # objets complets en lecture
-            "groupe_ids",           # IDs en écriture
-        ]
-        read_only_fields = BaseUserCrudSerializer.Meta.read_only_fields + ["institutions", "specialites", "groupes"]
-
-    def get_institutions(self, obj):
-        """Retourne les objets institutions complets"""
-        serializers_dict = _get_academic_serializers()
-        InstitutionSerializer = serializers_dict['InstitutionSerializer']
-        return InstitutionSerializer(obj.institutions.all(), many=True).data
-
-    def get_specialites(self, obj):
-        """Retourne les objets specialites complets"""
-        serializers_dict = _get_academic_serializers()
-        SpecialiteSerializer = serializers_dict['SpecialiteSerializer']
-        return SpecialiteSerializer(obj.specialites.all(), many=True).data
-
-    def get_groupes(self, obj):
-        """Retourne les objets groupes complets"""
-        serializers_dict = _get_academic_serializers()
-        GroupeSerializer = serializers_dict['GroupeSerializer']
-        return GroupeSerializer(obj.groupes.all(), many=True).data
 
     @transaction.atomic
     def create(self, validated_data):
         password = validated_data.pop("password", None)
 
+        matricule = _normalize_or_generate_matricule(validated_data)
+        validated_data["matricule"] = matricule
+
+        annee_scolaire = validated_data.pop("inscription_annee_scolaire", None)
+        classe = validated_data.pop("inscription_classe", None)
+
+        apprenant = Apprenant(**validated_data)
+
+        if password:
+            validate_password_strength(password)
+            apprenant.set_password(password)
+        else:
+            apprenant.set_unusable_password()
+
+        apprenant.role = _get_or_create_role("Apprenant")
+        apprenant.save()
+        _envoyer_code_activation(apprenant)
+
+        if annee_scolaire or classe:
+            institution = getattr(apprenant, "institution", None)
+            if not institution and annee_scolaire:
+                institution = getattr(annee_scolaire, "institution", None)
+            if not institution and classe:
+                institution = getattr(classe, "institution", None)
+            Inscription.objects.create(
+                apprenant=apprenant,
+                institution=institution,
+                annee_scolaire=annee_scolaire,
+                classe=classe,
+                statut="actif",
+                statut_paiement="en_attente",
+            )
+
+        return apprenant
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        self._apply_password(instance, validated_data)
+
+        annee_scolaire = validated_data.pop("inscription_annee_scolaire", None)
+        classe = validated_data.pop("inscription_classe", None)
+
+        for k, v in validated_data.items():
+            setattr(instance, k, v)
+
+        instance.role = _get_or_create_role("Apprenant")
+        instance.save()
+
+        if annee_scolaire or classe:
+            institution = getattr(instance, "institution", None)
+            if not institution and annee_scolaire:
+                institution = getattr(annee_scolaire, "institution", None)
+            if not institution and classe:
+                institution = getattr(classe, "institution", None)
+            Inscription.objects.create(
+                apprenant=instance,
+                institution=institution,
+                annee_scolaire=annee_scolaire,
+                classe=classe,
+                statut="actif",
+                statut_paiement="en_attente",
+            )
+
+        return instance
+
+
+# =============================================================================
+# Formateur
+# =============================================================================
+
+class FormateurCrudSerializer(BaseUserCrudSerializer):
+    institutions = serializers.SerializerMethodField(read_only=True)
+    specialites  = serializers.SerializerMethodField(read_only=True)
+    groupes      = serializers.SerializerMethodField(read_only=True)
+
+    institution_ids = serializers.PrimaryKeyRelatedField(
+        source="institutions",
+        queryset=Institution.objects.all(),
+        many=True, write_only=True, required=False,
+    )
+    specialite_ids = serializers.PrimaryKeyRelatedField(
+        source="specialites",
+        queryset=Specialite.objects.all(),
+        many=True, write_only=True, required=False,
+    )
+    groupe_ids = serializers.PrimaryKeyRelatedField(
+        source="groupes",
+        queryset=Groupe.objects.all(),
+        many=True, write_only=True, required=False,
+    )
+
+    class Meta(BaseUserCrudSerializer.Meta):
+        model  = Formateur
+        fields = BaseUserCrudSerializer.Meta.fields + [
+            "institutions",  "institution_ids",
+            "specialites",   "specialite_ids",
+            "groupes",       "groupe_ids",
+        ]
+        read_only_fields = BaseUserCrudSerializer.Meta.read_only_fields + [
+            "institutions", "specialites", "groupes",
+        ]
+
+    def get_institutions(self, obj):
+        return _get_academic_serializers()['InstitutionSerializer'](obj.institutions.all(), many=True).data
+
+    def get_specialites(self, obj):
+        return _get_academic_serializers()['SpecialiteSerializer'](obj.specialites.all(), many=True).data
+
+    def get_groupes(self, obj):
+        return _get_academic_serializers()['GroupeSerializer'](obj.groupes.all(), many=True).data
+
+    @transaction.atomic
+    def create(self, validated_data):
+        password = validated_data.pop("password", None)
+        # ✅ M2M poppés AVANT la construction (ne peuvent pas être passés au constructeur)
         institutions = validated_data.pop("institutions", [])
-        specialites = validated_data.pop("specialites", [])
-        groupes = validated_data.pop("groupes", [])
+        specialites  = validated_data.pop("specialites", [])
+        groupes      = validated_data.pop("groupes", [])
 
         formateur = Formateur(**validated_data)
         if password:
+            validate_password_strength(password)
             formateur.set_password(password)
+        else:
+            formateur.set_unusable_password()
         formateur.role = _get_or_create_role("Formateur")
         formateur.save()
+        _envoyer_code_activation(formateur)
 
+        # ✅ M2M assignés après le save()
         formateur.institutions.set(institutions)
         formateur.specialites.set(specialites)
         formateur.groupes.set(groupes)
@@ -674,11 +799,11 @@ class FormateurCrudSerializer(BaseUserCrudSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        instance = self._apply_password(instance, validated_data)
+        self._apply_password(instance, validated_data)
 
         institutions = validated_data.pop("institutions", None)
-        specialites = validated_data.pop("specialites", None)
-        groupes = validated_data.pop("groupes", None)
+        specialites  = validated_data.pop("specialites", None)
+        groupes      = validated_data.pop("groupes", None)
 
         for k, v in validated_data.items():
             setattr(instance, k, v)
@@ -696,9 +821,16 @@ class FormateurCrudSerializer(BaseUserCrudSerializer):
         return instance
 
 
+# =============================================================================
+# ResponsableAcademique  ← ✅ FIX : create() et update() remis ici (étaient
+#                          perdus dans le doublon ModifierMotDePasseSerializer)
+# =============================================================================
+
 class ResponsableAcademiqueCrudSerializer(BaseUserCrudSerializer):
-    institution = serializers.SerializerMethodField(read_only=True)
-    departement = serializers.SerializerMethodField(read_only=True)
+    institution         = serializers.SerializerMethodField(read_only=True)
+    departement         = serializers.SerializerMethodField(read_only=True)
+    departement_id_flat = serializers.SerializerMethodField(read_only=True)
+    institution_id_flat = serializers.SerializerMethodField(read_only=True)
 
     institution_id = serializers.PrimaryKeyRelatedField(
         source="institution",
@@ -712,47 +844,62 @@ class ResponsableAcademiqueCrudSerializer(BaseUserCrudSerializer):
     )
 
     class Meta(BaseUserCrudSerializer.Meta):
-        model = ResponsableAcademique
+        model  = ResponsableAcademique
         fields = BaseUserCrudSerializer.Meta.fields + [
-            "institution", "institution_id",
-            "departement", "departement_id",
+            "institution",        "institution_id",
+            "departement",        "departement_id",
+            "departement_id_flat",
+            "institution_id_flat",
         ]
         read_only_fields = BaseUserCrudSerializer.Meta.read_only_fields + [
-            "institution", "departement"
+            "institution", "departement",
+            "departement_id_flat", "institution_id_flat",
         ]
 
     def get_institution(self, obj):
-        # ✅ Accès direct — pas de serializer externe
         inst = obj.institution
         if not inst:
             return None
         return {"id": inst.id, "nom": inst.nom}
 
     def get_departement(self, obj):
-        # ✅ Accès direct via select_related — contourne tout filtrage
-        dept = obj.departement
-        if not dept:
+        # Requête fraîche — ignore le cache ORM sur obj.departement
+        fresh = ResponsableAcademique.objects.filter(pk=obj.pk).values(
+            'departement_id', 'departement__nom', 'departement__description'
+        ).first()
+        if not fresh or not fresh['departement_id']:
             return None
         return {
-            "id":          dept.id,
-            "nom":         dept.nom,
-            "description": getattr(dept, "description", None),
+            'id':          fresh['departement_id'],
+            'nom':         fresh['departement__nom'],
+            'description': fresh['departement__description'],
         }
 
-class ModifierMotDePasseSerializer(serializers.Serializer):
-    current_password = serializers.CharField(write_only=True)
-    new_password = serializers.CharField(write_only=True, min_length=8)
-    confirm_password = serializers.CharField(write_only=True, min_length=8)
+    def get_departement_id_flat(self, obj):
+        return ResponsableAcademique.objects.filter(
+            pk=obj.pk
+        ).values_list('departement_id', flat=True).first()
 
-    def validate_current_password(self, value):
-        user = self.context['request'].user
-        if not user.check_password(value):
-            raise serializers.ValidationError("Le mot de passe actuel est incorrect.")
-        return value
+    def get_institution_id_flat(self, obj):
+        return getattr(obj, 'institution_id', None)
+
+    @transaction.atomic
+    def create(self, validated_data):
+        password    = validated_data.pop("password", None)
+        responsable = ResponsableAcademique(**validated_data)
+        if password:
+            validate_password_strength(password)
+            responsable.set_password(password)
+        else:
+            responsable.set_unusable_password()
+        responsable.role = _get_or_create_role("ResponsableAcademique")
+        responsable.save()
+        _envoyer_code_activation(responsable)
+        return responsable
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        instance = self._apply_password(instance, validated_data)
+        self._apply_password(instance, validated_data)
         for k, v in validated_data.items():
             setattr(instance, k, v)
         instance.role = _get_or_create_role("ResponsableAcademique")
@@ -760,9 +907,13 @@ class ModifierMotDePasseSerializer(serializers.Serializer):
         return instance
 
 
+# =============================================================================
+# Modifier mot de passe  ← ✅ FIX : une seule définition, propre
+# =============================================================================
+
 class ModifierMotDePasseSerializer(serializers.Serializer):
     current_password = serializers.CharField(write_only=True)
-    new_password = serializers.CharField(write_only=True, min_length=8)
+    new_password     = serializers.CharField(write_only=True, min_length=8)
     confirm_password = serializers.CharField(write_only=True, min_length=8)
 
     def validate_current_password(self, value):
@@ -770,7 +921,7 @@ class ModifierMotDePasseSerializer(serializers.Serializer):
         if not user.check_password(value):
             raise serializers.ValidationError("Le mot de passe actuel est incorrect.")
         return value
-    
+
     def validate(self, data):
         if data['new_password'] != data['confirm_password']:
             raise serializers.ValidationError({
@@ -780,6 +931,8 @@ class ModifierMotDePasseSerializer(serializers.Serializer):
             raise serializers.ValidationError({
                 "new_password": "Le nouveau mot de passe doit être différent de l'actuel."
             })
+        # ✅ SÉCURITÉ : validateurs Django (mot de passe commun, numérique, etc.)
+        validate_password_strength(data['new_password'], self.context['request'].user)
         return data
 
     def save(self):

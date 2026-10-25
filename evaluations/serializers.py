@@ -16,16 +16,18 @@ from .models import (
 # ============================================================================
 
 class ReponseSerializer(serializers.ModelSerializer):
-    """Serializer pour les réponses prédéfinies (choix de QCM)"""
+    """Serializer complet — réservé aux formateurs/admins (expose est_correcte)."""
     class Meta:
         model = Reponse
-        fields = [
-            'id', 
-            'texte', 
-            'question', 
-            'est_correcte', 
-            'ordre'
-        ]
+        fields = ['id', 'texte', 'question', 'est_correcte', 'ordre']
+        read_only_fields = ['id']
+
+
+class ReponseApprenantSerializer(serializers.ModelSerializer):
+    """Serializer apprenant — n'expose JAMAIS est_correcte."""
+    class Meta:
+        model = Reponse
+        fields = ['id', 'texte', 'question', 'ordre']
         read_only_fields = ['id']
 
 
@@ -61,6 +63,11 @@ class QuestionSerializer(serializers.ModelSerializer):
             'est_qcm'
         ]
         read_only_fields = ['id', 'necessite_correction_manuelle', 'est_qcm']
+
+
+class QuestionApprenantSerializer(QuestionSerializer):
+    """Serializer question pour les apprenants : est_correcte masquée au niveau ORM."""
+    reponses_predefinies = ReponseApprenantSerializer(many=True, read_only=True)
 
 
 class QuestionCreateSerializer(serializers.ModelSerializer):
@@ -102,6 +109,7 @@ class QuizSerializer(serializers.ModelSerializer):
         source='questions.count', 
         read_only=True
     )
+    passages_count = serializers.IntegerField(source='passages.count', read_only=True)
     sequence_titre = serializers.CharField(
         source='sequence.titre',
         read_only=True
@@ -117,7 +125,8 @@ class QuizSerializer(serializers.ModelSerializer):
             'sequence_titre',
             'date_creation',
             'date_modification',
-            'nombre_questions'
+            'nombre_questions',
+            'passages_count',
         ]
         read_only_fields = ['id', 'date_creation', 'date_modification']
 
@@ -143,6 +152,12 @@ class QuizDetailSerializer(serializers.ModelSerializer):
             'questions'
         ]
         read_only_fields = ['id', 'date_creation', 'date_modification']
+
+
+class QuizDetailApprenantSerializer(QuizDetailSerializer):
+    """✅ Quiz détaillé côté APPRENANT : les corrigés (`est_correcte`) ne sont
+    JAMAIS sérialisés. Le masquage est fait au niveau ORM (sous-serializer)."""
+    questions = QuestionApprenantSerializer(many=True, read_only=True)
 
 
 class ReponseQuizSerializer(serializers.ModelSerializer):
@@ -202,14 +217,12 @@ class PassageQuizSerializer(serializers.ModelSerializer):
     def get_apprenant_nom(self, obj):
         try:
             return f"{obj.apprenant.prenom} {obj.apprenant.nom}"
-        except:
+        except Exception:
             return str(obj.apprenant)
-    
+
     def get_pourcentage(self, obj):
-        total_points = sum(q.points for q in obj.quiz.questions.all())
-        if total_points == 0:
-            return 0
-        return round((obj.score / total_points) * 100, 2)
+        # `score` est déjà un pourcentage (0-100).
+        return round(float(obj.score or 0), 2)
 
 
 class PassageQuizDetailSerializer(PassageQuizSerializer):
@@ -232,6 +245,7 @@ class EvaluationSerializer(serializers.ModelSerializer):
     cours_titre = serializers.CharField(source='cours.titre', read_only=True)
     enseignant_nom = serializers.SerializerMethodField()
     nombre_questions = serializers.IntegerField(read_only=True)
+    passages_count = serializers.IntegerField(source='passages.count', read_only=True)
     est_accessible = serializers.SerializerMethodField()
     peut_soumettre = serializers.SerializerMethodField()
     est_auto_corrigeable = serializers.SerializerMethodField()
@@ -243,7 +257,7 @@ class EvaluationSerializer(serializers.ModelSerializer):
             'titre', 'type_evaluation', 'type_evaluation_display', 'bareme',
             'duree_minutes', 'consigne_texte', 'fichier_sujet', 'date_debut',
             'date_fin', 'date_creation', 'date_modification', 'est_publiee',
-            'nombre_questions', 'est_accessible', 'peut_soumettre',
+            'nombre_questions', 'passages_count', 'est_accessible', 'peut_soumettre',
             'est_auto_corrigeable',
         ]
         read_only_fields = [
@@ -254,7 +268,7 @@ class EvaluationSerializer(serializers.ModelSerializer):
     def get_enseignant_nom(self, obj):
         try:
             return f"{obj.enseignant.prenom} {obj.enseignant.nom}"
-        except:
+        except Exception:
             return str(obj.enseignant)
 
     def get_est_accessible(self, obj):
@@ -340,7 +354,7 @@ class EvaluationDetailSerializer(serializers.ModelSerializer):
     def get_enseignant_nom(self, obj):
         try:
             return f"{obj.enseignant.prenom} {obj.enseignant.nom}"
-        except:
+        except Exception:
             return str(obj.enseignant)
     
     def get_est_accessible(self, obj):
@@ -351,6 +365,12 @@ class EvaluationDetailSerializer(serializers.ModelSerializer):
     
     def get_est_auto_corrigeable(self, obj):
         return obj.est_auto_corrigeable()
+
+
+class EvaluationDetailApprenantSerializer(EvaluationDetailSerializer):
+    """✅ Évaluation détaillée côté APPRENANT : les corrigés (`est_correcte`)
+    ne sont JAMAIS sérialisés (masquage au niveau ORM)."""
+    questions = QuestionApprenantSerializer(many=True, read_only=True)
 
 
 class EvaluationAccessibiliteSerializer(serializers.Serializer):
@@ -499,8 +519,8 @@ class PassageEvaluationSerializer(serializers.ModelSerializer):
             'est_corrige',
             'necessite_correction',
             'peut_etre_repris',
-            'peut_etre_soumis'
-        ]
+            'peut_etre_soumis',
+            'numero_tentative', 'session']
         read_only_fields = [
             'id', 
             'date_debut', 
@@ -511,9 +531,9 @@ class PassageEvaluationSerializer(serializers.ModelSerializer):
     def get_apprenant_nom(self, obj):
         try:
             return f"{obj.apprenant.prenom} {obj.apprenant.nom}"
-        except:
+        except Exception:
             return str(obj.apprenant)
-    
+
     def get_pourcentage(self, obj):
         return obj.pourcentage()
     
@@ -536,12 +556,29 @@ class PassageEvaluationDetailSerializer(PassageEvaluationSerializer):
         ]
 
     def get_evaluation_detail(self, obj):
-        """Retourne les détails complets de l'évaluation AVEC ses questions"""
-        from .serializers import QuestionSerializer  # import local pour éviter circular
+        """Détails de l'évaluation. Les bonnes réponses ne sont exposées que si
+        l'utilisateur est staff, OU si l'affichage des corrections est autorisé
+        (paramètre effectif : établissement > global)."""
+        from .serializers import QuestionSerializer, QuestionApprenantSerializer
+        from core.rbac import display_role
+        from parametres.services import evaluation_afficher_correction
 
-        questions = obj.evaluation.questions.prefetch_related(
-            'reponses_predefinies'
-        ).all()
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        role = display_role(user) if user is not None else None
+        is_staff = role in ('Admin', 'Responsable', 'Formateur')
+
+        institution = getattr(getattr(obj.evaluation, 'cours', None), 'institution', None)
+        # ✅ SÉCURITÉ : un apprenant ne reçoit les corrigés QUE si SON passage est
+        #    terminé (soumis/corrigé). Sinon, même avec le paramètre d'affichage
+        #    des corrections actif, les bonnes réponses restent masquées pendant
+        #    l'épreuve (sinon → triche triviale).
+        statut_passage = str(getattr(obj, 'statut', '') or '').lower()
+        passage_termine = statut_passage in ('soumis', 'corrige', 'termine', 'publie')
+        afficher = is_staff or (passage_termine and bool(evaluation_afficher_correction(institution)))
+
+        questions = obj.evaluation.questions.prefetch_related('reponses_predefinies').all()
+        serializer_cls = QuestionSerializer if afficher else QuestionApprenantSerializer
 
         return {
             'id': obj.evaluation.id,
@@ -557,8 +594,7 @@ class PassageEvaluationDetailSerializer(PassageEvaluationSerializer):
             'date_debut': obj.evaluation.date_debut,
             'date_fin': obj.evaluation.date_fin,
             'est_auto_corrigeable': obj.evaluation.est_auto_corrigeable(),
-            # ✅ AJOUT CRITIQUE : les questions avec leurs réponses prédéfinies
-            'questions': QuestionSerializer(questions, many=True).data,
+            'questions': serializer_cls(questions, many=True).data,
         }
 
 

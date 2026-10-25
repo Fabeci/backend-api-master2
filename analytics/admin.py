@@ -16,6 +16,7 @@ from .models import (
     BlocAnalyticsSummary,
     SequenceAnalyticsSummary,
     ModuleAnalyticsSummary,
+    RecommandationPedagogique,
 )
 
 
@@ -263,3 +264,21 @@ class ModuleAnalyticsSummaryAdmin(admin.ModelAdmin):
     @admin.display(description='Rythme')
     def pace_col(self, obj):
         return _pace_badge(obj.ratio_temps_pct)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 5. RecommandationPedagogique — Recommandations personnalisées
+# ══════════════════════════════════════════════════════════════════════════════
+
+@admin.register(RecommandationPedagogique)
+class RecommandationPedagogiqueAdmin(admin.ModelAdmin):
+    list_display  = (
+        'apprenant', 'type_recommandation', 'priorite',
+        'est_vue', 'est_suivie', 'est_ignoree', 'date_creation',
+    )
+    list_filter   = ('type_recommandation', 'priorite', 'est_vue', 'est_suivie', 'est_ignoree')
+    search_fields = ('apprenant__nom', 'apprenant__prenom', 'message')
+    readonly_fields = ('date_creation', 'date_vue', 'date_suivie', 'date_ignoree')
+    date_hierarchy  = 'date_creation'
+    list_per_page   = 50
+    ordering        = ('-priorite', '-date_creation')

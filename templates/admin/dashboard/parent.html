@@ -1,0 +1,71 @@
+{% extends "admin/dashboard/base.html" %}
+{% block dashboard_content %}
+
+{% if not parent %}
+<div class="alert-custom alert-warning">Profil parent non trouvé.</div>
+{% else %}
+
+<h2 class="section-title">Tableau de bord - {{ parent.prenom }} {{ parent.nom }}</h2>
+
+<div class="kpi-cards">
+  <div class="kpi-card">
+    <h3>Enfants suivis</h3>
+    <div class="value">{{ nb_enfants }}</div>
+  </div>
+  <div class="kpi-card warning">
+    <h3>Plans d'action</h3>
+    <div class="value">{{ total_plans }}</div>
+    <div class="subtitle">{{ overdue_plans }} en retard</div>
+  </div>
+  <div class="kpi-card danger">
+    <h3>Notifications</h3>
+    <div class="value">{{ unread_notifications }}</div>
+    <div class="subtitle">non lues</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Conversations</h3>
+    <div class="value">{{ nb_conversations }}</div>
+  </div>
+</div>
+
+<h2 class="section-title">Progression de mes enfants</h2>
+<table class="table-styled">
+  <thead>
+    <tr>
+      <th>Enfant</th>
+      <th>Complétion</th>
+      <th>Note moyenne</th>
+      <th>Cours suivis</th>
+      <th>Dernière activité</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in enfants_data %}
+    <tr>
+      <td>{{ item.enfant.prenom }} {{ item.enfant.nom }}</td>
+      <td>{{ item.avg_completion }}%</td>
+      <td>{{ item.avg_notes }}/20</td>
+      <td>{{ item.nb_cours }}</td>
+      <td>
+        {% if item.last_activity %}
+          {{ item.last_activity.date_activite|date:"d/m/Y" }}
+        {% else %}
+          -
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5">Aucun enfant associé</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="quick-actions">
+  <a href="{% url 'admin:users_apprenant_changelist' %}" class="btn-custom btn-primary">Voir les apprenants</a>
+  <a href="{% url 'admin:progress_historiqueactivite_changelist' %}" class="btn-custom">Activités</a>
+  <a href="{% url 'admin:notifications_notification_changelist' %}" class="btn-custom">Notifications</a>
+   <a href="{% url 'admin:index' %}" class="btn-custom">Conversations</a>
+</div>
+
+{% endif %}
+{% endblock %}

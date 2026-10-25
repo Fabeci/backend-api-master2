@@ -1,0 +1,81 @@
+{% extends "admin/dashboard/base.html" %}
+{% block dashboard_content %}
+<div class="alert-custom alert-info">
+  <strong>Bienvenue dans le système SOMAPRO !</strong><br>
+  Sélectionnez votre espace de travail ci-dessous.
+</div>
+
+<div class="kpi-cards">
+  <div class="kpi-card">
+    <h3>Votre Profil</h3>
+    <div class="value">{{ profile|title }}</div>
+    <div class="subtitle">Connecté en tant que {{ user_profile.email }}</div>
+  </div>
+</div>
+
+<h2 class="section-title">Espace de travail</h2>
+<div class="quick-actions">
+  {% if profile == 'superadmin' %}
+    <a href="{% url 'dashboard-superadmin' %}" class="btn-custom btn-primary">Tableau de bord SuperAdmin</a>
+    <a href="{% url 'admin:index' %}" class="btn-custom">Interface Admin classique</a>
+  {% elif profile == 'admin' %}
+    <a href="{% url 'dashboard-admin' %}" class="btn-custom btn-primary">Mon institution</a>
+    <a href="{% url 'admin:index' %}" class="btn-custom">Interface Admin classique</a>
+  {% elif profile == 'formateur' %}
+    <a href="{% url 'dashboard-formateur' %}" class="btn-custom btn-primary">Mes cours & apprenants</a>
+    <a href="{% url 'admin:index' %}" class="btn-custom">Interface Admin classique</a>
+  {% elif profile == 'parent' %}
+    <a href="{% url 'dashboard-parent' %}" class="btn-custom btn-primary">Suivi de mes enfants</a>
+    <a href="{% url 'admin:index' %}" class="btn-custom">Interface Admin classique</a>
+  {% elif profile == 'responsable' %}
+    <a href="{% url 'dashboard-responsable' %}" class="btn-custom btn-primary">Mon département</a>
+    <a href="{% url 'admin:index' %}" class="btn-custom">Interface Admin classique</a>
+  {% elif profile == 'apprenant' %}
+    <a href="{% url 'dashboard-apprenant' %}" class="btn-custom btn-primary">Ma progression</a>
+    <a href="{% url 'admin:index' %}" class="btn-custom">Interface Admin classique</a>
+  {% else %}
+    <a href="{% url 'admin:index' %}" class="btn-custom btn-primary">Accéder à l'administration</a>
+  {% endif %}
+</div>
+
+{% if profile %}
+<h2 class="section-title">Statistiques rapides</h2>
+<div class="kpi-cards">
+  <div class="kpi-card">
+    <h3>Utilisateurs</h3>
+    <div class="value" id="total-users">-</div>
+  </div>
+  <div class="kpi-card">
+    <h3>Cours actifs</h3>
+    <div class="value" id="total-courses">-</div>
+  </div>
+  <div class="kpi-card success">
+    <h3>Complétion moyenne</h3>
+    <div class="value" id="avg-completion">-</div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extrajs %}
+<script>
+  // Rediriger automatiquement selon le profil (optionnel)
+  // window.onload = function() {
+  //   const profile = "{{ profile }}";
+  //   if (profile) {
+  //     const urlMap = {
+  //       'superadmin': "{% url 'dashboard-superadmin' %}",
+  //       'admin': "{% url 'dashboard-admin' %}",
+  //       'formateur': "{% url 'dashboard-formateur' %}",
+  //       'parent': "{% url 'dashboard-parent' %}",
+  //       'responsable': "{% url 'dashboard-responsable' %}",
+  //       'apprenant': "{% url 'dashboard-apprenant' %}"
+  //     };
+  //     if (urlMap[profile]) {
+  //       window.location.href = urlMap[profile];
+  //     }
+  //   }
+  // };
+</script>
+{% endblock %}

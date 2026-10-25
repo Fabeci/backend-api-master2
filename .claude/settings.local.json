@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python create_test_accounts.py)",
+      "Bash(python manage.py check)",
+      "Bash(python -c ' *)",
+      "Bash(python seed_dashboards.py)",
+      "Bash(ls -la \"d:\\\\personnels\\\\Master\\\\master-frontend\")",
+      "Read(//d/personnels/Master/master-frontend/**)",
+      "Bash(python manage.py show_urls)",
+      "Bash(findstr \"dashboard\")",
+      "Bash(npx ng *)",
+      "Bash(python manage.py check --deploy)"
+    ]
+  }
+}

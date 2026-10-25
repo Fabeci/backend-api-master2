@@ -4,14 +4,17 @@
 from rest_framework import permissions, status
 from rest_framework.response import Response
 
-from academics.models import AnneeScolaire, DomaineEtude, Matiere, Specialite
+from academics.models import AffectationEnseignement, AnneeScolaire, DomaineEtude, Matiere, Semestre, Specialite, UE
 from academics.serializers import (
+    SemestreSerializer, UESerializer,
+    AffectationEnseignementSerializer,
     AnneeScolaireSerializer,
     DomaineEtudeSerializer,
     MatiereSerializer,
     SpecialiteSerializer,
 )
 from users.utils import BaseModelViewSet  # type: ignore
+from core.rbac import RBACPermission
 from academics.utils import filter_academics_queryset, get_role_name
 
 
@@ -20,11 +23,12 @@ from academics.utils import filter_academics_queryset, get_role_name
 # ============================================================================
 
 def _is_super_admin(user):
-    return getattr(user, 'is_superuser', False)
+    # MONO-ÉTABLISSEMENT : plus de rôle SuperAdmin.
+    return False
 
 
 
-def _check_write_permission(user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique')):
+def _check_write_permission(user, allowed_roles=('Admin',)):
     """
     Retourne (True, None) si autorisé, ou (False, Response 403) sinon.
     SuperAdmin est bloqué sur les ressources internes.
@@ -78,11 +82,16 @@ class DomaineEtudeViewSet(BaseModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         is_detail = self.action in ("retrieve", "update", "partial_update", "destroy")
+    
+        departement_id = self.request.query_params.get("departement")
+        if departement_id:
+            qs = qs.filter(departement_id=departement_id)
+    
         return filter_academics_queryset(qs, self.request, "DomaineEtude", is_detail=is_detail)
 
     def create(self, request, *args, **kwargs):
 
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
 
         if not ok:
             return err
@@ -90,7 +99,7 @@ class DomaineEtudeViewSet(BaseModelViewSet):
 
     def update(self, request, *args, **kwargs):
 
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
 
         if not ok:
             return err
@@ -98,7 +107,7 @@ class DomaineEtudeViewSet(BaseModelViewSet):
 
     def partial_update(self, request, *args, **kwargs):
 
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
 
         if not ok:
             return err
@@ -158,7 +167,11 @@ class MatiereViewSet(BaseModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         is_detail = self.action in ("retrieve", "update", "partial_update", "destroy")
-        return filter_academics_queryset(qs, self.request, "Matiere", is_detail=is_detail)
+        qs = filter_academics_queryset(qs, self.request, "Matiere", is_detail=is_detail)
+        ue = self.request.query_params.get('ue')
+        if ue:
+            qs = qs.filter(ue_id=ue)
+        return qs
 
     def _check_access(self, request):
         if _is_super_admin(request.user) or get_role_name(request.user) == 'Parent':
@@ -183,19 +196,16 @@ class MatiereViewSet(BaseModelViewSet):
 
     def create(self, request, *args, **kwargs):
 
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
 
         if not ok:
             return err
-        # Auto-assigner l'institution
-        if not request.user.is_superuser and hasattr(request.user, 'institution_id'):
-            request.data._mutable = True if hasattr(request.data, '_mutable') else None
             # On injecte via le serializer context plutôt
         return super().create(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
 
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
 
         if not ok:
             return err
@@ -203,7 +213,7 @@ class MatiereViewSet(BaseModelViewSet):
 
     def partial_update(self, request, *args, **kwargs):
 
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
 
         if not ok:
             return err
@@ -271,15 +281,15 @@ class SpecialiteViewSet(BaseModelViewSet):
 
     def create(self, request, *args, **kwargs):
 
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
         return err if not ok else super().create(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
         return err if not ok else super().update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
-        ok, err = _check_write_permission(request.user, allowed_roles=('Admin', 'Responsable', 'ResponsableAcademique'))
+        ok, err = _check_write_permission(request.user, allowed_roles=('Admin',))
 
         return err if not ok else super().partial_update(request, *args, **kwargs)
 
@@ -345,3 +355,69 @@ class AnneeScolaireViewSet(BaseModelViewSet):
     def destroy(self, request, *args, **kwargs):
         ok, err = _check_delete_permission(request.user, allowed_roles=('Admin',))
         return err if not ok else super().destroy(request, *args, **kwargs)
+
+class AffectationEnseignementViewSet(BaseModelViewSet):
+    """Affectations d'enseignement (groupe + matière + année → formateur).
+
+    - Admin / Responsable : lecture + création + suppression (périmètre établissement)
+    - Formateur : lecture seule de SES affectations (sert à filtrer la création de cours)
+    """
+    queryset = AffectationEnseignement.objects.select_related(
+        'formateur', 'groupe', 'matiere', 'annee_scolaire', 'institution'
+    ).all()
+    serializer_class = AffectationEnseignementSerializer
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
+    rbac_resource = 'affectations'
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        role = get_role_name(user)
+        if role == 'Formateur':
+            qs = qs.filter(formateur_id=user.pk)
+        elif role in ('Admin', 'Responsable'):
+            inst = getattr(user, 'institution_id', None)
+            if inst:
+                qs = qs.filter(institution_id=inst)
+        for key in ('formateur', 'groupe', 'matiere', 'annee_scolaire'):
+            val = self.request.query_params.get(key)
+            if val:
+                qs = qs.filter(**{f'{key}_id': val})
+        return qs.order_by('-date_creation')
+
+
+class SemestreViewSet(BaseModelViewSet):
+    """Semestres LMD (Admin/Responsable)."""
+    queryset = Semestre.objects.select_related('classe', 'annee_scolaire', 'institution').all()
+    serializer_class = SemestreSerializer
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
+    rbac_resource = 'semestres'
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        inst = getattr(self.request.user, 'institution_id', None)
+        if inst:
+            qs = qs.filter(institution_id=inst)
+        for key in ('classe', 'annee_scolaire'):
+            v = self.request.query_params.get(key)
+            if v:
+                qs = qs.filter(**{f'{key}_id': v})
+        return qs.order_by('numero')
+
+
+class UEViewSet(BaseModelViewSet):
+    """Unités d'enseignement (Admin/Responsable)."""
+    queryset = UE.objects.select_related('semestre', 'institution').prefetch_related('matieres').all()
+    serializer_class = UESerializer
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
+    rbac_resource = 'ues'
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        inst = getattr(self.request.user, 'institution_id', None)
+        if inst:
+            qs = qs.filter(institution_id=inst)
+        semestre = self.request.query_params.get('semestre')
+        if semestre:
+            qs = qs.filter(semestre_id=semestre)
+        return qs.order_by('code')
