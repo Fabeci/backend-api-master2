@@ -185,42 +185,6 @@ def _filter_passage_for_parent(qs, user, model='evaluation'):
     return qs.filter(apprenant_id__in=enfants_ids)
 
 
-def _get_annee_scolaire_id(request):
-    """
-    Extrait l'annee_scolaire_id depuis :
-      1. Header X-Annee-Scolaire-ID
-      2. Query param annee_scolaire_id
-      3. Attribut profil utilisateur
-    """
-    def _to_int(v):
-        if v is None:
-            return None
-        try:
-            return int(str(v).strip())
-        except (ValueError, TypeError):
-            return None
-
-    return (
-        _to_int(request.headers.get("X-Annee-Scolaire-ID"))
-        or _to_int(request.query_params.get("annee_scolaire_id"))
-        or _to_int(getattr(request.user, "annee_scolaire_active_id", None))
-    )
-
-
-def _apply_annee_filter_eval(qs, annee_scolaire_id):
-    """Filtre les évaluations par année scolaire via leur cours."""
-    if not annee_scolaire_id:
-        return qs
-    return qs.filter(cours__annee_scolaire_id=annee_scolaire_id)
-
-
-def _apply_annee_filter_quiz(qs, annee_scolaire_id):
-    """Filtre les quiz par année scolaire via leur sequence→module→cours."""
-    if not annee_scolaire_id:
-        return qs
-    return qs.filter(sequence__module__cours__annee_scolaire_id=annee_scolaire_id)
-
-
 # ============================================================================
 # RÉPONSES STANDARDISÉES
 # ============================================================================
@@ -276,8 +240,6 @@ class QuizListCreateAPIView(APIView):
         if role == 'Parent':
             return api_error("Accès non autorisé.", http_status=status.HTTP_403_FORBIDDEN)
 
-        annee_scolaire_id = _get_annee_scolaire_id(request)
-
         try:
             sequence_id = request.query_params.get('sequence')
             qs = Quiz.objects.select_related('sequence').all()
@@ -298,8 +260,6 @@ class QuizListCreateAPIView(APIView):
                     sequence__institution_id=institution_id,
                     sequence__module__cours__enseignant=request.user
                 )
-                qs = _apply_annee_filter_quiz(qs, annee_scolaire_id)
-
             elif role == 'Apprenant':
                 from django.db.models.functions import Lower
                 cours_ids = (
@@ -441,8 +401,6 @@ class QuestionListCreateAPIView(APIView):
         if role == 'Parent':
             return api_error("Accès non autorisé.", http_status=status.HTTP_403_FORBIDDEN)
 
-        annee_scolaire_id = _get_annee_scolaire_id(request)
-
         try:
             quiz_id = request.query_params.get('quiz')
             evaluation_id = request.query_params.get('evaluation')
@@ -475,12 +433,6 @@ class QuestionListCreateAPIView(APIView):
                     Q(quiz__sequence__module__cours__enseignant=request.user) |
                     Q(evaluation__cours__enseignant=request.user)
                 )
-                if annee_scolaire_id:
-                    qs = qs.filter(
-                        Q(quiz__sequence__module__cours__annee_scolaire_id=annee_scolaire_id) |
-                        Q(evaluation__cours__annee_scolaire_id=annee_scolaire_id)
-                    )
-
             elif role == 'Apprenant':
                 cours_ids = InscriptionCours.objects.filter(
                     apprenant=request.user, statut__in=INSCRIPTION_ACTIVE_STATUSES
@@ -734,16 +686,16 @@ class EvaluationListCreateAPIView(APIView):
     permission_classes = [IsAuthenticated, RBACPermission]
 
     def get(self, request):
+        # --- 1. Blocage SuperAdmin ---
         err = _block_super_admin(request.user)
         if err:
             return err
 
         role = _get_role(request.user)
 
+        # --- 2. Rôle inconnu / non géré → refus immédiat ---
         if role is None:
             return api_error("Rôle utilisateur introuvable.", http_status=status.HTTP_403_FORBIDDEN)
-
-        annee_scolaire_id = _get_annee_scolaire_id(request)
 
         try:
             cours_id = request.query_params.get('cours')
@@ -755,8 +707,6 @@ class EvaluationListCreateAPIView(APIView):
             # --- 3. Filtrage par rôle ---
             if role == 'Admin':
                 qs = _filter_by_institution(qs, request.user)
-                # ✅ Filtre par année scolaire
-                qs = _apply_annee_filter_eval(qs, annee_scolaire_id)
 
             elif role == 'Responsable':
                 institution_id = getattr(request.user, 'institution_id', None)
@@ -786,8 +736,6 @@ class EvaluationListCreateAPIView(APIView):
                         cours__enseignant=request.user,
                         cours__institution_id=institution_id
                     )
-                    # ✅ Filtre par année scolaire
-                    qs = _apply_annee_filter_eval(qs, annee_scolaire_id)
 
             elif role == 'Apprenant':
                 from django.db.models.functions import Lower
@@ -800,7 +748,6 @@ class EvaluationListCreateAPIView(APIView):
                 )
                 # ✅ Evaluation a un FK direct vers cours
                 qs = qs.filter(cours_id__in=cours_ids, est_publiee=True)
-                # Apprenant : année fixée par son inscription, pas de filtre supplémentaire
 
             elif role == 'Parent':
                 try:
@@ -819,8 +766,10 @@ class EvaluationListCreateAPIView(APIView):
                     qs = qs.none()
 
             else:
+                # Tout rôle non reconnu → liste vide (pas de None)
                 qs = qs.none()
 
+            # --- 4. Filtres additionnels ---
             if cours_id:
                 qs = qs.filter(cours_id=cours_id)
             if enseignant_id:
@@ -1280,7 +1229,6 @@ class PassageEvaluationListAPIView(APIView):
         if err:
             return err
         role = _get_role(request.user)
-        annee_scolaire_id = _get_annee_scolaire_id(request)
 
         try:
             apprenant_id = request.query_params.get('apprenant')
@@ -1302,15 +1250,10 @@ class PassageEvaluationListAPIView(APIView):
 
             elif role == 'Formateur':
                 qs = qs.filter(evaluation__cours__enseignant=request.user)
-                if annee_scolaire_id:
-                    qs = qs.filter(evaluation__cours__annee_scolaire_id=annee_scolaire_id)
-
             elif role == 'Apprenant':
                 qs = qs.filter(apprenant=request.user)
-
             elif role == 'Parent':
                 qs = _filter_passage_for_parent(qs, request.user)
-
             else:
                 qs = qs.none()
 
@@ -1538,7 +1481,6 @@ class EvaluationsACorrigerAPIView(APIView):
             return err
         try:
             role = _get_role(request.user)
-            annee_scolaire_id = _get_annee_scolaire_id(request)
             qs = PassageEvaluation.objects.select_related('apprenant', 'evaluation').filter(statut='soumis')
 
             if role == 'Admin':
@@ -1553,8 +1495,6 @@ class EvaluationsACorrigerAPIView(APIView):
                     qs = qs.filter(_dept_q("evaluation__cours__", dept_id))
             elif role == 'Formateur':
                 qs = qs.filter(evaluation__cours__enseignant=request.user)
-                if annee_scolaire_id:
-                    qs = qs.filter(evaluation__cours__annee_scolaire_id=annee_scolaire_id)
 
             enseignant_id = request.query_params.get('enseignant')
             if enseignant_id:
@@ -1579,8 +1519,6 @@ class PassageQuizListCreateAPIView(APIView):
         if err:
             return err
         role = _get_role(request.user)
-        annee_scolaire_id = _get_annee_scolaire_id(request)
-
         try:
             apprenant_id = request.query_params.get('apprenant')
             quiz_id = request.query_params.get('quiz')
@@ -1599,15 +1537,10 @@ class PassageQuizListCreateAPIView(APIView):
 
             elif role == 'Formateur':
                 qs = qs.filter(quiz__sequence__module__cours__enseignant=request.user)
-                if annee_scolaire_id:
-                    qs = qs.filter(quiz__sequence__module__cours__annee_scolaire_id=annee_scolaire_id)
-
             elif role == 'Apprenant':
                 qs = qs.filter(apprenant=request.user)
-
             elif role == 'Parent':
                 qs = _filter_passage_for_parent(qs, request.user, model='quiz')
-
             else:
                 qs = qs.none()
 
@@ -1781,24 +1714,10 @@ class StatistiquesApprenantAPIView(APIView):
                 return api_error("Apprenant hors de votre périmètre.",
                                  http_status=status.HTTP_403_FORBIDDEN)
 
-        annee_scolaire_id = _get_annee_scolaire_id(request)
-
         try:
             passages_quiz = PassageQuiz.objects.filter(apprenant_id=apprenant_id, termine=True)
             passages_eval = PassageEvaluation.objects.filter(apprenant_id=apprenant_id)
             passages_corriges = passages_eval.filter(statut='corrige')
-
-            # ✅ Filtre par année scolaire pour les stats aussi
-            if annee_scolaire_id and role not in ('Apprenant', 'Parent'):
-                passages_quiz = passages_quiz.filter(
-                    quiz__sequence__module__cours__annee_scolaire_id=annee_scolaire_id
-                )
-                passages_eval = passages_eval.filter(
-                    evaluation__cours__annee_scolaire_id=annee_scolaire_id
-                )
-                passages_corriges = passages_corriges.filter(
-                    evaluation__cours__annee_scolaire_id=annee_scolaire_id
-                )
 
             score_moyen = passages_quiz.aggregate(Avg('score'))['score__avg']
             note_moyenne = passages_corriges.aggregate(Avg('note'))['note__avg']

@@ -46,12 +46,15 @@ from .models import Admin, Parent, Apprenant, Formateur, ResponsableAcademique
 from .security import validate_password_strength
 
 
+# =============================================================================
+# Helpers réponse unifiée
+# =============================================================================
+
 def api_success(message: str, data=None, http_status=status.HTTP_200_OK):
     return Response(
         {"success": True, "status": http_status, "message": message, "data": data},
         status=http_status,
     )
-
 
 def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST):
     # Message plus précis quand des erreurs de champ sont fournies
@@ -72,6 +75,10 @@ def api_error(message: str, errors=None, http_status=status.HTTP_400_BAD_REQUEST
         payload["errors"] = errors
     return Response(payload, status=http_status)
 
+
+# =============================================================================
+# Helpers internes
+# =============================================================================
 
 def _user_institution(user):
     """MONO-ÉTABLISSEMENT : toujours l'institution de référence."""
@@ -98,38 +105,9 @@ def _get_responsable_context(user):
         return fresh['departement_id'], fresh['institution_id']
     return getattr(user, 'departement_id', None), getattr(user, 'institution_id', None)
 
-def _request_annee_scolaire_id(request):
-    annee_obj = getattr(request, "annee_scolaire", None)
-    if annee_obj is not None:
-        annee_id = getattr(annee_obj, "id", None)
-        if annee_id:
-            return annee_id
-
-    annee_id = getattr(request, "annee_scolaire_id", None)
-    if annee_id:
-        return annee_id
-
-    header_val = request.headers.get("x-annee-scolaire-id") or request.META.get("HTTP_X_ANNEE_SCOLAIRE_ID")
-    if header_val:
-        try:
-            return int(header_val)
-        except (TypeError, ValueError):
-            pass
-
-    return getattr(request.user, "annee_scolaire_active_id", None)
-
-
-def _filter_by_annee_if_possible(qs, annee_scolaire_id):
-    if not annee_scolaire_id:
-        return qs
-
-    model = qs.model
-    if hasattr(model, "annee_scolaire_id"):
-        return qs.filter(annee_scolaire_id=annee_scolaire_id)
-    if hasattr(model, "annee_scolaire_active_id"):
-        return qs.filter(annee_scolaire_active_id=annee_scolaire_id)
-    return qs
-
+# =============================================================================
+# Auth & Onboarding
+# =============================================================================
 
 class RegisterAPIView(APIView):
     # ✅ Création PUBLIQUE retirée : réservée aux profils habilités
@@ -198,7 +176,7 @@ class UserLoginAPIView(APIView):
             raise
         cache.delete(cle)
 
-        user = serializer.validated_data["user"]
+        user  = serializer.validated_data["user"]
         token = serializer.validated_data["token"]
 
         # Déclenche le signal user_logged_in pour la gamification et les analytics
@@ -213,6 +191,7 @@ class UserLoginAPIView(APIView):
             except Exception:
                 photo_url = None
 
+        # Récupérer institution complète
         institution = getattr(user, "institution", None)
         departement = getattr(user, "departement", None)
         pays = getattr(user, "pays_residence", None)
@@ -267,6 +246,10 @@ class LogoutAPIView(APIView):
         return api_success("Déconnexion réussie. Le token a été invalidé.")
 
 
+# =============================================================================
+# Permissions personnalisées
+# =============================================================================
+
 class IsStaffOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.method in ("GET", "HEAD", "OPTIONS"):
@@ -285,21 +268,30 @@ class IsAdminOrHigherOrSelf(permissions.BasePermission):
         if role_name in ['Admin', 'Responsable', 'ResponsableAcademique', 'Responsable Académique', 'Responsable académique']:
             return True
 
+        # ✅ Lecture autorisée pour TOUS les utilisateurs authentifiés
         if request.method in permissions.SAFE_METHODS:
             return True
 
+        # ✅ Écriture autorisée uniquement sur son propre profil
         pk = view.kwargs.get('pk')
         if pk is not None and str(pk) == str(request.user.pk):
             return True
         return False
+    
+# =========================
+# Helpers internes (évite les 500 AttributeError)
+# =========================
 
+
+# ─── Mixin partagé : upload_photo + change_password ──────────────────────────
 
 class ProfileActionsMixin:
+
     def _check_self_or_admin(self, request, pk):
         user = request.user
         if user.is_superuser:
             return
-        if _role_name(user) in ['Admin', 'Responsable', 'ResponsableAcademique', 'Responsable Académique']:
+        if _role_name(user) in ['Admin', 'Responsable']:
             return
         if str(pk) != str(user.pk):
             raise PermissionDenied("Vous ne pouvez modifier que votre propre profil.")
@@ -309,6 +301,8 @@ class ProfileActionsMixin:
         methods=['patch'],
         url_path='upload-photo',
         permission_classes=[permissions.IsAuthenticated],
+        # ✅ NE PAS mettre parser_classes=None — ça écrase avec None et casse get_parsers()
+        # DRF utilise automatiquement MultiPartParser + JSONParser par défaut
     )
     def upload_photo(self, request, pk=None):
         self._check_self_or_admin(request, pk)
@@ -372,6 +366,9 @@ class ProfileActionsMixin:
 
         return api_success("Mot de passe modifié avec succès.")
 
+# =============================================================================
+# CRUD ViewSets
+# =============================================================================
 
 class AdminViewSet(ProfileActionsMixin, BaseModelViewSet):
     queryset           = Admin.objects.select_related('institution', 'role', 'pays_residence').all()
@@ -388,7 +385,13 @@ class AdminViewSet(ProfileActionsMixin, BaseModelViewSet):
             return qs.filter(institution=inst)
         return Admin.objects.none()
 
-        return Admin.objects.none()
+    def perform_create(self, serializer):
+        user = self.request.user
+        inst = _user_institution(user)
+        if not user.is_superuser and inst:
+            serializer.save(institution=inst)
+        else:
+            serializer.save()
 
 
 class ParentViewSet(ProfileActionsMixin, BaseModelViewSet):
@@ -397,7 +400,7 @@ class ParentViewSet(ProfileActionsMixin, BaseModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdminOrHigherOrSelf, RBACPermission]
 
     def get_queryset(self):
-        user = self.request.user
+        user      = self.request.user
         role_name = _role_name(user)
         inst      = _user_institution(user)
         qs_base   = Parent.objects.select_related('institution', 'role', 'pays_residence')
@@ -406,7 +409,7 @@ class ParentViewSet(ProfileActionsMixin, BaseModelViewSet):
             return qs_base.all()
 
         if role_name == "Parent":
-            return _filter_by_annee_if_possible(Parent.objects.filter(pk=user.pk), annee_scolaire_id)
+            return Parent.objects.filter(pk=user.pk)
 
         if role_name == "Admin":
             return qs_base.filter(institution=inst) if inst else Parent.objects.none()
@@ -461,10 +464,9 @@ class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):
     ))
 
     def get_queryset(self):
-        user = self.request.user
+        user      = self.request.user
         role_name = _role_name(user)
-        inst = _user_institution(user)
-        annee_scolaire_id = _request_annee_scolaire_id(self.request)
+        inst      = _user_institution(user)
 
         if user.is_superuser:
             return self._qs_base().all()
@@ -521,13 +523,13 @@ class ApprenantViewSet(ProfileActionsMixin, BaseModelViewSet):
                 institution_id__in=formateur_inst_ids  # ← c'est ça qui manquait
             )
         if role_name == "Parent":
-            return _filter_by_annee_if_possible(Apprenant.objects.filter(tuteur=user), annee_scolaire_id)
+            return Apprenant.objects.filter(tuteur=user)
 
         if role_name == "Apprenant":
             groupe_id = getattr(user, 'groupe_id', None)
             if groupe_id:
-                return _filter_by_annee_if_possible(Apprenant.objects.filter(groupe_id=groupe_id), annee_scolaire_id)
-            return _filter_by_annee_if_possible(Apprenant.objects.filter(pk=user.pk), annee_scolaire_id)
+                return Apprenant.objects.filter(groupe_id=groupe_id)
+            return Apprenant.objects.filter(pk=user.pk)
 
         return Apprenant.objects.none()
 
@@ -587,10 +589,9 @@ class FormateurViewSet(ProfileActionsMixin, BaseModelViewSet):
     ).prefetch_related('institutions', 'specialites', 'groupes'))
 
     def get_queryset(self):
-        user = self.request.user
+        user      = self.request.user
         role_name = _role_name(user)
-        inst = _user_institution(user)
-        annee_scolaire_id = _request_annee_scolaire_id(self.request)
+        inst      = _user_institution(user)
 
         if user.is_superuser:
             return self._qs_base().all()
@@ -651,13 +652,11 @@ class ResponsableAcademiqueViewSet(ProfileActionsMixin, BaseModelViewSet):
     def get_queryset(self):
         user = self.request.user
         role_name = _role_name(user)
-        annee_scolaire_id = _request_annee_scolaire_id(self.request)
 
         if user.is_superuser:
-            qs = ResponsableAcademique.objects.select_related(
+            return ResponsableAcademique.objects.select_related(
                 'institution', 'departement', 'pays_residence', 'role'
             ).all()
-            return _filter_by_annee_if_possible(qs, annee_scolaire_id)
 
         if role_name in ["Responsable", "ResponsableAcademique", "Responsable Académique"]:
             # ✅ defer() force Django à ne PAS utiliser le cache — recharge tout depuis la BD
@@ -669,10 +668,9 @@ class ResponsableAcademiqueViewSet(ProfileActionsMixin, BaseModelViewSet):
 
         if role_name in ["Admin", "ResponsableAcademique"]:
             inst = _user_institution(user)
-            qs = ResponsableAcademique.objects.select_related(
+            return ResponsableAcademique.objects.select_related(
                 'institution', 'departement', 'pays_residence', 'role'
             ).filter(institution=inst) if inst else ResponsableAcademique.objects.none()
-            return _filter_by_annee_if_possible(qs, annee_scolaire_id)
 
         return ResponsableAcademique.objects.none()
     
@@ -695,9 +693,9 @@ class ChangePasswordAPIView(APIView):
             "Mot de passe modifié avec succès. Veuillez vous reconnecter.",
             data=None,
             http_status=status.HTTP_200_OK,
+
         )
-
-
+        
 class PasswordResetAPIView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -709,9 +707,10 @@ class PasswordResetAPIView(APIView):
         try:
             user = User.objects.get(email__iexact=email, is_active=True)
         except User.DoesNotExist:
+            # ✅ Ne pas révéler si l'email existe ou non (sécurité)
             return api_success("Si cet email existe, un lien a été envoyé.")
 
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        uid   = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
 
         # ✅ URL frontend : base + route RÉELLE de l'application.
@@ -739,8 +738,9 @@ class PasswordResetConfirmAPIView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, uidb64=None, token=None):
-        uid_raw = uidb64 or request.data.get('uid', '')
-        token_raw = token or request.data.get('token', '')
+        # Accepte depuis l'URL OU depuis le body (frontend envoie dans le body)
+        uid_raw      = uidb64   or request.data.get('uid', '')
+        token_raw    = token    or request.data.get('token', '')
         new_password = request.data.get('new_password', '').strip()
 
         if not uid_raw or not token_raw:
@@ -751,7 +751,7 @@ class PasswordResetConfirmAPIView(APIView):
             return api_error("Le mot de passe doit contenir au moins 8 caractères.")
 
         try:
-            uid = force_str(urlsafe_base64_decode(uid_raw))
+            uid  = force_str(urlsafe_base64_decode(uid_raw))
             user = User.objects.get(pk=uid)
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             return api_error("Lien invalide ou expiré.", http_status=status.HTTP_400_BAD_REQUEST)
@@ -767,6 +767,8 @@ class PasswordResetConfirmAPIView(APIView):
 
         user.set_password(new_password)
         user.save(update_fields=['password'])
+
+        # ✅ Invalider tous les tokens DRF existants
         Token.objects.filter(user=user).delete()
 
         return api_success("Mot de passe réinitialisé avec succès. Vous pouvez vous connecter.")

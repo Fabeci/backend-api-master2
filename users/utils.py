@@ -3,9 +3,11 @@ from django.conf import settings
 from django.urls import reverse
 from django.utils.http import urlencode
 from rest_framework.views import exception_handler
-from rest_framework.exceptions import NotAuthenticated
+from rest_framework.exceptions import AuthenticationFailed, NotAuthenticated
 from rest_framework.response import Response
 from rest_framework import status, viewsets
+from django.utils.http import urlsafe_base64_encode
+from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from academics.views import api_error, api_success
 
@@ -16,14 +18,10 @@ def send_verification_email(user):
     """
     token = user.generate_email_verification_token()
     verification_url = f"{settings.FRONTEND_BASE_URL}{reverse('verify-email')}?{urlencode({'token': token})}"
-
+    
     subject = "Vérification de votre compte"
-    message = (
-        f"Bonjour {user.nom},\n\n"
-        f"Cliquez sur le lien suivant pour vérifier votre e-mail : {verification_url}\n\n"
-        f"Merci !"
-    )
-
+    message = f"Bonjour {user.nom},\n\nCliquez sur le lien suivant pour vérifier votre e-mail : {verification_url}\n\nMerci !"
+    
     send_mail(
         subject,
         message,
@@ -145,7 +143,14 @@ def custom_exception_handler(exc, context):
 def send_activation_email(user, subject, url):
     """
     Envoie un email d'activation à l'utilisateur.
+
+    Args:
+        user (User): Instance de l'utilisateur pour lequel envoyer l'email.
+        frontend_url (str): URL de base de l'application frontend.
+        subject (str): Sujet de l'email. Par défaut : "Activer votre compte".
     """
+
+    # Envoi de l'email
     send_mail(
         subject,
         f'Cliquez sur ce lien pour activer votre compte : {url}',
@@ -153,16 +158,9 @@ def send_activation_email(user, subject, url):
         [user.email],
         fail_silently=False,
     )
-
+    
 
 class BaseModelViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet de base avec :
-    - filtrage automatique par institution
-    - filtrage automatique par année scolaire
-    - injection automatique des champs institution / année scolaire
-    - réponses uniformisées
-    """
 
     # ---------------------------------------------------------------------
     # Filtrage automatique par institution (si le modèle a institution_id)
@@ -177,21 +175,14 @@ class BaseModelViewSet(viewsets.ModelViewSet):
                 return qs.none()
             return qs.filter(institution_id=iid)
 
-        header_val = (
-            request.headers.get("x-annee-scolaire-id")
-            or request.META.get("HTTP_X_ANNEE_SCOLAIRE_ID")
-        )
-        if header_val:
-            try:
-                return int(header_val)
-            except (TypeError, ValueError):
-                pass
+        return qs
 
-        user_annee_id = getattr(request.user, "annee_scolaire_active_id", None)
-        if user_annee_id:
-            return user_annee_id
-
-        return None
+    # ---------------------------------------------------------------------
+    # Helpers : injection d'institution
+    # ---------------------------------------------------------------------
+    def _needs_institution(self, serializer) -> bool:
+        model = getattr(getattr(serializer, "Meta", None), "model", None)
+        return bool(model and hasattr(model, "institution_id"))
 
     def _get_user_institution_id(self):
         from core.tenant import default_institution_id
@@ -254,7 +245,7 @@ class BaseModelViewSet(viewsets.ModelViewSet):
         except ValidationError as e:
             return api_error(
                 "Erreur de validation",
-                errors=e.message_dict if hasattr(e, "message_dict") else str(e),
+                errors=e.detail,
                 http_status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -282,7 +273,7 @@ class BaseModelViewSet(viewsets.ModelViewSet):
         except ValidationError as e:
             return api_error(
                 "Erreur de validation",
-                errors=e.message_dict if hasattr(e, "message_dict") else str(e),
+                errors=e.detail,
                 http_status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -292,10 +283,6 @@ class BaseModelViewSet(viewsets.ModelViewSet):
             data=self.get_serializer(obj).data,
             http_status=status.HTTP_200_OK,
         )
-
-    def partial_update(self, request, *args, **kwargs):
-        kwargs["partial"] = True
-        return self.update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
