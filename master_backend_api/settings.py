@@ -160,6 +160,24 @@ if config('DB_ENGINE', default='sqlite').strip().lower() in ('postgres', 'postgr
         }
     }
 
+# ✅ Base MySQL / MariaDB (cPanel mutualisé) :
+#   DB_ENGINE=mysql + MYSQL_DB / MYSQL_USER / MYSQL_PASSWORD / MYSQL_HOST
+if config('DB_ENGINE', default='sqlite').strip().lower() in ('mysql', 'mariadb'):
+    import pymysql
+    pymysql.install_as_MySQLdb()
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': config('MYSQL_DB', default='somapro'),
+            'USER': config('MYSQL_USER', default=''),
+            'PASSWORD': config('MYSQL_PASSWORD', default=''),
+            'HOST': config('MYSQL_HOST', default='localhost'),
+            'PORT': config('MYSQL_PORT', default='3306'),
+            'OPTIONS': {'charset': 'utf8mb4'},
+            'CONN_MAX_AGE': 60,
+        }
+    }
+
 # ✅ Limites d'upload : au-delà, Django écrit sur disque (temp) au lieu de la RAM.
 DATA_UPLOAD_MAX_MEMORY_SIZE = config('DATA_UPLOAD_MAX_MEMORY_SIZE', default=10 * 1024 * 1024, cast=int)
 FILE_UPLOAD_MAX_MEMORY_SIZE = config('FILE_UPLOAD_MAX_MEMORY_SIZE', default=10 * 1024 * 1024, cast=int)
@@ -385,12 +403,23 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # En production : remplacer par Redis (pip install django-redis)
 #   CACHES = {'default': {'BACKEND': 'django_redis.cache.RedisCache',
 #                          'LOCATION': config('REDIS_URL'), ...}}
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'lms-default-cache',
+if _REDIS_URL:
+    # Cache partagé : indispensable pour suivre une tâche Celery depuis l'API.
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': _REDIS_URL,
+            'OPTIONS': {'CLIENT_CLASS': 'django_redis.client.DefaultClient'},
+            'KEY_PREFIX': 'somapro',
+        }
     }
-}
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'lms-default-cache',
+        }
+    }
 
 # ✅ CORS / CSRF pilotés par l'environnement (défauts = local).
 CORS_ALLOWED_ORIGINS = [

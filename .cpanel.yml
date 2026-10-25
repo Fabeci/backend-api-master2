@@ -1,0 +1,6 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/CPUSER/somapro/backend-api-master2
+    - /bin/cp -R ./* $DEPLOYPATH
+    - /bin/bash $DEPLOYPATH/deploy/cpanel/deploy-backend.sh
