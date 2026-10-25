@@ -72,25 +72,6 @@ def recompute_cascade(apprenant, sequence: Sequence):
     cp.save(update_fields=["est_termine", "completed_at", "updated_at"])
 
 
-# ============================================================================
-# UTILITAIRE : conversion entière sûre
-# ============================================================================
-
-def _to_int(v):
-    if v is None:
-        return None
-    if isinstance(v, int):
-        return v
-    try:
-        return int(str(v).strip())
-    except (ValueError, TypeError):
-        return None
-
-
-# ============================================================================
-# CONTEXTE UTILISATEUR
-# ============================================================================
-
 def get_user_context(request):
     """Contexte MONO-ÉTABLISSEMENT (institution 27 par défaut).
 

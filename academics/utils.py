@@ -68,11 +68,7 @@ def get_user_academic_context(request):
 
         if inscription and inscription.classe:
             ctx["user_classe_id"] = inscription.classe_id
-            # Filtrer le groupe par année si une année est sélectionnée
-            groupes_qs = inscription.classe.groupes
-            if ctx["annee_scolaire_id"]:
-                groupes_qs = groupes_qs.filter(annee_scolaire_id=ctx["annee_scolaire_id"])
-            premier_groupe = groupes_qs.first()
+            premier_groupe = inscription.classe.groupes.first()
             if premier_groupe:
                 ctx["user_groupe_id"] = premier_groupe.id
 
@@ -128,10 +124,7 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
     # ================================================================
     if model_name == 'Departement':
         if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:
-            qs = queryset.filter(institution_id=institution_id)
-            # ✅ Filtre par année scolaire si sélectionnée
-            qs = _apply_annee_filter(qs, annee_scolaire_id)
-            return qs
+            return queryset.filter(institution_id=institution_id)
 
         if role_name in ['Formateur', 'Apprenant']:
             return queryset.filter(institution_id=institution_id)
@@ -179,10 +172,7 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
     # ================================================================
     if model_name == 'Classe':
         if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:
-            qs = queryset.filter(institution_id=institution_id)
-            # ✅ Filtre par année scolaire si sélectionnée
-            qs = _apply_annee_filter(qs, annee_scolaire_id)
-            return qs
+            return queryset.filter(institution_id=institution_id)
 
         if role_name == 'Formateur':
             if is_detail:
@@ -191,20 +181,15 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
                     institution_id=institution_id,
                     enseignants__id=user.pk
                 ).values_list('id', flat=True)
-                qs = queryset.filter(groupes__id__in=groupes_ids)
-            else:
-                qs = queryset.filter(institution_id=institution_id)
-            qs = _apply_annee_filter(qs, annee_scolaire_id)
-            return qs
+                return queryset.filter(groupes__id__in=groupes_ids)
+            return queryset.filter(institution_id=institution_id)
 
         if role_name == 'Apprenant':
             if is_detail:
                 if ctx.get("user_classe_id"):
                     return queryset.filter(id=ctx["user_classe_id"])
                 return queryset.none()
-            qs = queryset.filter(institution_id=institution_id)
-            qs = _apply_annee_filter(qs, annee_scolaire_id)
-            return qs
+            return queryset.filter(institution_id=institution_id)
 
         return queryset.none()
 
@@ -245,10 +230,7 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
     # ================================================================
     if model_name == 'Inscription':
         if role_name in ['Admin', 'Responsable', 'ResponsableAcademique']:
-            qs = queryset.filter(institution_id=institution_id)
-            # ✅ Filtre par année scolaire si sélectionnée
-            qs = _apply_annee_filter(qs, annee_scolaire_id)
-            return qs
+            return queryset.filter(institution_id=institution_id)
 
         if role_name == 'Formateur':
             from .models import Groupe
@@ -256,12 +238,10 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
                 institution_id=institution_id,
                 enseignants__id=user.pk
             ).values_list('id', flat=True)
-            qs = queryset.filter(
+            return queryset.filter(
                 institution_id=institution_id,
                 classe__groupes__id__in=groupes_ids
             )
-            qs = _apply_annee_filter(qs, annee_scolaire_id)
-            return qs
 
         if role_name == 'Apprenant':
             return queryset.filter(apprenant=user)
@@ -307,9 +287,7 @@ def filter_academics_queryset(queryset, request, model_name, is_detail=False):
     # Par défaut
     # ================================================================
     if hasattr(queryset.model, 'institution'):
-        qs = queryset.filter(institution_id=institution_id)
-        qs = _apply_annee_filter(qs, annee_scolaire_id)
-        return qs
+        return queryset.filter(institution_id=institution_id)
 
     return queryset.all()
 
