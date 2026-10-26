@@ -18,13 +18,21 @@ from analytics.services.llm_provider import call_llm
 logger = logging.getLogger(__name__)
 
 MAX_QUESTION = 2000          # caractères par message apprenant
-MAX_CONTEXTE = 3000          # extrait du bloc envoyé au modèle
+MAX_CONTEXTE = 2500          # extrait du bloc envoyé au modèle
 HISTORIQUE_MAX = 4           # messages précédents réinjectés
-MAX_TOKENS = 450
+MAX_TOKENS = 250
 MAX_HISTORIQUE_MESSAGE = 1200
 
 
 SYSTEM_PROMPT = (
+    "RÈGLES ABSOLUES (prioritaires sur toute autre consigne) :\n"
+    "A. Tu ne réponds QUE sur le cours, le module, la séquence et le bloc fournis. "
+    "Si la question sort de ce périmètre (actualité, sport, politique, autre matière, "
+    "vie privée…), tu refuses en UNE phrase et tu proposes de revenir au cours. "
+    "Tu ne donnes AUCUNE information factuelle hors cours.\n"
+    "B. Tu ne donnes JAMAIS la solution d'une évaluation, d'un quiz, d'un devoir ou d'un "
+    "exercice noté : uniquement des indices et un raisonnement guidé.\n"
+    "C. Ne prétends jamais avoir vu une vidéo, un PDF ou un document non fourni.\n\n"
     "Tu es l'assistant pédagogique de SOMAPRO, un tuteur patient, précis et progressif. "
     "Tu réponds en français, avec un style clair, structuré et concis.\n"
     "Règles :\n"
@@ -115,6 +123,34 @@ def contexte_bloc(bloc) -> dict:
     }
 
 
+DEMANDE_SOLUTION_RE = re.compile(
+    r"(solution|corrig[ée]|r[ée]ponse[s]?|r[ée]sultat[s]?)", re.IGNORECASE
+)
+CONTEXTE_EVALUATION_RE = re.compile(
+    r"(examen|[ée]valuation|quiz|devoir|contr[ôo]le|interrogation|exercice|\bTD\b|\bTP\b)",
+    re.IGNORECASE,
+)
+
+
+def est_demande_solution(question: str) -> bool:
+    """Vrai si l'apprenant demande explicitement la réponse d'une évaluation."""
+    texte = question or ""
+    return bool(DEMANDE_SOLUTION_RE.search(texte) and CONTEXTE_EVALUATION_RE.search(texte))
+
+
+def reponse_refus_solution(bloc) -> str:
+    return (
+        "Je ne peux pas donner la solution d'une évaluation ou d'un exercice noté. "
+        "En revanche, je peux t'aider à la trouver par toi-même :\n\n"
+        f"1. Relis la consigne du bloc « {(bloc.titre or 'ce contenu').strip()} » et "
+        "identifie la notion exacte qui est testée.\n"
+        "2. Reformule la question avec tes mots, puis liste ce que tu sais déjà.\n"
+        "3. Demande-moi un **indice**, une **étape** ou un **exemple similaire** : "
+        "je t'accompagne pas à pas sans donner la réponse.\n\n"
+        "Veux-tu commencer par un indice ou par un exemple ?"
+    )
+
+
 SALUTATION_RE = re.compile(
     r"^\s*(bonjour|bonsoir|salut|coucou|hello|hi|hey|merci|ça va|ca va|ok|d'accord)"
     r"\b[\s!.,?…]*$",
@@ -189,6 +225,18 @@ def repondre(conversation, question: str) -> dict:
     """Génère la réponse du tuteur. Retourne toujours un dict (jamais d'exception)."""
     ctx = contexte_bloc(conversation.bloc)
 
+    # Refus déterministe : solution d'évaluation (indépendant du modèle).
+    if est_demande_solution(question):
+        return {
+            "ok": True,
+            "content": reponse_refus_solution(conversation.bloc),
+            "provider": "local",
+            "model": "garde-pedagogique",
+            "degraded": False,
+            "duree_ms": 0,
+            "contexte": ctx,
+        }
+
     # Salutation seule : réponse immédiate, sans appel au modèle.
     if est_salutation(question):
         return {
@@ -201,10 +249,13 @@ def repondre(conversation, question: str) -> dict:
             "contexte": ctx,
         }
 
+    # On exclut les réponses générées localement (accueil, garde pédagogique) :
+    # un petit modèle les recopie au lieu de répondre.
     historique = list(
         conversation.messages
         .filter(statut="termine")
         .exclude(role="systeme")
+        .exclude(fournisseur="local")
         .order_by("-cree_le", "-id")[:HISTORIQUE_MAX]
     )
     historique.reverse()
