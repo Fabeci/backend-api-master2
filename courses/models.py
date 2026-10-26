@@ -1056,3 +1056,234 @@ class SessionInvite(models.Model):
 
     def __str__(self):
         return f"{self.email} ({self.session_id})"
+
+
+# ============================================================================
+# ASSISTANT PÉDAGOGIQUE IA (chat par bloc de cours)
+# ============================================================================
+
+class ConversationTuteur(models.Model):
+    """Conversation de l'assistant pédagogique IA, par apprenant et par bloc.
+
+    Une conversation est rattachée au bloc consulté ; un apprenant peut avoir
+    plusieurs conversations pour un même bloc (historique archivé).
+    """
+    STATUT_CHOICES = [
+        ("active", "Active"),
+        ("archivee", "Archivée"),
+    ]
+
+    apprenant = models.ForeignKey(
+        Apprenant,
+        on_delete=models.CASCADE,
+        related_name="conversations_tuteur",
+    )
+    bloc = models.ForeignKey(
+        BlocContenu,
+        on_delete=models.CASCADE,
+        related_name="conversations_tuteur",
+    )
+    cours = models.ForeignKey(
+        Cours,
+        on_delete=models.CASCADE,
+        related_name="conversations_tuteur",
+    )
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="conversations_tuteur",
+    )
+    titre = models.CharField(max_length=255, blank=True, default="")
+    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default="active")
+    cree_le = models.DateTimeField(auto_now_add=True)
+    maj_le = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-maj_le"]
+        indexes = [
+            models.Index(fields=["apprenant", "bloc", "statut"]),
+            models.Index(fields=["bloc", "statut"]),
+        ]
+        verbose_name = "Conversation tuteur IA"
+        verbose_name_plural = "Conversations tuteur IA"
+
+    def __str__(self):
+        return f"{self.apprenant_id} · bloc {self.bloc_id} · {self.statut}"
+
+
+class MessageTuteur(models.Model):
+    """Message d'une conversation avec l'assistant pédagogique."""
+    ROLE_CHOICES = [
+        ("user", "Apprenant"),
+        ("assistant", "Assistant"),
+        ("systeme", "Système"),
+    ]
+    STATUT_CHOICES = [
+        ("en_cours", "En cours"),
+        ("termine", "Terminé"),
+        ("erreur", "Erreur"),
+        ("interrompu", "Interrompu"),
+    ]
+
+    conversation = models.ForeignKey(
+        ConversationTuteur,
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    role = models.CharField(max_length=12, choices=ROLE_CHOICES)
+    contenu = models.TextField()
+    statut = models.CharField(max_length=12, choices=STATUT_CHOICES, default="termine")
+    erreur = models.CharField(max_length=255, blank=True, default="")
+    fournisseur = models.CharField(max_length=40, blank=True, default="")
+    modele = models.CharField(max_length=80, blank=True, default="")
+    duree_ms = models.PositiveIntegerField(null=True, blank=True)
+    # Idempotence : identifiant fourni par le client pour éviter les doubles envois.
+    client_id = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    # Citations affichées sous la réponse (bloc(s) source du cours).
+    sources = models.JSONField(default=list, blank=True, verbose_name="Sources citées")
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["cree_le", "id"]
+        indexes = [models.Index(fields=["conversation", "cree_le"])]
+        verbose_name = "Message tuteur IA"
+        verbose_name_plural = "Messages tuteur IA"
+
+    def __str__(self):
+        return f"{self.role} · conv {self.conversation_id}"
+
+
+# ============================================================================
+# RAG DOCUMENTAIRE — extraits indexés pour le tuteur IA
+# ============================================================================
+
+class DocumentChunk(models.Model):
+    """Extrait de texte indexé (PDF/DOCX/TXT/MD) rattaché à un cours.
+
+    Permet au tuteur de citer des passages précis de documents sans base
+    vectorielle externe (recherche lexicale côté serveur).
+    """
+    cours = models.ForeignKey(
+        Cours, on_delete=models.CASCADE, related_name="document_chunks",
+    )
+    bloc = models.ForeignKey(
+        BlocContenu, on_delete=models.CASCADE, null=True, blank=True,
+        related_name="document_chunks",
+    )
+    ressource = models.ForeignKey(
+        "RessourceSequence", on_delete=models.CASCADE, null=True, blank=True,
+        related_name="document_chunks",
+    )
+    institution = models.ForeignKey(
+        Institution, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="document_chunks",
+    )
+    source_nom = models.CharField(max_length=255)
+    source_type = models.CharField(max_length=20, default="texte")
+    page = models.PositiveIntegerField(null=True, blank=True)
+    ordre = models.PositiveIntegerField(default=0)
+    texte = models.TextField()
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["bloc_id", "ressource_id", "ordre"]
+        indexes = [
+            models.Index(fields=["cours", "bloc"]),
+            models.Index(fields=["cours", "ressource"]),
+        ]
+        verbose_name = "Extrait de document (RAG)"
+        verbose_name_plural = "Extraits de documents (RAG)"
+
+    def __str__(self):
+        return f"{self.source_nom} · {self.page or '-'} · {self.texte[:40]}"
+
+
+# ============================================================================
+# QUIZ PÉDAGOGIQUE GÉNÉRÉ PAR L'IA (« Interroge-moi »)
+# ============================================================================
+
+class QuizTuteur(models.Model):
+    """Mini-quiz généré depuis un bloc ; la clé de correction reste serveur."""
+    STATUT_CHOICES = [
+        ("en_cours", "En cours"),
+        ("corrige", "Corrigé"),
+    ]
+
+    conversation = models.ForeignKey(
+        ConversationTuteur, on_delete=models.CASCADE, related_name="quiz_tuteur",
+    )
+    apprenant = models.ForeignKey(
+        Apprenant, on_delete=models.CASCADE, related_name="quiz_tuteur",
+    )
+    bloc = models.ForeignKey(
+        BlocContenu, on_delete=models.CASCADE, related_name="quiz_tuteur",
+    )
+    cours = models.ForeignKey(
+        Cours, on_delete=models.CASCADE, related_name="quiz_tuteur",
+    )
+    titre = models.CharField(max_length=255, blank=True, default="")
+    questions = models.JSONField(default=list)   # avec bonne_reponse + explication
+    reponses = models.JSONField(default=list)    # choix de l'apprenant
+    score = models.FloatField(null=True, blank=True)  # sur 100
+    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default="en_cours")
+    cree_le = models.DateTimeField(auto_now_add=True)
+    corrige_le = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-cree_le"]
+        indexes = [models.Index(fields=["conversation", "cree_le"])]
+        verbose_name = "Quiz tuteur IA"
+        verbose_name_plural = "Quiz tuteur IA"
+
+    def __str__(self):
+        return f"Quiz {self.pk} · bloc {self.bloc_id} · {self.score}"
+
+
+# ============================================================================
+# JOURNAL D'USAGE DU TUTEUR IA (agrégats formateur, sans contenu des messages)
+# ============================================================================
+
+class EvenementTuteur(models.Model):
+    """Événement agrégé du tuteur (refus d'évaluation, quiz, explication…).
+
+    Aucun contenu de message n'est stocké ici : uniquement des métadonnées
+    techniques pour le tableau de bord formateur.
+    """
+    TYPE_CHOICES = [
+        ("refus_evaluation", "Refus pendant évaluation"),
+        ("quiz", "Quiz généré"),
+        ("explication", "Explication d'erreur"),
+    ]
+
+    type = models.CharField(max_length=30, choices=TYPE_CHOICES)
+    apprenant = models.ForeignKey(
+        Apprenant, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="evenements_tuteur",
+    )
+    cours = models.ForeignKey(
+        Cours, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="evenements_tuteur",
+    )
+    bloc = models.ForeignKey(
+        BlocContenu, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="evenements_tuteur",
+    )
+    institution = models.ForeignKey(
+        Institution, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="evenements_tuteur",
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-cree_le"]
+        indexes = [
+            models.Index(fields=["type", "cree_le"]),
+            models.Index(fields=["cours", "type"]),
+        ]
+        verbose_name = "Événement tuteur IA"
+        verbose_name_plural = "Événements tuteur IA"
+
+    def __str__(self):
+        return f"{self.type} · cours {self.cours_id} · {self.cree_le}"

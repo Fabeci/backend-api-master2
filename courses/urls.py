@@ -83,6 +83,16 @@ from .views import (
     BlocValiderAPIView,
 )
 
+from courses.views_stats import TuteurStatsAPIView  # noqa: E402
+from courses.views_chat import (  # noqa: E402
+    BlocChatAPIView,
+    BlocChatStreamAPIView,
+    BlocQuizAPIView,
+    ConversationChatDetailAPIView,
+    ConversationChatNouvelleAPIView,
+    QuizCorrectionAPIView,
+)
+
 urlpatterns = [
     # Cours
     path('cours/', CoursListCreateAPIView.as_view(), name='cours-list-create'),
@@ -170,4 +180,15 @@ urlpatterns = [
 
     path('progress/cours/', CoursProgressListAPIView.as_view(), name='progress-cours-list'),
     path('progress/cours/<int:cours_id>/', CoursProgressToggleAPIView.as_view(), name='progress-cours-toggle'),
+
+    # =========================================================================
+    # ASSISTANT PÉDAGOGIQUE IA (chat par bloc)
+    # =========================================================================
+    path('blocs/<int:bloc_id>/chat/', BlocChatAPIView.as_view(), name='bloc-chat'),
+    path('blocs/<int:bloc_id>/chat/stream/', BlocChatStreamAPIView.as_view(), name='bloc-chat-stream'),
+    path('blocs/<int:bloc_id>/chat/quiz/', BlocQuizAPIView.as_view(), name='bloc-chat-quiz'),
+    path('chat/quiz/<int:pk>/corriger/', QuizCorrectionAPIView.as_view(), name='chat-quiz-corriger'),
+    path('chat/tuteur/stats/', TuteurStatsAPIView.as_view(), name='chat-tuteur-stats'),
+    path('chat/conversations/<int:pk>/', ConversationChatDetailAPIView.as_view(), name='chat-conversation-detail'),
+    path('chat/conversations/<int:pk>/nouvelle/', ConversationChatNouvelleAPIView.as_view(), name='chat-conversation-nouvelle'),
 ]
