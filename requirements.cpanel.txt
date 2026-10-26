@@ -1,0 +1,37 @@
+# Dépendances minimales pour l'hébergement cPanel (Passenger / WSGI, sans Docker).
+# Utilisé par deploy/cpanel/deploy-backend.sh et par « Run Pip Install » de cPanel.
+
+# Cœur Django / API
+Django==5.1.6
+djangorestframework==3.15.2
+django-cors-headers==4.7.0
+django-allauth==65.4.1
+dj-rest-auth==7.0.1
+drf-yasg==1.21.10
+
+# ASGI / Channels (daphne et channels sont dans INSTALLED_APPS)
+daphne==4.0.0
+channels==4.0.0
+
+# Celery — importé au démarrage par master_backend_api/__init__.py
+celery==5.3.4
+kombu-sqlalchemy==1.1.0
+django-celery-results==2.6.0
+django-celery-beat==2.8.1
+django-timezone-field==7.2.1
+
+# Configuration et utilitaires
+django-extensions==4.1
+python-decouple==3.8
+Pillow==11.1.0
+PyYAML==6.0.2
+
+# Bulletins PDF, exports Excel, imports Word/PDF
+reportlab==4.2.5
+openpyxl==3.1.5
+python-docx==1.1.2
+pypdf==5.1.0
+pdfplumber==0.11.4
+
+# IA (imports paresseux : uniquement si le fournisseur est utilisé)
+anthropic==0.79.0
