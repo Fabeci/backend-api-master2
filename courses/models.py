@@ -1238,3 +1238,52 @@ class QuizTuteur(models.Model):
 
     def __str__(self):
         return f"Quiz {self.pk} · bloc {self.bloc_id} · {self.score}"
+
+
+# ============================================================================
+# JOURNAL D'USAGE DU TUTEUR IA (agrégats formateur, sans contenu des messages)
+# ============================================================================
+
+class EvenementTuteur(models.Model):
+    """Événement agrégé du tuteur (refus d'évaluation, quiz, explication…).
+
+    Aucun contenu de message n'est stocké ici : uniquement des métadonnées
+    techniques pour le tableau de bord formateur.
+    """
+    TYPE_CHOICES = [
+        ("refus_evaluation", "Refus pendant évaluation"),
+        ("quiz", "Quiz généré"),
+        ("explication", "Explication d'erreur"),
+    ]
+
+    type = models.CharField(max_length=30, choices=TYPE_CHOICES)
+    apprenant = models.ForeignKey(
+        Apprenant, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="evenements_tuteur",
+    )
+    cours = models.ForeignKey(
+        Cours, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="evenements_tuteur",
+    )
+    bloc = models.ForeignKey(
+        BlocContenu, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="evenements_tuteur",
+    )
+    institution = models.ForeignKey(
+        Institution, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="evenements_tuteur",
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-cree_le"]
+        indexes = [
+            models.Index(fields=["type", "cree_le"]),
+            models.Index(fields=["cours", "type"]),
+        ]
+        verbose_name = "Événement tuteur IA"
+        verbose_name_plural = "Événements tuteur IA"
+
+    def __str__(self):
+        return f"{self.type} · cours {self.cours_id} · {self.cree_le}"

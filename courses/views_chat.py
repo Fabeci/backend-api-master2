@@ -26,7 +26,9 @@ from core.rbac import display_role
 from users.access_control import get_own_apprenant
 from users.views import api_error, api_success
 
-from .models import BlocContenu, ConversationTuteur, MessageTuteur, QuizTuteur
+from .models import (
+    BlocContenu, ConversationTuteur, EvenementTuteur, MessageTuteur, QuizTuteur,
+)
 from .publication import bloc_disponible
 from .services import chat_tuteur, difficulte as difficulte_service, quiz_tuteur
 from .throttles import ChatTuteurThrottle
@@ -158,6 +160,23 @@ def _evaluation_en_cours(apprenant, cours) -> bool:
 
 
 
+
+
+def _log_evenement(type_evenement: str, apprenant, bloc, **metadata) -> None:
+    """Journalise un usage agrégé (jamais le contenu du message)."""
+    try:
+        EvenementTuteur.objects.create(
+            type=type_evenement,
+            apprenant=apprenant,
+            cours=bloc.sequence.module.cours if bloc is not None else None,
+            bloc=bloc,
+            institution=getattr(bloc.sequence, "institution", None) if bloc is not None else None,
+            metadata=metadata,
+        )
+    except Exception:  # noqa: BLE001
+        logger.debug("[chat_tuteur] journalisation impossible", exc_info=True)
+
+
 def _sse(evenement: str, donnees: dict) -> str:
     """Formate un événement Server-Sent Events."""
     return f"event: {evenement}\ndata: {json.dumps(donnees, default=str)}\n\n"
@@ -235,6 +254,7 @@ class BlocChatAPIView(APIView):
 
         # Anti-triche : aucune question pendant une évaluation en cours.
         if _evaluation_en_cours(apprenant, bloc.sequence.module.cours):
+            _log_evenement("refus_evaluation", apprenant, bloc)
             return api_error(
                 "Une évaluation est en cours pour ce cours : l'assistant est "
                 "désactivé jusqu'à la remise de votre copie.",
@@ -415,6 +435,7 @@ class BlocChatStreamAPIView(APIView):
             return api_error(erreur, http_status=code)
 
         if _evaluation_en_cours(apprenant, bloc.sequence.module.cours):
+            _log_evenement("refus_evaluation", apprenant, bloc)
             return api_error(
                 "Une évaluation est en cours pour ce cours : l'assistant est "
                 "désactivé jusqu'à la remise de votre copie.",
@@ -549,6 +570,7 @@ class BlocQuizAPIView(APIView):
             return api_error(erreur, http_status=code)
 
         if _evaluation_en_cours(apprenant, bloc.sequence.module.cours):
+            _log_evenement("refus_evaluation", apprenant, bloc)
             return api_error(
                 "Une évaluation est en cours pour ce cours : l'assistant est "
                 "désactivé jusqu'à la remise de votre copie.",
@@ -578,6 +600,8 @@ class BlocQuizAPIView(APIView):
             questions=questions,
             statut="en_cours",
         )
+
+        _log_evenement("quiz", apprenant, bloc, quiz_id=quiz.id, source=source_quiz)
 
         return api_success("Quiz généré.", {
             "quiz_id": quiz.id,

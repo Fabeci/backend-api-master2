@@ -83,6 +83,7 @@ from .views import (
     BlocValiderAPIView,
 )
 
+from courses.views_stats import TuteurStatsAPIView  # noqa: E402
 from courses.views_chat import (  # noqa: E402
     BlocChatAPIView,
     BlocChatStreamAPIView,
@@ -187,6 +188,7 @@ urlpatterns = [
     path('blocs/<int:bloc_id>/chat/stream/', BlocChatStreamAPIView.as_view(), name='bloc-chat-stream'),
     path('blocs/<int:bloc_id>/chat/quiz/', BlocQuizAPIView.as_view(), name='bloc-chat-quiz'),
     path('chat/quiz/<int:pk>/corriger/', QuizCorrectionAPIView.as_view(), name='chat-quiz-corriger'),
+    path('chat/tuteur/stats/', TuteurStatsAPIView.as_view(), name='chat-tuteur-stats'),
     path('chat/conversations/<int:pk>/', ConversationChatDetailAPIView.as_view(), name='chat-conversation-detail'),
     path('chat/conversations/<int:pk>/nouvelle/', ConversationChatNouvelleAPIView.as_view(), name='chat-conversation-nouvelle'),
 ]

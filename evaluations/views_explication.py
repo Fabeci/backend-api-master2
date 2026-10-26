@@ -209,6 +209,20 @@ class PassageEvaluationExplicationAPIView(APIView):
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
+        try:
+            from courses.models import EvenementTuteur
+
+            EvenementTuteur.objects.create(
+                type="explication",
+                apprenant=apprenant,
+                cours=passage.evaluation.cours,
+                bloc=bloc,
+                institution=getattr(passage.evaluation.cours, "institution", None),
+                metadata={"question_id": question.id},
+            )
+        except Exception:  # noqa: BLE001
+            logger.debug("[explication] journalisation impossible", exc_info=True)
+
         return api_success("Explication générée.", {
             "question_id": question.id,
             "enonce": _texte(question.enonce_texte),
