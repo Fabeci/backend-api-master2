@@ -58,6 +58,7 @@ def _msg_data(message: MessageTuteur) -> dict:
         "statut": message.statut,
         "erreur": message.erreur,
         "duree_ms": message.duree_ms,
+        "sources": message.sources or [],
         "cree_le": message.cree_le,
     }
 
@@ -295,6 +296,7 @@ class BlocChatAPIView(APIView):
         if resultat.get("ok"):
             assistant.contenu = resultat["content"]
             assistant.statut = "termine"
+            assistant.sources = resultat.get("sources") or []
             assistant.save()
             conv.save(update_fields=["maj_le"])
             return api_success(
@@ -489,6 +491,7 @@ class BlocChatStreamAPIView(APIView):
                         assistant.statut = "termine"
                         assistant.fournisseur = (evenement.get("provider") or "")[:40]
                         assistant.modele = (evenement.get("model") or "")[:80]
+                        assistant.sources = evenement.get("sources") or []
                         assistant.save()
                         conv.save(update_fields=["maj_le"])
                         termine = True

@@ -1140,6 +1140,8 @@ class MessageTuteur(models.Model):
     duree_ms = models.PositiveIntegerField(null=True, blank=True)
     # Idempotence : identifiant fourni par le client pour éviter les doubles envois.
     client_id = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    # Citations affichées sous la réponse (bloc(s) source du cours).
+    sources = models.JSONField(default=list, blank=True, verbose_name="Sources citées")
     cree_le = models.DateTimeField(auto_now_add=True)
 
     class Meta:

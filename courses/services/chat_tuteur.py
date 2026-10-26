@@ -14,6 +14,7 @@ from django.conf import settings
 from django.utils.html import strip_tags
 
 from analytics.services.llm_provider import call_llm, stream_llm
+from courses.models import BlocContenu
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +224,70 @@ def _prompt_utilisateur(ctx: dict, historique: list, question: str) -> str:
 
 
 
+
+
+def sources_pour(bloc, question: str = "") -> list[dict]:
+    """Sources citables : le bloc courant + les blocs voisins réellement pertinents.
+
+    Aucun accès supplémentaire n'est ouvert : on reste dans le même cours et on
+    vérifie la disponibilité de chaque bloc.
+    """
+    sequence = bloc.sequence
+    module = sequence.module
+    cours = module.cours
+
+    def _source(b, principal=False):
+        return {
+            "bloc_id": b.id,
+            "bloc_titre": b.titre,
+            "sequence_id": b.sequence_id,
+            "sequence_titre": getattr(b.sequence, "titre", ""),
+            "module_id": getattr(b.sequence, "module_id", None),
+            "module_titre": getattr(getattr(b.sequence, "module", None), "titre", ""),
+            "cours_id": cours.id,
+            "cours_titre": cours.titre,
+            "principal": principal,
+        }
+
+    sources = [_source(bloc, True)]
+    vus = {bloc.id}
+
+    mots = list(dict.fromkeys(
+        m.lower() for m in re.findall(r"[A-Za-zÀ-ÿ0-9]{5,}", question or "")
+    ))[:6]
+    if not mots:
+        return sources
+
+    try:
+        from django.db.models import Q
+
+        from courses.publication import bloc_disponible
+
+        requete = Q()
+        for mot in mots:
+            requete |= Q(titre__icontains=mot) | Q(contenu_texte__icontains=mot)                 | Q(contenu_markdown__icontains=mot)
+
+        voisins = (
+            BlocContenu.objects
+            .filter(sequence__module__cours=cours)
+            .exclude(pk=bloc.pk)
+            .filter(requete)
+            .select_related("sequence__module")
+            .order_by("sequence__ordre", "ordre", "id")[:8]
+        )
+        for voisin in voisins:
+            if voisin.id in vus or not bloc_disponible(voisin):
+                continue
+            sources.append(_source(voisin))
+            vus.add(voisin.id)
+            if len(sources) >= 3:
+                break
+    except Exception:  # noqa: BLE001
+        logger.debug("[chat_tuteur] sources voisines indisponibles", exc_info=True)
+
+    return sources
+
+
 def _historique_recent(conversation) -> list:
     """Derniers messages utiles, hors réponses locales (que les petits modèles recopient)."""
     messages = list(
@@ -239,24 +304,31 @@ def _historique_recent(conversation) -> list:
 def repondre_flux(conversation, question: str):
     """Version streaming de `repondre` (générateur d'événements delta/done/error)."""
     ctx = contexte_bloc(conversation.bloc)
+    sources = sources_pour(conversation.bloc, question)
 
     if est_demande_solution(question):
         yield {"type": "delta", "text": reponse_refus_solution(conversation.bloc)}
-        yield {"type": "done", "provider": "local", "model": "garde-pedagogique", "tokens": 0}
+        yield {"type": "done", "provider": "local", "model": "garde-pedagogique",
+               "tokens": 0, "sources": []}
         return
 
     if est_salutation(question):
         yield {"type": "delta", "text": reponse_accueil(conversation.bloc)}
-        yield {"type": "done", "provider": "local", "model": "accueil", "tokens": 0}
+        yield {"type": "done", "provider": "local", "model": "accueil",
+               "tokens": 0, "sources": []}
         return
 
     prompt = _prompt_utilisateur(ctx, _historique_recent(conversation), question)
-    yield from stream_llm(SYSTEM_PROMPT, prompt, max_tokens=MAX_TOKENS)
+    for evenement in stream_llm(SYSTEM_PROMPT, prompt, max_tokens=MAX_TOKENS):
+        if evenement.get("type") == "done":
+            evenement = {**evenement, "sources": sources}
+        yield evenement
 
 
 def repondre(conversation, question: str) -> dict:
     """Génère la réponse du tuteur. Retourne toujours un dict (jamais d'exception)."""
     ctx = contexte_bloc(conversation.bloc)
+    sources = sources_pour(conversation.bloc, question)
 
     # Refus déterministe : solution d'évaluation (indépendant du modèle).
     if est_demande_solution(question):
@@ -268,6 +340,7 @@ def repondre(conversation, question: str) -> dict:
             "degraded": False,
             "duree_ms": 0,
             "contexte": ctx,
+            "sources": [],
         }
 
     # Salutation seule : réponse immédiate, sans appel au modèle.
@@ -280,6 +353,7 @@ def repondre(conversation, question: str) -> dict:
             "degraded": False,
             "duree_ms": 0,
             "contexte": ctx,
+            "sources": [],
         }
 
     historique = _historique_recent(conversation)
@@ -301,6 +375,7 @@ def repondre(conversation, question: str) -> dict:
             "model": "",
             "duree_ms": int((time.monotonic() - debut) * 1000),
             "contexte": ctx,
+            "sources": sources,
         }
 
     duree_ms = int((time.monotonic() - debut) * 1000)
@@ -315,6 +390,7 @@ def repondre(conversation, question: str) -> dict:
             "model": resultat.get("model", "") or "",
             "duree_ms": duree_ms,
             "contexte": ctx,
+            "sources": sources,
         }
 
     return {
@@ -325,6 +401,7 @@ def repondre(conversation, question: str) -> dict:
         "degraded": bool(resultat.get("degraded")),
         "duree_ms": duree_ms,
         "contexte": ctx,
+        "sources": sources,
     }
 
 _PRECHAUFFE_LANCE = False

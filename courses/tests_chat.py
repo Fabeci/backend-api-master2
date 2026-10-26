@@ -300,6 +300,8 @@ class ChatTuteurTests(TestCase):
         assistant = MessageTuteur.objects.filter(role="assistant").first()
         self.assertEqual(assistant.contenu, "Bonjour le monde")
         self.assertEqual(assistant.statut, "termine")
+        self.assertTrue(assistant.sources)
+        self.assertEqual(assistant.sources[0]["bloc_id"], self.bloc.id)
         self.assertEqual(MessageTuteur.objects.filter(role="user").count(), 1)
 
     def test_stream_salutation_repond_sans_modele(self):
@@ -337,3 +339,41 @@ class ChatTuteurTests(TestCase):
             f"{API}/blocs/{self.bloc.id}/chat/stream/",
             {"contenu": "Explique-moi."}, format="json")
         self.assertEqual(r.status_code, 403)
+
+    # ── Citations / sources ────────────────────────────────────────────────
+    @patch("courses.services.chat_tuteur.call_llm", side_effect=_fake_llm)
+    def test_sources_incluent_le_bloc_courant(self, _mocked):
+        r = self.as_(self.appr).post(
+            f"{API}/blocs/{self.bloc.id}/chat/",
+            {"contenu": "Explique-moi cette notion."}, format="json")
+        sources = r.data["data"]["message"]["sources"]
+        self.assertTrue(sources)
+        self.assertEqual(sources[0]["bloc_id"], self.bloc.id)
+        self.assertEqual(sources[0]["bloc_titre"], self.bloc.titre)
+        self.assertTrue(sources[0]["principal"])
+        self.assertIn(self.sequence.titre, sources[0]["sequence_titre"])
+
+    @patch("courses.services.chat_tuteur.call_llm", side_effect=_fake_llm)
+    def test_sources_voisines_pertinentes(self, _mocked):
+        voisin = BlocContenu.objects.create(
+            sequence=self.sequence,
+            titre="Les boucles for",
+            type_bloc="texte",
+            contenu_texte="Une boucle for répète un traitement.",
+        )
+        r = self.as_(self.appr).post(
+            f"{API}/blocs/{self.bloc.id}/chat/",
+            {"contenu": "Explique-moi les boucles for."}, format="json")
+        ids = [s["bloc_id"] for s in r.data["data"]["message"]["sources"]]
+        self.assertIn(self.bloc.id, ids)
+        self.assertIn(voisin.id, ids)
+        self.assertLessEqual(len(ids), 3)
+
+    @patch("courses.services.chat_tuteur.call_llm", side_effect=_fake_llm)
+    def test_historique_conserve_les_sources(self, _mocked):
+        self.as_(self.appr).post(
+            f"{API}/blocs/{self.bloc.id}/chat/",
+            {"contenu": "Explique-moi cette notion."}, format="json")
+        r = self.as_(self.appr).get(f"{API}/blocs/{self.bloc.id}/chat/")
+        assistant = [m for m in r.data["data"]["messages"] if m["role"] == "assistant"][0]
+        self.assertTrue(assistant["sources"])
