@@ -70,7 +70,7 @@ def _extract_json_block(text: str) -> str:
 
 # ── Fournisseurs ────────────────────────────────────────────────────────────
 
-def _call_ollama(system_prompt, user_prompt, json_mode, max_tokens):
+def _call_ollama(system_prompt, user_prompt, json_mode, max_tokens, timeout=None):
     """LLM 100 % local / hors-ligne via l'API HTTP d'Ollama."""
     if httpx is None:
         return _err('httpx non installé')
@@ -112,14 +112,14 @@ def _call_ollama(system_prompt, user_prompt, json_mode, max_tokens):
     return {'content': content, 'tokens': tokens, 'error': None}
 
 
-def _call_claude(system_prompt, user_prompt, json_mode, max_tokens):
+def _call_claude(system_prompt, user_prompt, json_mode, max_tokens, timeout=None):
     if anthropic is None:
         return _err('anthropic non installé')
     api_key = getattr(settings, 'ANTHROPIC_API_KEY', '') or ''
     if not api_key:
         return _err('ANTHROPIC_API_KEY manquant')
     try:
-        client = anthropic.Anthropic(api_key=api_key)
+        client = anthropic.Anthropic(api_key=api_key, timeout=timeout or getattr(settings, 'AI_TIMEOUT', 60))
         resp = client.messages.create(
             model=getattr(settings, 'ANTHROPIC_MODEL', 'claude-sonnet-4-20250514'),
             max_tokens=max_tokens,
@@ -135,13 +135,13 @@ def _call_claude(system_prompt, user_prompt, json_mode, max_tokens):
 
 
 def _call_openai_compatible(base_url, api_key, model, system_prompt,
-                             user_prompt, json_mode, max_tokens):
+                             user_prompt, json_mode, max_tokens, timeout=None):
     """OpenAI et Mistral partagent l'API /chat/completions."""
     if httpx is None:
         return _err('httpx non installé')
     if not api_key:
         return _err('clé API manquante')
-    timeout = getattr(settings, 'AI_TIMEOUT', 60)
+    timeout = timeout or getattr(settings, 'AI_TIMEOUT', 60)
     payload = {
         'model': model,
         'messages': [
@@ -170,7 +170,7 @@ def _call_openai_compatible(base_url, api_key, model, system_prompt,
         return _err(str(exc))
 
 
-def _call_gemini(system_prompt, user_prompt, json_mode, max_tokens):
+def _call_gemini(system_prompt, user_prompt, json_mode, max_tokens, timeout=None):
     if httpx is None:
         return _err('httpx non installé')
     api_key = getattr(settings, 'GEMINI_API_KEY', '') or getattr(settings, 'GOOGLE_API_KEY', '')
@@ -262,7 +262,8 @@ def _model_for(provider: str) -> str:
 
 
 def call_llm(system_prompt: str, user_prompt: str,
-             json_mode: bool = True, max_tokens: int = None) -> dict:
+             json_mode: bool = True, max_tokens: int = None,
+             timeout: int = None) -> dict:
     """
     Appelle le fournisseur LLM configuré (settings.AI_PROVIDER).
 
@@ -282,7 +283,7 @@ def call_llm(system_prompt: str, user_prompt: str,
         return _norm(
             _call_openai_compatible('https://api.openai.com/v1',
                                     getattr(settings, 'OPENAI_API_KEY', ''),
-                                    model, system_prompt, user_prompt, json_mode, max_tokens),
+                                    model, system_prompt, user_prompt, json_mode, max_tokens, timeout),
             'openai', model,
         )
     if provider == 'mistral':
@@ -290,7 +291,7 @@ def call_llm(system_prompt: str, user_prompt: str,
         return _norm(
             _call_openai_compatible('https://api.mistral.ai/v1',
                                     getattr(settings, 'MISTRAL_API_KEY', ''),
-                                    model, system_prompt, user_prompt, json_mode, max_tokens),
+                                    model, system_prompt, user_prompt, json_mode, max_tokens, timeout),
             'mistral', model,
         )
 
@@ -301,7 +302,7 @@ def call_llm(system_prompt: str, user_prompt: str,
         fn = _call_claude
 
     model = _model_for(provider)
-    result = fn(system_prompt, user_prompt, json_mode, max_tokens)
+    result = fn(system_prompt, user_prompt, json_mode, max_tokens, timeout)
 
     # Repli local si le fournisseur échoue (utile quand le réseau est instable).
     if result.get('error') and provider != 'mock' and fallback_enabled:
@@ -335,13 +336,13 @@ def _provider_courant() -> str:
     return (getattr(settings, 'AI_PROVIDER', 'claude') or 'claude').strip().lower()
 
 
-def _stream_ollama(system_prompt, user_prompt, max_tokens):
+def _stream_ollama(system_prompt, user_prompt, max_tokens, timeout=None):
     if httpx is None:
         yield {'type': 'error', 'message': 'httpx non installé'}
         return
     base = (getattr(settings, 'OLLAMA_BASE_URL', 'http://127.0.0.1:11434') or '').rstrip('/')
     modele = getattr(settings, 'OLLAMA_MODEL', 'qwen2.5:3b-instruct')
-    timeout = getattr(settings, 'AI_TIMEOUT', 60)
+    timeout = timeout or getattr(settings, 'AI_TIMEOUT', 60)
     payload = {
         'model': modele,
         'messages': [
@@ -381,14 +382,14 @@ def _stream_ollama(system_prompt, user_prompt, max_tokens):
         yield {'type': 'error', 'message': f'Ollama : {exc}'}
 
 
-def _stream_openai_compatible(base_url, api_key, modele, system_prompt, user_prompt, max_tokens):
+def _stream_openai_compatible(base_url, api_key, modele, system_prompt, user_prompt, max_tokens, timeout=None):
     if httpx is None:
         yield {'type': 'error', 'message': 'httpx non installé'}
         return
     if not api_key:
         yield {'type': 'error', 'message': 'clé API manquante'}
         return
-    timeout = getattr(settings, 'AI_TIMEOUT', 60)
+    timeout = timeout or getattr(settings, 'AI_TIMEOUT', 60)
     payload = {
         'model': modele,
         'messages': [
@@ -436,7 +437,7 @@ def _stream_claude(system_prompt, user_prompt, max_tokens):
         return
     modele = getattr(settings, 'ANTHROPIC_MODEL', 'claude-sonnet-4-20250514')
     try:
-        client = anthropic.Anthropic(api_key=api_key)
+        client = anthropic.Anthropic(api_key=api_key, timeout=timeout or getattr(settings, 'AI_TIMEOUT', 60))
         with client.messages.stream(
             model=modele,
             max_tokens=max_tokens,

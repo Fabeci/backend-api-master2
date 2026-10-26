@@ -13,13 +13,15 @@ from html import unescape
 
 from analytics.services.llm_provider import _extract_json_block, call_llm
 
+from django.conf import settings
+
 from . import chat_tuteur, rag
 
 logger = logging.getLogger(__name__)
 
 NB_QUESTIONS = 3
 NB_OPTIONS = 4
-MAX_TOKENS_QUIZ = 900
+MAX_TOKENS_QUIZ = 600
 
 SYSTEM_PROMPT = (
     "Tu es un concepteur de quiz pédagogiques pour SOMAPRO. "
@@ -66,7 +68,7 @@ def _prompt(conversation) -> str:
         lignes.append(f"OBJECTIFS : {ctx['objectifs']}")
 
     if ctx["contenu_disponible"]:
-        lignes.append("CONTENU DU BLOC :\n" + ctx["contenu"])
+        lignes.append("CONTENU DU BLOC :\n" + ctx["contenu"][:2000])
     else:
         lignes.append(
             "CONTENU DU BLOC : non disponible (média/fichier). "
@@ -79,11 +81,11 @@ def _prompt(conversation) -> str:
         extraits = []
     if extraits:
         lignes.append("EXTRAITS DE DOCUMENTS :")
-        for index, extrait in enumerate(extraits, start=1):
+        for index, extrait in enumerate(extraits[:2], start=1):
             page = f", page {extrait.get('page')}" if extrait.get("page") else ""
             lignes.append(
                 f"[{index}] ({extrait.get('source_nom')}{page}) : "
-                f"{extrait.get('texte', '')[:1200]}"
+                f"{extrait.get('texte', '')[:700]}"
             )
 
     lignes.append(f"Génère {NB_QUESTIONS} questions maintenant, au format JSON demandé.")
@@ -139,6 +141,13 @@ def _valider_questions(data) -> list[dict]:
 
 def generer_quiz(conversation):
     """Retourne (questions, erreur). Les questions contiennent la clé de correction."""
+    provider = (getattr(settings, "AI_PROVIDER", "") or "").strip().lower()
+    if provider == "mock":
+        return [], (
+            "L'assistant IA n'est pas configuré (mode démonstration). "
+            "Renseignez AI_PROVIDER et une clé API pour générer un quiz."
+        )
+
     try:
         rag.assurer_index_bloc(conversation.bloc)
     except Exception:  # noqa: BLE001
@@ -149,6 +158,7 @@ def generer_quiz(conversation):
         _prompt(conversation),
         json_mode=True,
         max_tokens=MAX_TOKENS_QUIZ,
+        timeout=75,
     )
     if resultat.get("error"):
         return [], f"IA indisponible : {resultat['error']}"
