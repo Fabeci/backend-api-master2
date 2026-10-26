@@ -83,6 +83,12 @@ from .views import (
     BlocValiderAPIView,
 )
 
+from courses.views_chat import (  # noqa: E402
+    BlocChatAPIView,
+    ConversationChatDetailAPIView,
+    ConversationChatNouvelleAPIView,
+)
+
 urlpatterns = [
     # Cours
     path('cours/', CoursListCreateAPIView.as_view(), name='cours-list-create'),
@@ -170,4 +176,11 @@ urlpatterns = [
 
     path('progress/cours/', CoursProgressListAPIView.as_view(), name='progress-cours-list'),
     path('progress/cours/<int:cours_id>/', CoursProgressToggleAPIView.as_view(), name='progress-cours-toggle'),
+
+    # =========================================================================
+    # ASSISTANT PÉDAGOGIQUE IA (chat par bloc)
+    # =========================================================================
+    path('blocs/<int:bloc_id>/chat/', BlocChatAPIView.as_view(), name='bloc-chat'),
+    path('chat/conversations/<int:pk>/', ConversationChatDetailAPIView.as_view(), name='chat-conversation-detail'),
+    path('chat/conversations/<int:pk>/nouvelle/', ConversationChatNouvelleAPIView.as_view(), name='chat-conversation-nouvelle'),
 ]

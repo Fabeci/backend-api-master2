@@ -233,6 +233,7 @@ REST_FRAMEWORK = {
         'anon': '200/hour',
         'user': '2000/hour',
         'login': '5/minute',   # scope utilisé sur UserLoginAPIView
+        'chat_tuteur': '40/hour',  # assistant pédagogique (chat par bloc)
     },
 }
 
