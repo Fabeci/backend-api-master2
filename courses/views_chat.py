@@ -9,9 +9,12 @@ Sécurité :
 """
 from __future__ import annotations
 
+import json
 import threading
 from datetime import timedelta
 
+from django.db import close_old_connections
+from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -150,6 +153,13 @@ def _evaluation_en_cours(apprenant, cours) -> bool:
         statut="en_cours",
         evaluation__cours=cours,
     ).exists()
+
+
+
+
+def _sse(evenement: str, donnees: dict) -> str:
+    """Formate un événement Server-Sent Events."""
+    return f"event: {evenement}\ndata: {json.dumps(donnees, default=str)}\n\n"
 
 
 class ConversationIntrouvable(Exception):
@@ -387,3 +397,135 @@ class ConversationChatNouvelleAPIView(APIView):
                 "suggestions": chat_tuteur.suggestions(conv.bloc),
             },
         )
+
+
+class BlocChatStreamAPIView(APIView):
+    """POST : même logique que BlocChatAPIView, mais réponse en flux SSE."""
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ChatTuteurThrottle]
+
+    def post(self, request, bloc_id: int):
+        bloc = _bloc_complet(bloc_id)
+        apprenant, erreur, code = _acces_bloc(request.user, bloc)
+        if erreur:
+            return api_error(erreur, http_status=code)
+
+        if _evaluation_en_cours(apprenant, bloc.sequence.module.cours):
+            return api_error(
+                "Une évaluation est en cours pour ce cours : l'assistant est "
+                "désactivé jusqu'à la remise de votre copie.",
+                http_status=423,
+            )
+
+        contenu = str(request.data.get("contenu") or request.data.get("message") or "").strip()
+        client_id = str(request.data.get("client_id") or "").strip()[:64]
+
+        if not contenu:
+            return api_error("Le message est vide.", http_status=status.HTTP_400_BAD_REQUEST)
+        if len(contenu) > MAX_MESSAGE:
+            return api_error(
+                f"Message trop long (maximum {MAX_MESSAGE} caractères).",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        conv = _conversation_active(apprenant, bloc)
+
+        # Idempotence : on rejoue la réponse déjà produite, en flux.
+        if client_id:
+            deja = (
+                MessageTuteur.objects
+                .filter(conversation=conv, role="user", client_id=client_id)
+                .first()
+            )
+            if deja is not None:
+                reponse = (
+                    conv.messages
+                    .filter(role="assistant", cree_le__gte=deja.cree_le)
+                    .order_by("cree_le", "id")
+                    .first()
+                )
+
+                def rejouer():
+                    if reponse and reponse.contenu:
+                        yield _sse("delta", {"delta": reponse.contenu})
+                    yield _sse("done", {
+                        "message": _msg_data(reponse) if reponse else None,
+                        "conversation": _conv_data(conv),
+                        "messages": _messages_data(conv),
+                    })
+
+                response = StreamingHttpResponse(rejouer(), content_type="text/event-stream")
+                response["Cache-Control"] = "no-cache"
+                response["X-Accel-Buffering"] = "no"
+                return response
+
+        limite = timezone.now() - timedelta(seconds=EN_COURS_TTL_SECONDES)
+        if conv.messages.filter(role="assistant", statut="en_cours", cree_le__gte=limite).exists():
+            return api_error(
+                "Une réponse est déjà en cours pour cette conversation. Patientez un instant.",
+                http_status=status.HTTP_409_CONFLICT,
+            )
+
+        MessageTuteur.objects.create(
+            conversation=conv, role="user", contenu=contenu,
+            statut="termine", client_id=client_id,
+        )
+        assistant = MessageTuteur.objects.create(
+            conversation=conv, role="assistant", contenu="", statut="en_cours",
+        )
+
+        def generer():
+            morceaux = []
+            termine = False
+            try:
+                for evenement in chat_tuteur.repondre_flux(conv, contenu):
+                    if evenement.get("type") == "delta":
+                        texte = evenement.get("text") or ""
+                        if texte:
+                            morceaux.append(texte)
+                            yield _sse("delta", {"delta": texte})
+                    elif evenement.get("type") == "done":
+                        assistant.contenu = "".join(morceaux)
+                        assistant.statut = "termine"
+                        assistant.fournisseur = (evenement.get("provider") or "")[:40]
+                        assistant.modele = (evenement.get("model") or "")[:80]
+                        assistant.save()
+                        conv.save(update_fields=["maj_le"])
+                        termine = True
+                        yield _sse("done", {
+                            "message": _msg_data(assistant),
+                            "conversation": _conv_data(conv),
+                            "messages": _messages_data(conv),
+                        })
+                        return
+                    elif evenement.get("type") == "error":
+                        raise RuntimeError(evenement.get("message") or "Erreur IA")
+            except GeneratorExit:
+                # Client déconnecté : on conserve la réponse partielle.
+                assistant.contenu = "".join(morceaux)
+                assistant.statut = "interrompu"
+                assistant.save()
+                raise
+            except Exception as exc:  # noqa: BLE001
+                assistant.contenu = "".join(morceaux) or (
+                    "Je n'ai pas pu générer de réponse pour le moment. Réessayez."
+                )
+                assistant.statut = "erreur"
+                assistant.erreur = str(exc)[:255]
+                assistant.save()
+                conv.save(update_fields=["maj_le"])
+                yield _sse("error", {
+                    "message": "L'assistant n'a pas pu répondre. Réessayez.",
+                    "data": {"messages": _messages_data(conv)},
+                })
+            finally:
+                if not termine and assistant.statut == "en_cours":
+                    assistant.contenu = "".join(morceaux)
+                    assistant.statut = "interrompu"
+                    assistant.save()
+                close_old_connections()
+
+        response = StreamingHttpResponse(generer(), content_type="text/event-stream")
+        response["Cache-Control"] = "no-cache"
+        response["X-Accel-Buffering"] = "no"
+        return response

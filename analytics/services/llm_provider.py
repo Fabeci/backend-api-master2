@@ -321,3 +321,171 @@ def get_provider_info() -> dict:
         'offline_fallback': getattr(settings, 'AI_OFFLINE_FALLBACK', False),
         'ollama_base_url': getattr(settings, 'OLLAMA_BASE_URL', ''),
     }
+
+
+# ============================================================================
+# STREAMING — générateurs de morceaux de texte (SSE côté API)
+# Chaque yield est un dict :
+#   {'type': 'delta', 'text': '...'}
+#   {'type': 'done', 'provider': ..., 'model': ..., 'tokens': int}
+#   {'type': 'error', 'message': '...'}
+# ============================================================================
+
+def _provider_courant() -> str:
+    return (getattr(settings, 'AI_PROVIDER', 'claude') or 'claude').strip().lower()
+
+
+def _stream_ollama(system_prompt, user_prompt, max_tokens):
+    if httpx is None:
+        yield {'type': 'error', 'message': 'httpx non installé'}
+        return
+    base = (getattr(settings, 'OLLAMA_BASE_URL', 'http://127.0.0.1:11434') or '').rstrip('/')
+    modele = getattr(settings, 'OLLAMA_MODEL', 'qwen2.5:3b-instruct')
+    timeout = getattr(settings, 'AI_TIMEOUT', 60)
+    payload = {
+        'model': modele,
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_prompt},
+        ],
+        'stream': True,
+        'keep_alive': getattr(settings, 'OLLAMA_KEEP_ALIVE', '30m'),
+        'options': {
+            'temperature': 0.4,
+            'num_predict': max_tokens,
+            'num_ctx': getattr(settings, 'OLLAMA_NUM_CTX', 4096),
+        },
+    }
+    try:
+        with httpx.stream('POST', f'{base}/api/chat', json=payload, timeout=timeout) as reponse:
+            reponse.raise_for_status()
+            for ligne in reponse.iter_lines():
+                if not ligne:
+                    continue
+                try:
+                    data = json.loads(ligne)
+                except Exception:  # noqa: BLE001
+                    continue
+                if data.get('error'):
+                    yield {'type': 'error', 'message': str(data['error'])}
+                    return
+                texte = (data.get('message') or {}).get('content') or ''
+                if texte:
+                    yield {'type': 'delta', 'text': texte}
+                if data.get('done'):
+                    tokens = int(data.get('prompt_eval_count', 0)) + int(data.get('eval_count', 0))
+                    yield {'type': 'done', 'provider': 'ollama', 'model': modele, 'tokens': tokens}
+                    return
+    except Exception as exc:  # noqa: BLE001
+        logger.error('[llm/ollama/stream] %s', exc)
+        yield {'type': 'error', 'message': f'Ollama : {exc}'}
+
+
+def _stream_openai_compatible(base_url, api_key, modele, system_prompt, user_prompt, max_tokens):
+    if httpx is None:
+        yield {'type': 'error', 'message': 'httpx non installé'}
+        return
+    if not api_key:
+        yield {'type': 'error', 'message': 'clé API manquante'}
+        return
+    timeout = getattr(settings, 'AI_TIMEOUT', 60)
+    payload = {
+        'model': modele,
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_prompt},
+        ],
+        'temperature': 0.4,
+        'max_tokens': max_tokens,
+        'stream': True,
+    }
+    try:
+        with httpx.stream(
+            'POST', f'{base_url.rstrip("/")}/chat/completions',
+            headers={'Authorization': f'Bearer {api_key}'},
+            json=payload, timeout=timeout,
+        ) as reponse:
+            reponse.raise_for_status()
+            for ligne in reponse.iter_lines():
+                if not ligne or not ligne.startswith('data:'):
+                    continue
+                data = ligne[5:].strip()
+                if data == '[DONE]':
+                    yield {'type': 'done', 'provider': base_url, 'model': modele, 'tokens': 0}
+                    return
+                try:
+                    j = json.loads(data)
+                except Exception:  # noqa: BLE001
+                    continue
+                choix = (j.get('choices') or [{}])[0]
+                texte = (choix.get('delta') or {}).get('content') or ''
+                if texte:
+                    yield {'type': 'delta', 'text': texte}
+    except Exception as exc:  # noqa: BLE001
+        logger.error('[llm/openai/stream] %s', exc)
+        yield {'type': 'error', 'message': str(exc)}
+
+
+def _stream_claude(system_prompt, user_prompt, max_tokens):
+    if anthropic is None:
+        yield {'type': 'error', 'message': 'anthropic non installé'}
+        return
+    api_key = getattr(settings, 'ANTHROPIC_API_KEY', '') or ''
+    if not api_key:
+        yield {'type': 'error', 'message': 'ANTHROPIC_API_KEY manquant'}
+        return
+    modele = getattr(settings, 'ANTHROPIC_MODEL', 'claude-sonnet-4-20250514')
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        with client.messages.stream(
+            model=modele,
+            max_tokens=max_tokens,
+            system=system_prompt,
+            messages=[{'role': 'user', 'content': user_prompt}],
+        ) as flux:
+            for texte in flux.text_stream:
+                if texte:
+                    yield {'type': 'delta', 'text': texte}
+        yield {'type': 'done', 'provider': 'claude', 'model': modele, 'tokens': 0}
+    except Exception as exc:  # noqa: BLE001
+        logger.error('[llm/claude/stream] %s', exc)
+        yield {'type': 'error', 'message': str(exc)}
+
+
+def stream_llm(system_prompt: str, user_prompt: str, max_tokens: int = None):
+    """Générateur de texte en flux, quel que soit le fournisseur configuré."""
+    max_tokens = max_tokens or getattr(settings, 'ANTHROPIC_MAX_TOKENS', 4000)
+    provider = _provider_courant()
+
+    if provider == 'ollama':
+        yield from _stream_ollama(system_prompt, user_prompt, max_tokens)
+        return
+    if provider in ('openai', 'mistral'):
+        if provider == 'openai':
+            base = 'https://api.openai.com/v1'
+            cle = getattr(settings, 'OPENAI_API_KEY', '')
+            modele = _model_for('openai')
+        else:
+            base = 'https://api.mistral.ai/v1'
+            cle = getattr(settings, 'MISTRAL_API_KEY', '')
+            modele = _model_for('mistral')
+        yield from _stream_openai_compatible(base, cle, modele, system_prompt, user_prompt, max_tokens)
+        return
+    if provider == 'claude':
+        yield from _stream_claude(system_prompt, user_prompt, max_tokens)
+        return
+
+    # Fournisseurs sans streaming (gemini, mock, inconnu) : repli en un bloc.
+    resultat = call_llm(system_prompt, user_prompt, json_mode=False, max_tokens=max_tokens)
+    if resultat.get('error'):
+        yield {'type': 'error', 'message': resultat['error']}
+        return
+    contenu = (resultat.get('content') or '')
+    if contenu:
+        yield {'type': 'delta', 'text': contenu}
+    yield {
+        'type': 'done',
+        'provider': resultat.get('provider', provider),
+        'model': resultat.get('model', ''),
+        'tokens': resultat.get('tokens', 0),
+    }

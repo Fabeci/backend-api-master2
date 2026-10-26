@@ -22,7 +22,10 @@ from courses.import_views import (
 )
 from courses.import_course_views import (
     CoursImportAnalyseAPIView,
+    CoursImportAsyncStatusAPIView,
+    CoursImportAsyncTreeCreateAPIView,
     CoursImportCreateAPIView,
+    CoursImportTreeCreateAPIView,
 )
 from courses.import_inscription_views import (
     InscriptionImportAnalyseAPIView,
@@ -85,6 +88,7 @@ from .views import (
 
 from courses.views_chat import (  # noqa: E402
     BlocChatAPIView,
+    BlocChatStreamAPIView,
     ConversationChatDetailAPIView,
     ConversationChatNouvelleAPIView,
 )
@@ -94,6 +98,9 @@ urlpatterns = [
     path('cours/', CoursListCreateAPIView.as_view(), name='cours-list-create'),
     # Import d'un cours complet (Word / PDF → modules, séquences, blocs, quiz)
     path('cours/importer/analyser/', CoursImportAnalyseAPIView.as_view(), name='cours-import-analyser'),
+    path('cours/importer/creer/', CoursImportTreeCreateAPIView.as_view(), name='cours-import-create-tree'),
+    path('cours/importer/async/', CoursImportAsyncTreeCreateAPIView.as_view(), name='cours-import-create-async'),
+    path('cours/importer/async/<str:task_id>/', CoursImportAsyncStatusAPIView.as_view(), name='cours-import-async-status'),
     path('cours/importer/', CoursImportCreateAPIView.as_view(), name='cours-import-create'),
     path('cours/<int:pk>/', CoursDetailAPIView.as_view(), name='cours-detail'),
     path('cours/<int:cours_id>/modules/', CoursModulesAPIView.as_view(), name='cours-modules'),
@@ -181,6 +188,7 @@ urlpatterns = [
     # ASSISTANT PÉDAGOGIQUE IA (chat par bloc)
     # =========================================================================
     path('blocs/<int:bloc_id>/chat/', BlocChatAPIView.as_view(), name='bloc-chat'),
+    path('blocs/<int:bloc_id>/chat/stream/', BlocChatStreamAPIView.as_view(), name='bloc-chat-stream'),
     path('chat/conversations/<int:pk>/', ConversationChatDetailAPIView.as_view(), name='chat-conversation-detail'),
     path('chat/conversations/<int:pk>/nouvelle/', ConversationChatNouvelleAPIView.as_view(), name='chat-conversation-nouvelle'),
 ]

@@ -13,7 +13,7 @@ import time
 from django.conf import settings
 from django.utils.html import strip_tags
 
-from analytics.services.llm_provider import call_llm
+from analytics.services.llm_provider import call_llm, stream_llm
 
 logger = logging.getLogger(__name__)
 
@@ -221,6 +221,39 @@ def _prompt_utilisateur(ctx: dict, historique: list, question: str) -> str:
     return "\n\n".join(lignes)
 
 
+
+
+def _historique_recent(conversation) -> list:
+    """Derniers messages utiles, hors réponses locales (que les petits modèles recopient)."""
+    messages = list(
+        conversation.messages
+        .filter(statut="termine")
+        .exclude(role="systeme")
+        .exclude(fournisseur="local")
+        .order_by("-cree_le", "-id")[:HISTORIQUE_MAX]
+    )
+    messages.reverse()
+    return messages
+
+
+def repondre_flux(conversation, question: str):
+    """Version streaming de `repondre` (générateur d'événements delta/done/error)."""
+    ctx = contexte_bloc(conversation.bloc)
+
+    if est_demande_solution(question):
+        yield {"type": "delta", "text": reponse_refus_solution(conversation.bloc)}
+        yield {"type": "done", "provider": "local", "model": "garde-pedagogique", "tokens": 0}
+        return
+
+    if est_salutation(question):
+        yield {"type": "delta", "text": reponse_accueil(conversation.bloc)}
+        yield {"type": "done", "provider": "local", "model": "accueil", "tokens": 0}
+        return
+
+    prompt = _prompt_utilisateur(ctx, _historique_recent(conversation), question)
+    yield from stream_llm(SYSTEM_PROMPT, prompt, max_tokens=MAX_TOKENS)
+
+
 def repondre(conversation, question: str) -> dict:
     """Génère la réponse du tuteur. Retourne toujours un dict (jamais d'exception)."""
     ctx = contexte_bloc(conversation.bloc)
@@ -249,16 +282,7 @@ def repondre(conversation, question: str) -> dict:
             "contexte": ctx,
         }
 
-    # On exclut les réponses générées localement (accueil, garde pédagogique) :
-    # un petit modèle les recopie au lieu de répondre.
-    historique = list(
-        conversation.messages
-        .filter(statut="termine")
-        .exclude(role="systeme")
-        .exclude(fournisseur="local")
-        .order_by("-cree_le", "-id")[:HISTORIQUE_MAX]
-    )
-    historique.reverse()
+    historique = _historique_recent(conversation)
 
     debut = time.monotonic()
     try:

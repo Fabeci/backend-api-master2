@@ -277,3 +277,63 @@ class ChatTuteurTests(TestCase):
         r = self.as_(self.appr).get(f"{API}/blocs/{self.bloc.id}/chat/")
         self.assertEqual(r.status_code, 200)
         self.assertFalse(r.data["data"]["evaluation"]["en_cours"])
+
+    # ── Streaming SSE ──────────────────────────────────────────────────────
+    @patch("courses.services.chat_tuteur.stream_llm")
+    def test_stream_envoie_les_deltas_et_persiste(self, mocked_stream):
+        def faux_flux(*args, **kwargs):
+            yield {"type": "delta", "text": "Bonjour "}
+            yield {"type": "delta", "text": "le monde"}
+            yield {"type": "done", "provider": "mock", "model": "test", "tokens": 3}
+
+        mocked_stream.side_effect = faux_flux
+        r = self.as_(self.appr).post(
+            f"{API}/blocs/{self.bloc.id}/chat/stream/",
+            {"contenu": "Explique-moi."}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("text/event-stream", r["Content-Type"])
+        corps = b"".join(r.streaming_content).decode()
+        self.assertIn("Bonjour ", corps)
+        self.assertIn("le monde", corps)
+        self.assertIn("event: done", corps)
+
+        assistant = MessageTuteur.objects.filter(role="assistant").first()
+        self.assertEqual(assistant.contenu, "Bonjour le monde")
+        self.assertEqual(assistant.statut, "termine")
+        self.assertEqual(MessageTuteur.objects.filter(role="user").count(), 1)
+
+    def test_stream_salutation_repond_sans_modele(self):
+        r = self.as_(self.appr).post(
+            f"{API}/blocs/{self.bloc.id}/chat/stream/",
+            {"contenu": "Bonjour"}, format="json")
+        corps = b"".join(r.streaming_content).decode()
+        self.assertIn("Je suis votre tuteur", corps)
+        self.assertIn("event: done", corps)
+
+    @patch("courses.services.chat_tuteur.stream_llm")
+    def test_stream_erreur_ia_persiste_le_statut(self, mocked_stream):
+        def flux_en_erreur(*args, **kwargs):
+            yield {"type": "error", "message": "timeout"}
+
+        mocked_stream.side_effect = flux_en_erreur
+        r = self.as_(self.appr).post(
+            f"{API}/blocs/{self.bloc.id}/chat/stream/",
+            {"contenu": "Explique-moi."}, format="json")
+        corps = b"".join(r.streaming_content).decode()
+        self.assertIn("event: error", corps)
+        assistant = MessageTuteur.objects.filter(role="assistant").first()
+        self.assertEqual(assistant.statut, "erreur")
+
+    def test_stream_bloque_pendant_evaluation(self):
+        self._passage_evaluation(statut="en_cours")
+        r = self.as_(self.appr).post(
+            f"{API}/blocs/{self.bloc.id}/chat/stream/",
+            {"contenu": "Explique-moi."}, format="json")
+        self.assertEqual(r.status_code, 423)
+        self.assertEqual(MessageTuteur.objects.count(), 0)
+
+    def test_stream_acces_refuse_sans_inscription(self):
+        r = self.as_(self.autre).post(
+            f"{API}/blocs/{self.bloc.id}/chat/stream/",
+            {"contenu": "Explique-moi."}, format="json")
+        self.assertEqual(r.status_code, 403)
