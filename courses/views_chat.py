@@ -553,7 +553,7 @@ class BlocQuizAPIView(APIView):
             )
 
         conv = _conversation_active(apprenant, bloc)
-        questions, erreur_quiz = quiz_tuteur.generer_quiz(conv)
+        questions, erreur_quiz, source_quiz = quiz_tuteur.generer_quiz(conv)
         if erreur_quiz:
             return Response(
                 {
@@ -579,6 +579,7 @@ class BlocQuizAPIView(APIView):
         return api_success("Quiz généré.", {
             "quiz_id": quiz.id,
             "titre": quiz.titre,
+            "source": source_quiz,
             "questions": quiz_tuteur.questions_publiques(questions),
         })
 

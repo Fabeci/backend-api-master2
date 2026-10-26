@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 import re
 from html import unescape
 
@@ -16,6 +17,7 @@ from analytics.services.llm_provider import _extract_json_block, call_llm
 from django.conf import settings
 
 from . import chat_tuteur, rag
+from .rag import STOPWORDS
 
 logger = logging.getLogger(__name__)
 
@@ -140,12 +142,18 @@ def _valider_questions(data) -> list[dict]:
 
 
 def generer_quiz(conversation):
-    """Retourne (questions, erreur). Les questions contiennent la clé de correction."""
+    """Retourne (questions, erreur, source). source = 'ia' ou 'contenu'."""
     provider = (getattr(settings, "AI_PROVIDER", "") or "").strip().lower()
+
+    def _secours(erreur: str):
+        questions = quiz_depuis_contenu(conversation.bloc)
+        if questions:
+            return questions, None, "contenu"
+        return [], erreur, "contenu"
+
     if provider == "mock":
-        return [], (
-            "L'assistant IA n'est pas configuré (mode démonstration). "
-            "Renseignez AI_PROVIDER et une clé API pour générer un quiz."
+        return _secours(
+            "Aucun contenu textuel exploitable dans ce bloc pour générer un quiz."
         )
 
     try:
@@ -161,13 +169,80 @@ def generer_quiz(conversation):
         timeout=75,
     )
     if resultat.get("error"):
-        return [], f"IA indisponible : {resultat['error']}"
+        return _secours(f"IA indisponible : {resultat['error']}")
 
     questions = _valider_questions(_parser_json(resultat.get("content") or ""))
     if len(questions) < 2:
-        return [], "Le quiz généré est incomplet. Réessayez."
+        return _secours("Le quiz généré par l'IA est incomplet.")
 
-    return questions, None
+    return questions, None, "ia"
+
+
+
+
+# ── Quiz de secours (déterministe, sans IA) ─────────────────────────────────
+
+def _phrases(texte: str) -> list[str]:
+    texte = re.sub(r"\s+", " ", unescape(texte or "")).strip()
+    morceaux = re.split(r"(?<=[.!?])\s+", texte)
+    return [
+        m.strip() for m in morceaux
+        if 40 <= len(m.strip()) <= 260
+    ]
+
+
+def _mots(texte: str) -> list[str]:
+    return [
+        m for m in re.findall(r"[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'-]{4,}", texte or "")
+        if m.lower() not in STOPWORDS
+    ]
+
+
+def quiz_depuis_contenu(bloc) -> list[dict]:
+    """Construit 2-3 QCM « complétez la phrase » à partir du texte du bloc.
+
+    Utilisé quand le fournisseur IA est absent ou renvoie un JSON inexploitable.
+    """
+    texte = chat_tuteur.texte_du_bloc(bloc)
+    phrases = _phrases(texte)
+    if not phrases:
+        return []
+
+    tous_mots = list(dict.fromkeys(_mots(texte)))
+    questions: list[dict] = []
+    rng = random.Random(bloc.id or 1)
+
+    for phrase in phrases:
+        candidats = [m for m in _mots(phrase) if len(m) >= 5]
+        if not candidats:
+            continue
+        correct = max(candidats, key=len)
+        distracteurs = [
+            m for m in tous_mots
+            if m.lower() != correct.lower()
+            and abs(len(m) - len(correct)) <= 5
+        ][:3]
+        if len(distracteurs) < 3:
+            distracteurs = [m for m in tous_mots if m.lower() != correct.lower()][:3]
+        if len(distracteurs) < 3:
+            continue
+
+        options = [correct, *distracteurs]
+        rng.shuffle(options)
+        enonce = re.sub(re.escape(correct), "______", phrase, count=1, flags=re.IGNORECASE)
+        if "______" not in enonce:
+            continue
+
+        questions.append({
+            "question": f"Complétez : « {enonce} »",
+            "options": options,
+            "bonne_reponse": options.index(correct),
+            "explication": phrase,
+        })
+        if len(questions) >= NB_QUESTIONS:
+            break
+
+    return questions
 
 
 def questions_publiques(questions: list[dict]) -> list[dict]:

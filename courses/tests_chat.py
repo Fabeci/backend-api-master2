@@ -485,6 +485,7 @@ class ChatTuteurTests(TestCase):
         self.assertNotIn("bonne_reponse", questions[0])
         self.assertNotIn("explication", questions[0])
         self.assertEqual(len(questions[0]["options"]), 4)
+        self.assertEqual(r.data["data"]["source"], "ia")
         self.assertEqual(QuizTuteur.objects.count(), 1)
 
     @patch("courses.services.quiz_tuteur.call_llm")
@@ -526,11 +527,29 @@ class ChatTuteurTests(TestCase):
         self.assertEqual(r.status_code, 404)
 
     @patch("courses.services.quiz_tuteur.call_llm")
-    def test_quiz_json_invalide_renvoie_502(self, mocked):
+    def test_quiz_json_invalide_utilise_le_secours(self, mocked):
         mocked.return_value = {"content": "ceci n'est pas du json", "error": None, "provider": "mock", "model": "test"}
         r = self.as_(self.appr).post(f"{API}/blocs/{self.bloc.id}/chat/quiz/")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data["data"]["source"], "contenu")
+        self.assertGreaterEqual(len(r.data["data"]["questions"]), 1)
+        self.assertEqual(QuizTuteur.objects.count(), 1)
+
+    @override_settings(AI_PROVIDER="mock")
+    def test_quiz_mock_utilise_le_secours_sans_ia(self):
+        r = self.as_(self.appr).post(f"{API}/blocs/{self.bloc.id}/chat/quiz/")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data["data"]["source"], "contenu")
+        self.assertGreaterEqual(len(r.data["data"]["questions"]), 1)
+
+    @patch("courses.services.quiz_tuteur.call_llm")
+    def test_quiz_sans_contenu_ni_ia_renvoie_502(self, mocked):
+        mixed = json.dumps({"questions": []})
+        mocked.return_value = {"content": mixed, "error": None, "provider": "mock", "model": "test"}
+        bloc_vide = BlocContenu.objects.create(
+            sequence=self.sequence, titre="Vidéo sans texte", type_bloc="video")
+        r = self.as_(self.appr).post(f"{API}/blocs/{bloc_vide.id}/chat/quiz/")
         self.assertEqual(r.status_code, 502)
-        self.assertEqual(QuizTuteur.objects.count(), 0)
 
     def test_quiz_bloque_pendant_evaluation(self):
         self._passage_evaluation(statut="en_cours")
