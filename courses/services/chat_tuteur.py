@@ -16,6 +16,8 @@ from django.utils.html import strip_tags
 from analytics.services.llm_provider import call_llm, stream_llm
 from courses.models import BlocContenu
 
+from . import rag
+
 logger = logging.getLogger(__name__)
 
 MAX_QUESTION = 2000          # caractères par message apprenant
@@ -53,6 +55,8 @@ SYSTEM_PROMPT = (
     "10. Ne prétends jamais avoir analysé une vidéo, un PDF, un audio ou un document dont "
     "le contenu ne t'est pas fourni.\n"
     "11. Sois concis (300 à 450 mots maximum sauf demande explicite) et évite les répétitions.\n"
+    "12. Lorsque tu t'appuies sur un EXTRAIT DE DOCUMENT numéroté, cite-le entre crochets "
+    "(ex. [1]) pour que l'apprenant retrouve la source.\n"
     "Utilise du Markdown simple (titres courts, listes, gras, code) sans HTML brut."
 )
 
@@ -212,6 +216,17 @@ def _prompt_utilisateur(ctx: dict, historique: list, question: str) -> str:
     if ctx["ressources"]:
         lignes.append("RESSOURCES ASSOCIÉES : " + " ; ".join(ctx["ressources"]))
 
+    extraits = ctx.get("extraits") or []
+    if extraits:
+        lignes.append(
+            "EXTRAITS DE DOCUMENTS DU COURS (sources officielles ; cite-les sous la forme [1], [2]…) :"
+        )
+        for index, extrait in enumerate(extraits, start=1):
+            page = f", page {extrait.get('page')}" if extrait.get("page") else ""
+            lignes.append(
+                f"[{index}] ({extrait.get('source_nom')}{page}) : {extrait.get('texte', '')[:1500]}"
+            )
+
     if historique:
         lignes.append("HISTORIQUE RÉCENT DE LA CONVERSATION :")
         for message in historique:
@@ -226,7 +241,7 @@ def _prompt_utilisateur(ctx: dict, historique: list, question: str) -> str:
 
 
 
-def sources_pour(bloc, question: str = "") -> list[dict]:
+def sources_pour(bloc, question: str = "", extraits: list | None = None) -> list[dict]:
     """Sources citables : le bloc courant + les blocs voisins réellement pertinents.
 
     Aucun accès supplémentaire n'est ouvert : on reste dans le même cours et on
@@ -238,6 +253,7 @@ def sources_pour(bloc, question: str = "") -> list[dict]:
 
     def _source(b, principal=False):
         return {
+            "kind": "bloc",
             "bloc_id": b.id,
             "bloc_titre": b.titre,
             "sequence_id": b.sequence_id,
@@ -280,12 +296,49 @@ def sources_pour(bloc, question: str = "") -> list[dict]:
                 continue
             sources.append(_source(voisin))
             vus.add(voisin.id)
-            if len(sources) >= 3:
+            if len(sources) >= 2:
                 break
     except Exception:  # noqa: BLE001
         logger.debug("[chat_tuteur] sources voisines indisponibles", exc_info=True)
 
+    # Citations de passages de documents (RAG)
+    for extrait in (extraits or [])[:2]:
+        sources.append({
+            "kind": "document",
+            "document_nom": extrait.get("source_nom") or "Document",
+            "page": extrait.get("page"),
+            "bloc_id": extrait.get("bloc_id") or bloc.id,
+            "sequence_id": sequence.id,
+            "sequence_titre": sequence.titre,
+            "module_id": module.id,
+            "module_titre": module.titre,
+            "cours_id": cours.id,
+            "cours_titre": cours.titre,
+            "principal": False,
+        })
+
     return sources
+
+
+
+
+def _preparer_contexte(conversation, question: str):
+    """Contexte pédagogique + extraits RAG + sources citables."""
+    bloc = conversation.bloc
+    try:
+        rag.assurer_index_bloc(bloc)
+    except Exception:  # noqa: BLE001
+        logger.exception("[chat_tuteur] indexation RAG impossible")
+
+    ctx = contexte_bloc(bloc)
+    try:
+        ctx["extraits"] = rag.rechercher(bloc.sequence.module.cours, question)
+    except Exception:  # noqa: BLE001
+        logger.exception("[chat_tuteur] recherche RAG impossible")
+        ctx["extraits"] = []
+
+    sources = sources_pour(bloc, question, ctx["extraits"])
+    return ctx, sources
 
 
 def _historique_recent(conversation) -> list:
@@ -303,8 +356,7 @@ def _historique_recent(conversation) -> list:
 
 def repondre_flux(conversation, question: str):
     """Version streaming de `repondre` (générateur d'événements delta/done/error)."""
-    ctx = contexte_bloc(conversation.bloc)
-    sources = sources_pour(conversation.bloc, question)
+    ctx, sources = _preparer_contexte(conversation, question)
 
     if est_demande_solution(question):
         yield {"type": "delta", "text": reponse_refus_solution(conversation.bloc)}
@@ -327,8 +379,7 @@ def repondre_flux(conversation, question: str):
 
 def repondre(conversation, question: str) -> dict:
     """Génère la réponse du tuteur. Retourne toujours un dict (jamais d'exception)."""
-    ctx = contexte_bloc(conversation.bloc)
-    sources = sources_pour(conversation.bloc, question)
+    ctx, sources = _preparer_contexte(conversation, question)
 
     # Refus déterministe : solution d'évaluation (indépendant du modèle).
     if est_demande_solution(question):

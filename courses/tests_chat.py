@@ -3,9 +3,13 @@
 
 Lancer : python manage.py test courses.tests_chat -v2
 """
+import io
+import os
+import tempfile
 from datetime import timedelta
 from unittest.mock import Mock, patch
 
+from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -14,9 +18,10 @@ from academics.models import (
     AnneeScolaire, Classe, Groupe, Institution, Matiere,
 )
 from courses.models import (
-    BlocContenu, ConversationTuteur, Cours, InscriptionCours, MessageTuteur,
-    Module, Sequence,
+    BlocContenu, ConversationTuteur, Cours, DocumentChunk, InscriptionCours,
+    MessageTuteur, Module, Sequence,
 )
+from courses.services import rag
 from locations.models import Pays
 from users.models import Apprenant, Formateur, User, UserRole
 
@@ -33,7 +38,13 @@ def _fake_llm(system_prompt="", user_prompt="", json_mode=True, max_tokens=None)
     }
 
 
-@override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})
+MEDIA_TEST = tempfile.mkdtemp(prefix="somapro-chat-media-")
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    MEDIA_ROOT=MEDIA_TEST,
+)
 class ChatTuteurTests(TestCase):
     def setUp(self):
         self.pays = Pays.objects.create(nom="Sénégal", code="SN")
@@ -377,3 +388,76 @@ class ChatTuteurTests(TestCase):
         r = self.as_(self.appr).get(f"{API}/blocs/{self.bloc.id}/chat/")
         assistant = [m for m in r.data["data"]["messages"] if m["role"] == "assistant"][0]
         self.assertTrue(assistant["sources"])
+
+    # ── RAG documentaire ───────────────────────────────────────────────────
+    def _pdf(self, texte: str, nom: str = "algo.pdf"):
+        from reportlab.pdfgen import canvas
+
+        tampon = io.BytesIO()
+        doc = canvas.Canvas(tampon)
+        doc.drawString(80, 750, texte)
+        doc.save()
+        self.bloc.fichier.save(nom, ContentFile(tampon.getvalue()), save=True)
+        self.bloc.refresh_from_db()
+        return os.path.basename(self.bloc.fichier.name)
+
+    def test_decoupage_produit_des_extraits_avec_chevauchement(self):
+        texte = "A" * 3000
+        morceaux = rag.decouper(texte, taille=1000, chevauchement=200)
+        self.assertGreaterEqual(len(morceaux), 3)
+        self.assertTrue(all(len(m) <= 1000 for m in morceaux))
+        self.assertEqual(morceaux[0][-200:], morceaux[1][:200])
+
+    @patch("courses.services.chat_tuteur.call_llm", side_effect=_fake_llm)
+    def test_rag_indexe_le_pdf_et_le_cite(self, mocked):
+        nom = self._pdf("Une pile est une structure LIFO : dernier entre, premier sorti.")
+        r = self.as_(self.appr).post(
+            f"{API}/blocs/{self.bloc.id}/chat/",
+            {"contenu": "Explique-moi la structure LIFO du document."}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+
+        # indexation créée
+        self.assertGreater(DocumentChunk.objects.filter(bloc=self.bloc).count(), 0)
+
+        # le prompt contient l'extrait du document
+        prompt = mocked.call_args[0][1]
+        self.assertIn("EXTRAITS DE DOCUMENTS", prompt)
+        self.assertIn("LIFO", prompt)
+        self.assertIn(nom, prompt)
+
+        # la réponse cite le document
+        sources = r.data["data"]["message"]["sources"]
+        documents = [s for s in sources if s.get("kind") == "document"]
+        self.assertTrue(documents)
+        self.assertEqual(documents[0]["document_nom"], nom)
+        self.assertEqual(documents[0]["page"], 1)
+
+    def test_rag_ne_fuit_pas_vers_un_autre_cours(self):
+        autre_matiere = Matiere.objects.create(institution=self.inst, nom="Autre matière")
+        autre_cours = Cours.objects.create(
+            titre="Autre cours", institution=self.inst,
+            annee_scolaire=self.annee, matiere=autre_matiere,
+            groupe=self.groupe, enseignant=self.formateur,
+        )
+        autre_module = Module.objects.create(titre="M2", cours=autre_cours)
+        autre_sequence = Sequence.objects.create(titre="S2", module=autre_module)
+        autre_bloc = BlocContenu.objects.create(
+            sequence=autre_sequence, titre="Secret", type_bloc="texte",
+            contenu_texte="CONFIDENTIEL-ZETA",
+        )
+        DocumentChunk.objects.create(
+            cours=autre_cours, bloc=autre_bloc, institution=self.inst,
+            source_nom="secret.pdf", source_type="pdf", page=1,
+            texte="Ceci contient le mot CONFIDENTIEL-ZETA.",
+        )
+        resultats = rag.rechercher(self.cours, "CONFIDENTIEL-ZETA")
+        self.assertEqual(resultats, [])
+
+    @patch("courses.services.chat_tuteur.call_llm", side_effect=_fake_llm)
+    def test_rag_recherche_retourne_le_passage_le_plus_pertinent(self, _mocked):
+        nom = self._pdf("Les boucles for répètent un traitement un nombre connu de fois.")
+        rag.indexer_bloc(self.bloc)
+        resultats = rag.rechercher(self.cours, "boucles for")
+        self.assertTrue(resultats)
+        self.assertIn("boucles for", resultats[0]["texte"].lower())
+        self.assertEqual(resultats[0]["source_nom"], nom)

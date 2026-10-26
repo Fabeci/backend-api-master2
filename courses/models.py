@@ -1152,3 +1152,48 @@ class MessageTuteur(models.Model):
 
     def __str__(self):
         return f"{self.role} · conv {self.conversation_id}"
+
+
+# ============================================================================
+# RAG DOCUMENTAIRE — extraits indexés pour le tuteur IA
+# ============================================================================
+
+class DocumentChunk(models.Model):
+    """Extrait de texte indexé (PDF/DOCX/TXT/MD) rattaché à un cours.
+
+    Permet au tuteur de citer des passages précis de documents sans base
+    vectorielle externe (recherche lexicale côté serveur).
+    """
+    cours = models.ForeignKey(
+        Cours, on_delete=models.CASCADE, related_name="document_chunks",
+    )
+    bloc = models.ForeignKey(
+        BlocContenu, on_delete=models.CASCADE, null=True, blank=True,
+        related_name="document_chunks",
+    )
+    ressource = models.ForeignKey(
+        "RessourceSequence", on_delete=models.CASCADE, null=True, blank=True,
+        related_name="document_chunks",
+    )
+    institution = models.ForeignKey(
+        Institution, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="document_chunks",
+    )
+    source_nom = models.CharField(max_length=255)
+    source_type = models.CharField(max_length=20, default="texte")
+    page = models.PositiveIntegerField(null=True, blank=True)
+    ordre = models.PositiveIntegerField(default=0)
+    texte = models.TextField()
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["bloc_id", "ressource_id", "ordre"]
+        indexes = [
+            models.Index(fields=["cours", "bloc"]),
+            models.Index(fields=["cours", "ressource"]),
+        ]
+        verbose_name = "Extrait de document (RAG)"
+        verbose_name_plural = "Extraits de documents (RAG)"
+
+    def __str__(self):
+        return f"{self.source_nom} · {self.page or '-'} · {self.texte[:40]}"
