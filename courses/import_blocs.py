@@ -12,11 +12,13 @@
 #            warnings: [str], nb: int }
 # =============================================================================
 
+import base64
 import csv
 import html as _html
 import io
 import logging
 import re
+from types import SimpleNamespace
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +73,8 @@ def _md_to_html(t: str) -> str:
             if not in_list:
                 out.append("<ul>")
                 in_list = True
-            out.append(f"<li>{_inline_md(re.sub(r'^\s*[-*]\s+', '', line))}</li>")
+            item = re.sub(r"^\s*[-*]\s+", "", line)
+            out.append(f"<li>{_inline_md(item)}</li>")
             continue
         if in_list:
             out.append("</ul>")
@@ -281,6 +284,100 @@ def _docx_family(name: str) -> str:
     return f"{name}, Arial, sans-serif"
 
 
+
+def _style_font(style, normal_font=None):
+    """Résout la chaîne de styles Word (base_style) + style Normal.
+
+    Retourne un objet léger exposant name/size/color/bold/italic/underline.
+    Word n'écrit que les propriétés surchargées : sans cette résolution, un
+    texte hérité du style « Titre 1 » ou d'un style personnalisé perd sa police.
+    """
+    name = size = color = None
+    bold = italic = underline = None
+    seen = set()
+    cur = style
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        try:
+            f = cur.font
+        except Exception:
+            f = None
+        if f is not None:
+            try:
+                if name is None and f.name:
+                    name = f.name
+                if size is None and f.size:
+                    size = f.size
+                if color is None and f.color and f.color.rgb:
+                    color = f.color.rgb
+                if bold is None and f.bold is not None:
+                    bold = bool(f.bold)
+                if italic is None and f.italic is not None:
+                    italic = bool(f.italic)
+                if underline is None and f.underline is not None:
+                    underline = bool(f.underline)
+            except Exception:
+                pass
+        cur = getattr(cur, "base_style", None)
+
+    if normal_font is not None:
+        try:
+            if name is None and normal_font.name:
+                name = normal_font.name
+            if size is None and normal_font.size:
+                size = normal_font.size
+            if color is None and normal_font.color and normal_font.color.rgb:
+                color = normal_font.color.rgb
+        except Exception:
+            pass
+
+    return SimpleNamespace(
+        name=name, size=size,
+        color=SimpleNamespace(rgb=color) if color else None,
+        bold=bool(bold) if bold is not None else False,
+        italic=bool(italic) if italic is not None else False,
+        underline=bool(underline) if underline is not None else False,
+    )
+
+
+def _docx_images(p, doc, max_bytes=2 * 1024 * 1024):
+    """Extrait les images inline d'un paragraphe Word en data-URI.
+
+    Les images sont auto-portées : l'aperçu éditable et la création depuis
+    l'arborescence (JSON) les conservent sans dépendre d'un fichier média.
+    """
+    uris = []
+    try:
+        from docx.oxml.ns import qn
+        blips = p._element.findall(".//" + qn("a:blip"))
+    except Exception:
+        return uris
+    for blip in blips:
+        try:
+            rid = blip.get(qn("r:embed"))
+            if not rid:
+                continue
+            part = doc.part.related_parts.get(rid)
+            if part is None:
+                continue
+            blob = getattr(part, "blob", None)
+            if not blob or len(blob) > max_bytes:
+                continue
+            mime = getattr(part, "content_type", None) or "image/png"
+            uris.append(f"data:{mime};base64,{base64.b64encode(blob).decode('ascii')}")
+        except Exception:
+            continue
+    return uris
+
+
+def _images_html(uris):
+    return "".join(
+        f'<p style="text-align:center;margin:8px 0;">'
+        f'<img src="{u}" alt="Image du document" style="max-width:100%;height:auto;" />'
+        f'</p>'
+        for u in uris
+    )
+
 def _run_style(r, base=None) -> str:
     """Style inline d'un run Word : police, taille, couleur, gras/italique/souligné.
     `base` = police héritée du style de paragraphe / style Normal."""
@@ -319,11 +416,16 @@ def _run_style(r, base=None) -> str:
             st.append(f"color:{color}")
     except Exception:
         pass
-    if r.bold:
+    bold = r.bold if r.bold is not None else getattr(base, "bold", False)
+    italic = r.italic if r.italic is not None else getattr(base, "italic", False)
+    underline = getattr(r, "underline", None)
+    if underline is None:
+        underline = getattr(base, "underline", False)
+    if bold:
         st.append("font-weight:700")
-    if r.italic:
+    if italic:
         st.append("font-style:italic")
-    if getattr(r, "underline", False):
+    if underline:
         st.append("text-decoration:underline")
     return ";".join(st)
 
@@ -371,7 +473,12 @@ def _docx_to_blocs(data):
 
     for p in d.paragraphs:
         txt = (p.text or "").strip()
+        images = _docx_images(p, d)
         if not txt:
+            if images:
+                if cur is None:
+                    _new("Images")
+                cur["contenu"] += _images_html(images) + "\n"
             continue
         style = (p.style.name if p.style else "") or ""
         level = _heading_level(style, _size(p))
@@ -379,12 +486,7 @@ def _docx_to_blocs(data):
         align_css = _align_css(getattr(p, "alignment", None))
         style_attr = f' style="text-align:{align_css}"' if align_css else ""
 
-        try:
-            base_font = p.style.font if p.style else None
-        except Exception:
-            base_font = None
-        if base_font is None or (not base_font.name and not base_font.size):
-            base_font = normal_font
+        base_font = _style_font(p.style if p.style else None, normal_font)
 
         if level:
             _new(txt)
@@ -403,7 +505,7 @@ def _docx_to_blocs(data):
             inner = f"<pre><code>{_html.escape(txt)}</code></pre>"
         else:
             inner = f"<p{style_attr}>{inner}</p>"
-        cur["contenu"] += inner + "\n"
+        cur["contenu"] += inner + (_images_html(images) if images else "") + "\n"
 
     for table in d.tables:
         if cur is None:
@@ -460,9 +562,35 @@ def extract_blocs(filename: str, data: bytes) -> dict:
             blocs = pdf_to_blocs(data)
         except Exception as exc:
             _warn(f"Extraction PDF stylée impossible ({exc}) → repli en texte.")
-            blocs = _text_to_blocs(_read_pdf(data), base)
+            blocs = []
+        if not blocs or not any((b.get("contenu") or "").strip() for b in blocs):
+            text = _read_pdf(data)
+            if not (text or "").strip():
+                try:
+                    from . import ocr
+                    if ocr.disponible():
+                        text = ocr.ocr_pdf(data)
+                        if text.strip():
+                            _warn("PDF scanné : texte extrait par OCR (mise en forme approximative).")
+                except Exception as exc:
+                    _warn(f"OCR du PDF impossible ({exc}).")
+            blocs = _text_to_blocs(text, base)
+    elif name.endswith((".png", ".jpg", ".jpeg", ".tif", ".tiff")):
+        try:
+            from . import ocr
+            if ocr.disponible():
+                text = ocr.ocr_image(data)
+                blocs = _text_to_blocs(text, base)
+                if blocs:
+                    _warn("Image : texte extrait par OCR (mise en forme approximative).")
+            else:
+                _warn("OCR indisponible : installez tesseract-ocr et pytesseract.")
+                blocs = []
+        except Exception as exc:
+            _warn(f"OCR de l'image impossible ({exc}).")
+            blocs = []
     else:
-        _warn("Format non pris en charge (.xlsx, .csv, .docx, .pdf, .txt).")
+        _warn("Format non pris en charge (.xlsx, .csv, .docx, .pdf, images, .txt).")
         blocs = []
 
     return {"blocs": blocs, "warnings": list(_WARN), "nb": len(blocs)}
