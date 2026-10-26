@@ -22,7 +22,7 @@ from courses.models import (
     BlocContenu, ConversationTuteur, Cours, DocumentChunk, InscriptionCours,
     MessageTuteur, Module, QuizTuteur, Sequence,
 )
-from courses.services import rag
+from courses.services import difficulte, rag
 from locations.models import Pays
 from users.models import Apprenant, Formateur, User, UserRole
 
@@ -559,3 +559,56 @@ class ChatTuteurTests(TestCase):
     def test_quiz_acces_refuse_sans_inscription(self):
         r = self.as_(self.autre).post(f"{API}/blocs/{self.bloc.id}/chat/quiz/")
         self.assertEqual(r.status_code, 403)
+
+    # ── Détection de difficulté / remédiation ──────────────────────────────
+    def _conv(self):
+        return ConversationTuteur.objects.create(
+            apprenant=self.appr, bloc=self.bloc, cours=self.cours,
+            institution=self.inst, titre=self.bloc.titre)
+
+    def _msg(self, conv, texte):
+        return MessageTuteur.objects.create(
+            conversation=conv, role="user", contenu=texte, statut="termine")
+
+    def test_difficulte_questions_repetees(self):
+        conv = self._conv()
+        for texte in ["Explique-moi les piles", "Les piles encore", "Je veux comprendre les piles"]:
+            self._msg(conv, texte)
+        d = difficulte.analyser(conv)
+        self.assertEqual(d["niveau"], "difficulte")
+        self.assertTrue(d["notions"])
+        types = {a["type"] for a in d["actions"]}
+        self.assertIn("quiz", types)
+        self.assertIn("revoir_bloc", types)
+
+    def test_pas_de_difficulte_sur_questions_variees(self):
+        conv = self._conv()
+        for texte in ["Qu'est-ce qu'une variable ?", "Comment fonctionne une boucle ?",
+                      "Parle-moi des fonctions."]:
+            self._msg(conv, texte)
+        d = difficulte.analyser(conv)
+        self.assertEqual(d["niveau"], "ok")
+        self.assertEqual(d["actions"], [])
+
+    def test_phrase_explicite_difficulte(self):
+        conv = self._conv()
+        for texte in ["Explique-moi ce bloc.", "Donne un exemple.", "Je ne comprends pas."]:
+            self._msg(conv, texte)
+        d = difficulte.analyser(conv)
+        self.assertEqual(d["niveau"], "difficulte")
+        self.assertTrue(d["message"])
+
+    def test_difficulte_ignoree_si_trop_peu_de_messages(self):
+        conv = self._conv()
+        self._msg(conv, "les piles")
+        self._msg(conv, "les piles")
+        self.assertEqual(difficulte.analyser(conv)["niveau"], "ok")
+
+    def test_api_expose_la_difficulte(self):
+        r = self.as_(self.appr).get(f"{API}/blocs/{self.bloc.id}/chat/")
+        conv = ConversationTuteur.objects.get(pk=r.data["data"]["conversation"]["id"])
+        for texte in ["les piles", "les piles encore", "les piles toujours"]:
+            self._msg(conv, texte)
+        r2 = self.as_(self.appr).get(f"{API}/blocs/{self.bloc.id}/chat/")
+        self.assertIn("difficulte", r2.data["data"])
+        self.assertEqual(r2.data["data"]["difficulte"]["niveau"], "difficulte")

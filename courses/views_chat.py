@@ -28,7 +28,7 @@ from users.views import api_error, api_success
 
 from .models import BlocContenu, ConversationTuteur, MessageTuteur, QuizTuteur
 from .publication import bloc_disponible
-from .services import chat_tuteur, quiz_tuteur
+from .services import chat_tuteur, difficulte as difficulte_service, quiz_tuteur
 from .throttles import ChatTuteurThrottle
 from .utils import _get_apprenant_cours_ids
 
@@ -205,6 +205,7 @@ class BlocChatAPIView(APIView):
                 "conversation": _conv_data(conv),
                 "messages": _messages_data(conv),
                 "suggestions": chat_tuteur.suggestions(bloc),
+                "difficulte": difficulte_service.analyser(conv),
                 "contexte": {
                     "contenu_disponible": ctx["contenu_disponible"],
                     "tronque": ctx["tronque"],
@@ -306,6 +307,7 @@ class BlocChatAPIView(APIView):
                     "conversation": _conv_data(conv),
                     "message": _msg_data(assistant),
                     "messages": _messages_data(conv),
+                    "difficulte": difficulte_service.analyser(conv),
                 },
             )
 
@@ -499,6 +501,7 @@ class BlocChatStreamAPIView(APIView):
                             "message": _msg_data(assistant),
                             "conversation": _conv_data(conv),
                             "messages": _messages_data(conv),
+                            "difficulte": difficulte_service.analyser(conv),
                         })
                         return
                     elif evenement.get("type") == "error":
