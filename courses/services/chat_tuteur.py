@@ -18,9 +18,9 @@ from analytics.services.llm_provider import call_llm
 logger = logging.getLogger(__name__)
 
 MAX_QUESTION = 2000          # caractères par message apprenant
-MAX_CONTEXTE = 7000          # extrait du bloc envoyé au modèle
-HISTORIQUE_MAX = 8           # messages précédents réinjectés
-MAX_TOKENS = 1100
+MAX_CONTEXTE = 3000          # extrait du bloc envoyé au modèle
+HISTORIQUE_MAX = 4           # messages précédents réinjectés
+MAX_TOKENS = 450
 MAX_HISTORIQUE_MESSAGE = 1200
 
 
@@ -115,6 +115,28 @@ def contexte_bloc(bloc) -> dict:
     }
 
 
+SALUTATION_RE = re.compile(
+    r"^\s*(bonjour|bonsoir|salut|coucou|hello|hi|hey|merci|ça va|ca va|ok|d'accord)"
+    r"\b[\s!.,?…]*$",
+    re.IGNORECASE,
+)
+
+
+def est_salutation(question: str) -> bool:
+    """Vrai uniquement pour un message de politesse seul (pas une vraie question)."""
+    texte = (question or "").strip()
+    return bool(texte) and len(texte) <= 32 and bool(SALUTATION_RE.match(texte))
+
+
+def reponse_accueil(bloc) -> str:
+    titre = (bloc.titre or "ce contenu").strip()
+    return (
+        f"Bonjour ! Je suis votre tuteur pour « {titre} ».\n\n"
+        "Posez-moi une question sur ce contenu : par exemple « Explique-moi avec des mots "
+        "simples », « Donne-moi un exemple » ou « Quelles sont les erreurs à éviter ? »."
+    )
+
+
 def suggestions(bloc) -> list[str]:
     """Questions de démarrage contextuelles (adaptées au bloc)."""
     titre = (bloc.titre or "cette notion").strip()
@@ -167,6 +189,18 @@ def repondre(conversation, question: str) -> dict:
     """Génère la réponse du tuteur. Retourne toujours un dict (jamais d'exception)."""
     ctx = contexte_bloc(conversation.bloc)
 
+    # Salutation seule : réponse immédiate, sans appel au modèle.
+    if est_salutation(question):
+        return {
+            "ok": True,
+            "content": reponse_accueil(conversation.bloc),
+            "provider": "local",
+            "model": "accueil",
+            "degraded": False,
+            "duree_ms": 0,
+            "contexte": ctx,
+        }
+
     historique = list(
         conversation.messages
         .filter(statut="termine")
@@ -217,3 +251,45 @@ def repondre(conversation, question: str) -> dict:
         "duree_ms": duree_ms,
         "contexte": ctx,
     }
+
+_PRECHAUFFE_LANCE = False
+
+
+def precharger_modele() -> None:
+    """Charge le modèle Ollama en arrière-plan (réduit le 1er temps de réponse).
+
+    Sans effet pour les fournisseurs cloud ou le mode mock.
+    """
+    global _PRECHAUFFE_LANCE
+    import sys
+
+    if _PRECHAUFFE_LANCE or "test" in sys.argv:
+        return
+    _PRECHAUFFE_LANCE = True
+    try:
+        if (getattr(settings, "AI_PROVIDER", "") or "").strip().lower() != "ollama":
+            return
+        import httpx
+
+        base = (getattr(settings, "OLLAMA_BASE_URL", "") or "").rstrip("/")
+        modele = getattr(settings, "OLLAMA_MODEL", "")
+        if not base or not modele:
+            return
+        httpx.post(
+            f"{base}/api/chat",
+            json={
+                "model": modele,
+                "messages": [{"role": "user", "content": "ping"}],
+                "stream": False,
+                "keep_alive": getattr(settings, "OLLAMA_KEEP_ALIVE", "30m"),
+                "options": {
+                    "num_predict": 1,
+                    "num_ctx": getattr(settings, "OLLAMA_NUM_CTX", 4096),
+                },
+            },
+            timeout=90,
+        )
+        logger.info("[chat_tuteur] modèle %s préchargé", modele)
+    except Exception:  # noqa: BLE001
+        logger.debug("[chat_tuteur] préchargement impossible", exc_info=True)
+

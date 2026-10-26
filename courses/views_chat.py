@@ -9,6 +9,7 @@ Sécurité :
 """
 from __future__ import annotations
 
+import threading
 from datetime import timedelta
 
 from django.shortcuts import get_object_or_404
@@ -158,6 +159,10 @@ class BlocChatAPIView(APIView):
             return api_error(erreur, http_status=code)
 
         conv = _conversation_active(apprenant, bloc)
+
+        # Précharge le modèle en arrière-plan pendant que l'apprenant lit/écrit.
+        threading.Thread(target=chat_tuteur.precharger_modele, daemon=True).start()
+
         ctx = chat_tuteur.contexte_bloc(bloc)
         return api_success(
             "Conversation chargée.",

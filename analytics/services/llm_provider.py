@@ -88,6 +88,8 @@ def _call_ollama(system_prompt, user_prompt, json_mode, max_tokens):
             {'role': 'user', 'content': user_prompt},
         ],
         'stream': False,
+        # Évite le rechargement du modèle (3 s) entre deux messages.
+        'keep_alive': getattr(settings, 'OLLAMA_KEEP_ALIVE', '30m'),
         'options': {
             'temperature': 0.4,
             'num_predict': max_tokens,
