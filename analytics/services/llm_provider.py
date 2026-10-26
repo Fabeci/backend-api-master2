@@ -201,6 +201,24 @@ def _call_gemini(system_prompt, user_prompt, json_mode, max_tokens):
 
 def _call_mock(system_prompt, user_prompt, json_mode, max_tokens):
     """Repli déterministe (aucun réseau) — évite les 500 et dégrade proprement."""
+    if not json_mode:
+        # Chat libre (tuteur) : renvoyer un texte lisible, pas du JSON.
+        question = ""
+        if user_prompt:
+            marqueur = "QUESTION DE L'APPRENANT :"
+            question = user_prompt.split(marqueur)[-1].strip() if marqueur in user_prompt else user_prompt
+            question = question.strip()[:300]
+        return {
+            "content": (
+                "**Mode démonstration — aucun fournisseur IA n'est configuré.**\n\n"
+                "Je ne peux pas produire une réponse pédagogique réelle pour le moment. "
+                "Pour activer le tuteur, renseignez `AI_PROVIDER` et la clé correspondante "
+                "(ou un serveur Ollama) dans le fichier `.env` du backend.\n\n"
+                + (f"Votre question : « {question} »" if question else "")
+            ),
+            "tokens": 0,
+            "error": None,
+        }
     payload = json.dumps({
         'contenu_json': {
             'type_generation': 'indisponible',
