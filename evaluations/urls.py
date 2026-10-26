@@ -51,6 +51,8 @@ from .views import (
 
 app_name = 'evaluations'
 
+from evaluations.views_explication import PassageEvaluationExplicationAPIView  # noqa: E402
+
 urlpatterns = [
     # ============================================================================
     # QUIZ
@@ -207,4 +209,9 @@ urlpatterns = [
      path("evaluations/importer-questions/", EvaluationImportQuestionsAPIView.as_view(), name="evaluation-import-questions"),
      path("evaluations/importer/", EvaluationImportCreateAPIView.as_view(), name="evaluation-import-create"),
      path("quiz/importer/", QuizImportCreateAPIView.as_view(), name="quiz-import-create"),
-] 
+
+    # « Explique mon erreur » (après remise uniquement)
+    path('passages-evaluations/<int:pk>/explication/',
+         PassageEvaluationExplicationAPIView.as_view(),
+         name='passage-evaluation-explication'),
+]
