@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from html import unescape
 
 from analytics.services.llm_provider import _extract_json_block, call_llm
 
@@ -89,10 +90,14 @@ def _prompt(conversation) -> str:
     return "\n\n".join(lignes)
 
 
-def _valider_questions(data: dict | None) -> list[dict]:
-    if not isinstance(data, dict):
+def _valider_questions(data) -> list[dict]:
+    # Certains modèles renvoient directement la liste de questions.
+    if isinstance(data, list):
+        brut = data
+    elif isinstance(data, dict):
+        brut = data.get("questions")
+    else:
         return []
-    brut = data.get("questions")
     if not isinstance(brut, list):
         return []
 
@@ -106,9 +111,15 @@ def _valider_questions(data: dict | None) -> list[dict]:
 
         if not question or not isinstance(options, list) or len(options) != NB_OPTIONS:
             continue
-        options = [str(o).strip()[:300] for o in options]
+        options = [
+            re.sub(r"\s+", " ", unescape(str(o)).replace("\xa0", " ")).strip()[:300]
+            for o in options
+        ]
         if any(not o for o in options):
             continue
+        # « B » / « b » → 1
+        if isinstance(bonne, str) and bonne.strip().upper()[:1] in ("A", "B", "C", "D"):
+            bonne = "ABCD".index(bonne.strip().upper()[:1])
         try:
             bonne = int(bonne)
         except Exception:  # noqa: BLE001
@@ -117,7 +128,7 @@ def _valider_questions(data: dict | None) -> list[dict]:
             continue
 
         valides.append({
-            "question": question[:500],
+            "question": re.sub(r"\s+", " ", unescape(question).replace("\xa0", " ")).strip()[:500],
             "options": options,
             "bonne_reponse": bonne,
             "explication": str(item.get("explication") or "").strip()[:600],

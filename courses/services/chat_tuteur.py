@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from html import unescape
 
 from django.conf import settings
 from django.utils.html import strip_tags
@@ -62,7 +63,7 @@ SYSTEM_PROMPT = (
 
 
 def _nettoyer(texte: str, limite: int) -> str:
-    texte = strip_tags(texte or "")
+    texte = unescape(strip_tags(texte or "")).replace("\xa0", " ")
     texte = re.sub(r"[ \t]+", " ", texte)
     texte = re.sub(r"\n{3,}", "\n\n", texte)
     return texte.strip()[:limite]
