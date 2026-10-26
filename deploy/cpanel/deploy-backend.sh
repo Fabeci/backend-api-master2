@@ -17,7 +17,19 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$APP_DIR"
 
-VENV="${VENV:-$HOME/virtualenv/somaproapi/3.12}"
+# Virtualenv cPanel : détection automatique, surchargeable via VENV=...
+if [ -z "${VENV:-}" ]; then
+  for candidate in \
+    "$HOME/virtualenv/public_html/somaproapi/3.11" \
+    "$HOME/virtualenv/somaproapi/3.12" \
+    "$HOME/virtualenv/somaproapi/3.11"; do
+    if [ -f "$candidate/bin/activate" ]; then
+      VENV="$candidate"
+      break
+    fi
+  done
+fi
+VENV="${VENV:?virtualenv introuvable — définir VENV=/chemin/du/virtualenv}"
 REQ_FILE="${REQ_FILE:-requirements.cpanel.txt}"
 
 echo "── 1. Code ($APP_DIR)"
