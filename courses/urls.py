@@ -86,8 +86,10 @@ from .views import (
 from courses.views_chat import (  # noqa: E402
     BlocChatAPIView,
     BlocChatStreamAPIView,
+    BlocQuizAPIView,
     ConversationChatDetailAPIView,
     ConversationChatNouvelleAPIView,
+    QuizCorrectionAPIView,
 )
 
 urlpatterns = [
@@ -183,6 +185,8 @@ urlpatterns = [
     # =========================================================================
     path('blocs/<int:bloc_id>/chat/', BlocChatAPIView.as_view(), name='bloc-chat'),
     path('blocs/<int:bloc_id>/chat/stream/', BlocChatStreamAPIView.as_view(), name='bloc-chat-stream'),
+    path('blocs/<int:bloc_id>/chat/quiz/', BlocQuizAPIView.as_view(), name='bloc-chat-quiz'),
+    path('chat/quiz/<int:pk>/corriger/', QuizCorrectionAPIView.as_view(), name='chat-quiz-corriger'),
     path('chat/conversations/<int:pk>/', ConversationChatDetailAPIView.as_view(), name='chat-conversation-detail'),
     path('chat/conversations/<int:pk>/nouvelle/', ConversationChatNouvelleAPIView.as_view(), name='chat-conversation-nouvelle'),
 ]

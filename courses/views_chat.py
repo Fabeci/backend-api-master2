@@ -26,9 +26,9 @@ from core.rbac import display_role
 from users.access_control import get_own_apprenant
 from users.views import api_error, api_success
 
-from .models import BlocContenu, ConversationTuteur, MessageTuteur
+from .models import BlocContenu, ConversationTuteur, MessageTuteur, QuizTuteur
 from .publication import bloc_disponible
-from .services import chat_tuteur
+from .services import chat_tuteur, quiz_tuteur
 from .throttles import ChatTuteurThrottle
 from .utils import _get_apprenant_cours_ids
 
@@ -532,3 +532,101 @@ class BlocChatStreamAPIView(APIView):
         response["Cache-Control"] = "no-cache"
         response["X-Accel-Buffering"] = "no"
         return response
+
+
+class BlocQuizAPIView(APIView):
+    """POST : génère un mini-quiz (3 QCM) à partir du bloc courant."""
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ChatTuteurThrottle]
+
+    def post(self, request, bloc_id: int):
+        bloc = _bloc_complet(bloc_id)
+        apprenant, erreur, code = _acces_bloc(request.user, bloc)
+        if erreur:
+            return api_error(erreur, http_status=code)
+
+        if _evaluation_en_cours(apprenant, bloc.sequence.module.cours):
+            return api_error(
+                "Une évaluation est en cours pour ce cours : l'assistant est "
+                "désactivé jusqu'à la remise de votre copie.",
+                http_status=423,
+            )
+
+        conv = _conversation_active(apprenant, bloc)
+        questions, erreur_quiz = quiz_tuteur.generer_quiz(conv)
+        if erreur_quiz:
+            return Response(
+                {
+                    "success": False,
+                    "status": status.HTTP_502_BAD_GATEWAY,
+                    "code": "AI_PROVIDER_ERROR",
+                    "message": "Impossible de générer le quiz pour le moment. Réessayez.",
+                    "detail": erreur_quiz,
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        quiz = QuizTuteur.objects.create(
+            conversation=conv,
+            apprenant=apprenant,
+            bloc=bloc,
+            cours=bloc.sequence.module.cours,
+            titre=(bloc.titre or "")[:255],
+            questions=questions,
+            statut="en_cours",
+        )
+
+        return api_success("Quiz généré.", {
+            "quiz_id": quiz.id,
+            "titre": quiz.titre,
+            "questions": quiz_tuteur.questions_publiques(questions),
+        })
+
+
+class QuizCorrectionAPIView(APIView):
+    """POST : corrige un quiz (barème et explications restent côté serveur)."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk: int):
+        quiz = get_object_or_404(
+            QuizTuteur.objects.select_related("bloc__sequence__module__cours"),
+            pk=pk,
+        )
+        apprenant = get_own_apprenant(request.user)
+        if apprenant is None or quiz.apprenant_id != apprenant.id:
+            return api_error("Quiz introuvable.", http_status=status.HTTP_404_NOT_FOUND)
+
+        if not bloc_disponible(quiz.bloc):
+            return api_error("Ce contenu n'est plus disponible.", http_status=status.HTTP_403_FORBIDDEN)
+
+        reponses = request.data.get("reponses")
+        if not isinstance(reponses, list) or len(reponses) != len(quiz.questions):
+            return api_error("Réponses invalides.", http_status=status.HTTP_400_BAD_REQUEST)
+        for reponse in reponses:
+            if reponse is None:
+                continue
+            if not isinstance(reponse, int) or not 0 <= reponse < quiz_tuteur.NB_OPTIONS:
+                return api_error("Réponses invalides.", http_status=status.HTTP_400_BAD_REQUEST)
+
+        if quiz.statut == "corrige":
+            score = quiz.score or 0
+            _, details = quiz_tuteur.corriger(quiz.questions, quiz.reponses)
+        else:
+            score, details = quiz_tuteur.corriger(quiz.questions, reponses)
+            quiz.reponses = reponses
+            quiz.score = score
+            quiz.statut = "corrige"
+            quiz.corrige_le = timezone.now()
+            quiz.save(update_fields=["reponses", "score", "statut", "corrige_le"])
+
+        publiques = quiz_tuteur.questions_publiques(quiz.questions)
+        for index, question in enumerate(quiz.questions):
+            publiques[index]["bonne_reponse"] = question["bonne_reponse"]
+            publiques[index]["explication"] = question.get("explication", "")
+
+        return api_success("Quiz corrigé.", {
+            "quiz_id": quiz.id,
+            "score": score,
+            "details": details,
+            "questions": publiques,
+        })

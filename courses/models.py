@@ -1197,3 +1197,44 @@ class DocumentChunk(models.Model):
 
     def __str__(self):
         return f"{self.source_nom} · {self.page or '-'} · {self.texte[:40]}"
+
+
+# ============================================================================
+# QUIZ PÉDAGOGIQUE GÉNÉRÉ PAR L'IA (« Interroge-moi »)
+# ============================================================================
+
+class QuizTuteur(models.Model):
+    """Mini-quiz généré depuis un bloc ; la clé de correction reste serveur."""
+    STATUT_CHOICES = [
+        ("en_cours", "En cours"),
+        ("corrige", "Corrigé"),
+    ]
+
+    conversation = models.ForeignKey(
+        ConversationTuteur, on_delete=models.CASCADE, related_name="quiz_tuteur",
+    )
+    apprenant = models.ForeignKey(
+        Apprenant, on_delete=models.CASCADE, related_name="quiz_tuteur",
+    )
+    bloc = models.ForeignKey(
+        BlocContenu, on_delete=models.CASCADE, related_name="quiz_tuteur",
+    )
+    cours = models.ForeignKey(
+        Cours, on_delete=models.CASCADE, related_name="quiz_tuteur",
+    )
+    titre = models.CharField(max_length=255, blank=True, default="")
+    questions = models.JSONField(default=list)   # avec bonne_reponse + explication
+    reponses = models.JSONField(default=list)    # choix de l'apprenant
+    score = models.FloatField(null=True, blank=True)  # sur 100
+    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default="en_cours")
+    cree_le = models.DateTimeField(auto_now_add=True)
+    corrige_le = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-cree_le"]
+        indexes = [models.Index(fields=["conversation", "cree_le"])]
+        verbose_name = "Quiz tuteur IA"
+        verbose_name_plural = "Quiz tuteur IA"
+
+    def __str__(self):
+        return f"Quiz {self.pk} · bloc {self.bloc_id} · {self.score}"

@@ -4,6 +4,7 @@
 Lancer : python manage.py test courses.tests_chat -v2
 """
 import io
+import json
 import os
 import tempfile
 from datetime import timedelta
@@ -19,7 +20,7 @@ from academics.models import (
 )
 from courses.models import (
     BlocContenu, ConversationTuteur, Cours, DocumentChunk, InscriptionCours,
-    MessageTuteur, Module, Sequence,
+    MessageTuteur, Module, QuizTuteur, Sequence,
 )
 from courses.services import rag
 from locations.models import Pays
@@ -39,6 +40,17 @@ def _fake_llm(system_prompt="", user_prompt="", json_mode=True, max_tokens=None)
 
 
 MEDIA_TEST = tempfile.mkdtemp(prefix="somapro-chat-media-")
+
+QUIZ_JSON = json.dumps({
+    "questions": [
+        {"question": "Une pile est de type… ?", "options": ["FIFO", "LIFO", "LILO", "RANDOM"],
+         "bonne_reponse": 1, "explication": "LIFO = dernier entré, premier sorti."},
+        {"question": "Quelle opération ajoute un élément ?", "options": ["pop", "push", "peek", "clear"],
+         "bonne_reponse": 1, "explication": "push empile un élément."},
+        {"question": "Que fait pop ?", "options": ["Ajoute", "Retire le dernier", "Vide tout", "Trie"],
+         "bonne_reponse": 1, "explication": "pop retire l'élément au sommet."},
+    ]
+})
 
 
 @override_settings(
@@ -461,3 +473,70 @@ class ChatTuteurTests(TestCase):
         self.assertTrue(resultats)
         self.assertIn("boucles for", resultats[0]["texte"].lower())
         self.assertEqual(resultats[0]["source_nom"], nom)
+
+    # ── Quiz « Interroge-moi » ─────────────────────────────────────────────
+    @patch("courses.services.quiz_tuteur.call_llm")
+    def test_quiz_genere_sans_exposer_les_reponses(self, mocked):
+        mocked.return_value = {"content": QUIZ_JSON, "error": None, "provider": "mock", "model": "test"}
+        r = self.as_(self.appr).post(f"{API}/blocs/{self.bloc.id}/chat/quiz/")
+        self.assertEqual(r.status_code, 200, r.data)
+        questions = r.data["data"]["questions"]
+        self.assertEqual(len(questions), 3)
+        self.assertNotIn("bonne_reponse", questions[0])
+        self.assertNotIn("explication", questions[0])
+        self.assertEqual(len(questions[0]["options"]), 4)
+        self.assertEqual(QuizTuteur.objects.count(), 1)
+
+    @patch("courses.services.quiz_tuteur.call_llm")
+    def test_quiz_correction_et_score(self, mocked):
+        mocked.return_value = {"content": QUIZ_JSON, "error": None, "provider": "mock", "model": "test"}
+        gen = self.as_(self.appr).post(f"{API}/blocs/{self.bloc.id}/chat/quiz/")
+        quiz_id = gen.data["data"]["quiz_id"]
+
+        r = self.as_(self.appr).post(
+            f"{API}/chat/quiz/{quiz_id}/corriger/",
+            {"reponses": [1, 1, 1]}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data["data"]["score"], 100.0)
+        self.assertTrue(all(d["correct"] for d in r.data["data"]["details"]))
+        self.assertTrue(all("explication" in q for q in r.data["data"]["questions"]))
+
+        quiz = QuizTuteur.objects.get(pk=quiz_id)
+        self.assertEqual(quiz.statut, "corrige")
+
+    @patch("courses.services.quiz_tuteur.call_llm")
+    def test_quiz_mauvaises_reponses_score_zero(self, mocked):
+        mocked.return_value = {"content": QUIZ_JSON, "error": None, "provider": "mock", "model": "test"}
+        gen = self.as_(self.appr).post(f"{API}/blocs/{self.bloc.id}/chat/quiz/")
+        quiz_id = gen.data["data"]["quiz_id"]
+        r = self.as_(self.appr).post(
+            f"{API}/chat/quiz/{quiz_id}/corriger/",
+            {"reponses": [0, 0, 0]}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data["data"]["score"], 0.0)
+
+    @patch("courses.services.quiz_tuteur.call_llm")
+    def test_quiz_d_un_autre_apprenant_inaccessible(self, mocked):
+        mocked.return_value = {"content": QUIZ_JSON, "error": None, "provider": "mock", "model": "test"}
+        gen = self.as_(self.appr).post(f"{API}/blocs/{self.bloc.id}/chat/quiz/")
+        quiz_id = gen.data["data"]["quiz_id"]
+        r = self.as_(self.autre).post(
+            f"{API}/chat/quiz/{quiz_id}/corriger/",
+            {"reponses": [1, 1, 1]}, format="json")
+        self.assertEqual(r.status_code, 404)
+
+    @patch("courses.services.quiz_tuteur.call_llm")
+    def test_quiz_json_invalide_renvoie_502(self, mocked):
+        mocked.return_value = {"content": "ceci n'est pas du json", "error": None, "provider": "mock", "model": "test"}
+        r = self.as_(self.appr).post(f"{API}/blocs/{self.bloc.id}/chat/quiz/")
+        self.assertEqual(r.status_code, 502)
+        self.assertEqual(QuizTuteur.objects.count(), 0)
+
+    def test_quiz_bloque_pendant_evaluation(self):
+        self._passage_evaluation(statut="en_cours")
+        r = self.as_(self.appr).post(f"{API}/blocs/{self.bloc.id}/chat/quiz/")
+        self.assertEqual(r.status_code, 423)
+
+    def test_quiz_acces_refuse_sans_inscription(self):
+        r = self.as_(self.autre).post(f"{API}/blocs/{self.bloc.id}/chat/quiz/")
+        self.assertEqual(r.status_code, 403)
