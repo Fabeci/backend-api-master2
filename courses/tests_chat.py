@@ -3,9 +3,11 @@
 
 Lancer : python manage.py test courses.tests_chat -v2
 """
+from datetime import timedelta
 from unittest.mock import Mock, patch
 
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from academics.models import (
@@ -91,6 +93,31 @@ class ChatTuteurTests(TestCase):
     def as_(self, user):
         self.client.force_authenticate(user=user)
         return self.client
+
+
+    def _passage_evaluation(self, statut="en_cours", apprenant=None):
+        from evaluations.models import Evaluation, PassageEvaluation
+
+        evaluation = Evaluation.objects.create(
+            cours=self.cours,
+            enseignant=self.formateur,
+            titre="Examen final",
+            type_evaluation="structuree",
+            bareme=20,
+            date_debut=timezone.now() - timedelta(hours=1),
+            date_fin=timezone.now() + timedelta(hours=1),
+            est_publiee=True,
+            coefficient=1,
+            categorie="examen",
+        )
+        PassageEvaluation.objects.create(
+            apprenant=apprenant or self.appr,
+            evaluation=evaluation,
+            statut=statut,
+            session="normale",
+            numero_tentative=1,
+        )
+        return evaluation
 
     # ── Ouverture / contexte ───────────────────────────────────────────────
     def test_ouverture_cree_une_conversation_avec_suggestions(self):
@@ -218,3 +245,35 @@ class ChatTuteurTests(TestCase):
         self.bloc.save(update_fields=["est_visible"])
         r = self.as_(self.appr).get(f"{API}/blocs/{self.bloc.id}/chat/")
         self.assertEqual(r.status_code, 403)
+
+    # ── Anti-triche : évaluation en cours ──────────────────────────────────
+    @patch("courses.services.chat_tuteur.call_llm", side_effect=_fake_llm)
+    def test_evaluation_en_cours_bloque_l_assistant(self, mocked):
+        self._passage_evaluation(statut="en_cours")
+
+        r = self.as_(self.appr).get(f"{API}/blocs/{self.bloc.id}/chat/")
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.data["data"]["evaluation"]["en_cours"])
+
+        r2 = self.as_(self.appr).post(
+            f"{API}/blocs/{self.bloc.id}/chat/",
+            {"contenu": "Explique-moi la notion."}, format="json")
+        self.assertEqual(r2.status_code, 423)
+        self.assertFalse(mocked.called)
+        self.assertEqual(MessageTuteur.objects.count(), 0)
+
+    @patch("courses.services.chat_tuteur.call_llm", side_effect=_fake_llm)
+    def test_apres_remise_l_assistant_redevient_disponible(self, mocked):
+        self._passage_evaluation(statut="soumis")
+        r = self.as_(self.appr).post(
+            f"{API}/blocs/{self.bloc.id}/chat/",
+            {"contenu": "Explique-moi la notion."}, format="json")
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(mocked.called)
+        self.assertFalse(r.data["data"]["evaluation"]["en_cours"])
+
+    def test_evaluation_d_un_autre_apprenant_ne_bloque_pas(self):
+        self._passage_evaluation(statut="en_cours", apprenant=self.autre)
+        r = self.as_(self.appr).get(f"{API}/blocs/{self.bloc.id}/chat/")
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(r.data["data"]["evaluation"]["en_cours"])

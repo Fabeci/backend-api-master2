@@ -137,6 +137,21 @@ def _conversation_autorisee(user, pk: int):
     return apprenant, conv
 
 
+def _evaluation_en_cours(apprenant, cours) -> bool:
+    """Vrai si l'apprenant a un passage d'évaluation non soumis pour ce cours.
+
+    C'est un contrôle SERVEUR, indépendant de la formulation de la question :
+    impossible de contourner en demandant « la réponse » autrement.
+    """
+    from evaluations.models import PassageEvaluation
+
+    return PassageEvaluation.objects.filter(
+        apprenant=apprenant,
+        statut="en_cours",
+        evaluation__cours=cours,
+    ).exists()
+
+
 class ConversationIntrouvable(Exception):
     pass
 
@@ -164,9 +179,18 @@ class BlocChatAPIView(APIView):
         threading.Thread(target=chat_tuteur.precharger_modele, daemon=True).start()
 
         ctx = chat_tuteur.contexte_bloc(bloc)
+        evaluation_active = _evaluation_en_cours(apprenant, bloc.sequence.module.cours)
         return api_success(
             "Conversation chargée.",
             {
+                "evaluation": {
+                    "en_cours": evaluation_active,
+                    "message": (
+                        "Une évaluation est en cours pour ce cours : "
+                        "l'assistant est suspendu jusqu'à la remise de votre copie."
+                        if evaluation_active else ""
+                    ),
+                },
                 "conversation": _conv_data(conv),
                 "messages": _messages_data(conv),
                 "suggestions": chat_tuteur.suggestions(bloc),
@@ -195,6 +219,14 @@ class BlocChatAPIView(APIView):
             return api_error(
                 f"Message trop long (maximum {MAX_MESSAGE} caractères).",
                 http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Anti-triche : aucune question pendant une évaluation en cours.
+        if _evaluation_en_cours(apprenant, bloc.sequence.module.cours):
+            return api_error(
+                "Une évaluation est en cours pour ce cours : l'assistant est "
+                "désactivé jusqu'à la remise de votre copie.",
+                http_status=423,
             )
 
         conv = _conversation_active(apprenant, bloc)
@@ -258,6 +290,7 @@ class BlocChatAPIView(APIView):
             return api_success(
                 "Réponse générée.",
                 {
+                    "evaluation": {"en_cours": False, "message": ""},
                     "conversation": _conv_data(conv),
                     "message": _msg_data(assistant),
                     "messages": _messages_data(conv),
