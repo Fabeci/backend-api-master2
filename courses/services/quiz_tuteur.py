@@ -16,6 +16,8 @@ from analytics.services.llm_provider import _extract_json_block, call_llm
 
 from django.conf import settings
 
+from courses.models import DocumentChunk
+
 from . import chat_tuteur, rag
 from .rag import STOPWORDS
 
@@ -149,7 +151,11 @@ def generer_quiz(conversation):
         questions = quiz_depuis_contenu(conversation.bloc)
         if questions:
             return questions, None, "contenu"
-        return [], erreur, "contenu"
+        return [], _message_sans_contenu(conversation.bloc), "contenu"
+
+    # Bloc sans texte exploitable (vidéo/audio/lien) : on n'invente pas de quiz.
+    if len(_texte_pour_quiz(conversation.bloc).strip()) < 60:
+        return [], _message_sans_contenu(conversation.bloc), "contenu"
 
     if provider == "mock":
         return _secours(
@@ -198,13 +204,54 @@ def _mots(texte: str) -> list[str]:
     ]
 
 
+
+
+def _texte_pour_quiz(bloc) -> str:
+    """Texte du bloc, complété par les extraits du document attaché (PDF/DOCX)."""
+    texte = chat_tuteur.texte_du_bloc(bloc)
+    if len(texte) >= 120:
+        return texte
+
+    try:
+        rag.assurer_index_bloc(bloc)
+        morceaux = list(
+            DocumentChunk.objects
+            .filter(bloc=bloc)
+            .values_list("texte", flat=True)[:6]
+        )
+        if morceaux:
+            return "\n".join(morceaux)
+    except Exception:  # noqa: BLE001
+        logger.debug("[quiz_tuteur] extraits documentaires indisponibles", exc_info=True)
+
+    return texte
+
+
+def _message_sans_contenu(bloc) -> str:
+    type_bloc = getattr(bloc, "type_bloc", "")
+    if type_bloc in ("video", "audio"):
+        return ("Ce bloc est une vidéo/audio : aucun texte n'est disponible pour générer un quiz. "
+                "Utilisez un bloc texte ou un document.")
+    if type_bloc == "lien":
+        return ("Ce bloc est un lien externe : ajoutez un contenu texte ou un document PDF "
+                "pour générer un quiz.")
+    if type_bloc == "fichier":
+        return ("Le document de ce bloc n'a pas pu être lu (PDF scanné ou format non pris en charge). "
+                "Ajoutez un texte ou un PDF avec couche texte.")
+    return ("Ce bloc ne contient pas assez de texte exploitable pour générer un quiz. "
+            "Ajoutez un contenu texte ou un document PDF.")
+
+
 def quiz_depuis_contenu(bloc) -> list[dict]:
     """Construit 2-3 QCM « complétez la phrase » à partir du texte du bloc.
 
     Utilisé quand le fournisseur IA est absent ou renvoie un JSON inexploitable.
     """
-    texte = chat_tuteur.texte_du_bloc(bloc)
+    texte = _texte_pour_quiz(bloc)
     phrases = _phrases(texte)
+    if not phrases and len(texte.strip()) >= 40:
+        # Code source / texte sans ponctuation : on utilise le texte tel quel.
+        phrases = [texte.strip()[:260]]
     if not phrases:
         return []
 

@@ -585,7 +585,7 @@ class BlocQuizAPIView(APIView):
                     "success": False,
                     "status": status.HTTP_502_BAD_GATEWAY,
                     "code": "AI_PROVIDER_ERROR",
-                    "message": "Impossible de générer le quiz pour le moment. Réessayez.",
+                    "message": erreur_quiz or "Impossible de générer le quiz pour le moment. Réessayez.",
                     "detail": erreur_quiz,
                 },
                 status=status.HTTP_502_BAD_GATEWAY,
