@@ -759,9 +759,14 @@ class CohortOverviewView(APIView):
             diags.values('competence__libelle', 'diagnosis_type')
             .annotate(n=Count('id')).order_by('-n')[:6]
         )
+        # Libellés français : le code technique (MASTERY_GAP, …) ne doit
+        # jamais être affiché à l'utilisateur.
+        diag_labels = dict(LearningDiagnosis.TYPE_CHOICES)
         difficultes = [
             {
-                'label': d['competence__libelle'] or d['diagnosis_type'],
+                'label': d['competence__libelle'] or diag_labels.get(
+                    d['diagnosis_type'], d['diagnosis_type']
+                ),
                 'n': d['n'],
             }
             for d in top_diag

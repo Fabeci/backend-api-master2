@@ -7,6 +7,7 @@
 
 import logging
 
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -30,34 +31,45 @@ def _allowed_types(quiz: bool):
     return QUIZ_TYPES if quiz else None  # None = tous les types d'évaluation
 
 
-def _creer_questions(items, *, quiz=None, evaluation=None, warnings=None):
+def _creer_questions(items, *, quiz=None, evaluation=None, warnings=None, errors=None):
+    """Crée les questions une par une ; une question invalide n'annule pas les autres."""
     allowed = _allowed_types(quiz is not None)
     created = 0
     for i, q in enumerate(items, start=1):
-        tq = q.get("type_question") or "choix_unique"
-        if allowed is not None and tq not in allowed:
-            if warnings is not None:
-                warnings.append(f"Question {i} : type « {tq} » non valide pour un quiz → 'choix_unique'.")
-            tq = "choix_unique"
+        try:
+            tq = q.get("type_question") or "choix_unique"
+            if allowed is not None and tq not in allowed:
+                if warnings is not None:
+                    warnings.append(f"Question {i} : type « {tq} » non valide pour un quiz → 'choix_unique'.")
+                tq = "choix_unique"
 
-        question = Question.objects.create(
-            quiz=quiz,
-            evaluation=evaluation,
-            enonce_texte=(q.get("enonce_texte") or f"Question {i}").strip(),
-            type_question=tq,
-            mode_correction="automatique",
-            points=float(q.get("points") or 1),
-            ordre=i,
-            indication_reponse=(q.get("indication_reponse") or "").strip(),
-        )
-        for j, r in enumerate(q.get("reponses") or [], start=1):
-            Reponse.objects.create(
-                question=question,
-                texte=(r.get("texte") or "").strip(),
-                est_correcte=bool(r.get("est_correcte")),
-                ordre=j,
-            )
-        created += 1
+            with transaction.atomic():
+                question = Question.objects.create(
+                    quiz=quiz,
+                    evaluation=evaluation,
+                    enonce_texte=(q.get("enonce_texte") or f"Question {i}").strip(),
+                    type_question=tq,
+                    mode_correction="automatique",
+                    points=float(q.get("points") or 1),
+                    ordre=i,
+                    indication_reponse=(q.get("indication_reponse") or "").strip(),
+                )
+                for j, r in enumerate(q.get("reponses") or [], start=1):
+                    Reponse.objects.create(
+                        question=question,
+                        texte=(r.get("texte") or "").strip(),
+                        est_correcte=bool(r.get("est_correcte")),
+                        ordre=j,
+                    )
+            created += 1
+        except Exception as exc:
+            logger.exception("Création de la question %s échouée", i)
+            if errors is not None:
+                errors.append({
+                    "question": i,
+                    "enonce": (q.get("enonce_texte") or "")[:200],
+                    "message": str(exc),
+                })
     return created
 
 
@@ -107,11 +119,25 @@ class EvaluationImportCreateAPIView(APIView):
             consigne_texte=(request.data.get("consigne_texte") or "").strip(),
             est_publiee=False,
         )
-        created = _creer_questions(questions, evaluation=evaluation, warnings=None)
+        errors = []
+        created = _creer_questions(questions, evaluation=evaluation, warnings=None, errors=errors)
+        if created == 0:
+            evaluation.delete()
+            return api_error(
+                "Aucune question n'a pu être créée.",
+                errors={"errors": errors, "warnings": res.get("warnings", [])},
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
 
         return api_success(
-            f"Évaluation créée avec {created} question(s).",
-            {"evaluation_id": evaluation.id, "questions": created, "warnings": res.get("warnings", [])},
+            f"Évaluation créée avec {created} question(s)"
+            + (f", {len(errors)} question(s) ignorée(s)." if errors else "."),
+            {
+                "evaluation_id": evaluation.id,
+                "questions": created,
+                "errors": errors,
+                "warnings": res.get("warnings", []),
+            },
             status.HTTP_201_CREATED,
         )
 
@@ -152,10 +178,19 @@ class QuizImportCreateAPIView(APIView):
         warnings = list(res.get("warnings", []))
         titre = (request.data.get("titre") or f"Quiz importé ({f.name})")[:255]
         quiz = Quiz.objects.create(titre=titre, sequence=seq)
-        created = _creer_questions(questions, quiz=quiz, warnings=warnings)
+        errors = []
+        created = _creer_questions(questions, quiz=quiz, warnings=warnings, errors=errors)
+        if created == 0:
+            quiz.delete()
+            return api_error(
+                "Aucune question n'a pu être créée.",
+                errors={"errors": errors, "warnings": warnings},
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
 
         return api_success(
-            f"Quiz créé avec {created} question(s).",
-            {"quiz_id": quiz.id, "questions": created, "warnings": warnings},
+            f"Quiz créé avec {created} question(s)"
+            + (f", {len(errors)} question(s) ignorée(s)." if errors else "."),
+            {"quiz_id": quiz.id, "questions": created, "errors": errors, "warnings": warnings},
             status.HTTP_201_CREATED,
         )

@@ -300,13 +300,8 @@ def _docx_heading(p, normal_font) -> int:
 
 
 def _base_font(p, normal_font):
-    try:
-        f = p.style.font if p.style else None
-    except Exception:
-        f = None
-    if f is None or (not f.name and not f.size):
-        return normal_font
-    return f
+    """Police effective : style du paragraphe → chaîne base_style → Normal."""
+    return import_blocs._style_font(p.style if p.style else None, normal_font)
 
 
 def _runs_inner(p, base) -> str:
@@ -381,7 +376,10 @@ def _docx_tree(data: bytes, filename: str) -> dict:
         if tag == "p":
             p = Paragraph(child, d)
             txt = (p.text or "").strip()
+            images = import_blocs._docx_images(p, d)
             if not txt:
+                if images:
+                    builder.add_content(import_blocs._images_html(images), "")
                 continue
             style = p.style.name if p.style else ""
 
@@ -424,6 +422,8 @@ def _docx_tree(data: bytes, filename: str) -> dict:
                 continue
 
             html = _para_html(p, base, tag=f"h{lvl}") if lvl else _para_html(p, base)
+            if images:
+                html += import_blocs._images_html(images)
             builder.add_content(html, txt)
 
         elif tag == "tbl":
@@ -466,8 +466,29 @@ def _pdf_tree(data: bytes, filename: str) -> dict:
             lines.append({**l, "page": p["page"]})
 
     if not lines:
+        # PDF probablement scanné : tentative d'OCR (si tesseract est installé).
+        try:
+            from courses import ocr
+            if ocr.disponible():
+                page_texts = [t for t in ocr.ocr_pdf_pages(data) if (t or "").strip()]
+                if page_texts:
+                    builder = _Builder(titre)
+                    builder.warnings.append(
+                        "PDF scanné : texte extrait par OCR (mise en forme approximative)."
+                    )
+                    builder.heading("module", titre)
+                    builder.heading("sequence", "Contenu OCR")
+                    for i, text in enumerate(page_texts, start=1):
+                        builder.heading("bloc", f"Page {i}")
+                        builder.add_content(import_blocs._text_to_html(text), "")
+                    return builder.finish()
+        except Exception:
+            logger.exception("OCR du PDF échoué (%s)", filename)
         builder = _Builder(titre)
-        builder.warnings.append("Aucun texte détecté (PDF scanné ou vide ?).")
+        builder.warnings.append(
+            "Aucun texte détecté (PDF scanné ou vide ?). "
+            "Installez tesseract-ocr et poppler-utils pour activer l'OCR."
+        )
         return builder.finish()
 
     sizes = Counter(round(l["size"], 1) for l in lines)
@@ -596,7 +617,33 @@ def _pdf_tree(data: bytes, filename: str) -> dict:
 # API publique
 # ─────────────────────────────────────────────────────────────────────────────
 
-SUPPORTED = (".docx", ".pdf")
+SUPPORTED = (".docx", ".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff")
+
+
+def _image_tree(data: bytes, filename: str) -> dict:
+    import os as _os
+    titre = _os.path.splitext(_os.path.basename(filename or ""))[0] or "Image importée"
+    builder = _Builder(titre)
+    try:
+        from courses import ocr
+        if not ocr.disponible():
+            builder.warnings.append(
+                "OCR indisponible : installez tesseract-ocr et pytesseract pour importer une image."
+            )
+            return builder.finish()
+        text = ocr.ocr_image(data)
+        if not (text or "").strip():
+            builder.warnings.append("Aucun texte détecté dans l'image.")
+            return builder.finish()
+        builder.warnings.append("Image : texte extrait par OCR (mise en forme approximative).")
+        builder.heading("module", titre)
+        builder.heading("sequence", "Contenu OCR")
+        builder.heading("bloc", "Page 1")
+        builder.add_content(import_blocs._text_to_html(text), "")
+    except Exception:
+        logger.exception("OCR de l'image échoué (%s)", filename)
+        builder.warnings.append("Impossible d'extraire le texte de l'image.")
+    return builder.finish()
 
 
 def extract_course(filename: str, data: bytes) -> dict:
@@ -605,7 +652,11 @@ def extract_course(filename: str, data: bytes) -> dict:
         return _docx_tree(data, filename)
     if name.endswith(".pdf"):
         return _pdf_tree(data, filename)
-    raise ValueError("Format non pris en charge : utilisez un fichier Word (.docx) ou PDF.")
+    if name.endswith((".png", ".jpg", ".jpeg", ".tif", ".tiff")):
+        return _image_tree(data, filename)
+    raise ValueError(
+        "Format non pris en charge : utilisez un fichier Word (.docx), PDF ou image (.png, .jpg, .tif)."
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

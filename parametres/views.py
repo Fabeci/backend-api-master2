@@ -2,7 +2,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from .models import ParametresPlateforme, ParametresInstitution, PreferencesUtilisateur
 from .serializers import (
@@ -160,3 +160,44 @@ class PreferencesUtilisateurView(APIView):
             ser.save()
             return api_ok(ser.data)
         return api_err(str(ser.errors), status.HTTP_400_BAD_REQUEST)
+
+
+# ─── Contact (public) — envoi d'e-mail ───────────────────────────────────────
+
+class ContactMessageAPIView(APIView):
+    """Reçoit un message du formulaire de contact et l'envoie par e-mail."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        from django.conf import settings
+        from django.core.mail import send_mail
+
+        data = request.data or {}
+        nom = str(data.get("nom") or "").strip()
+        email = str(data.get("email") or "").strip()
+        message = str(data.get("message") or "").strip()
+        if not nom or not email or not message:
+            return api_err("Nom, e-mail et message sont requis.")
+
+        corps = (
+            f"Nom : {nom}\n"
+            f"E-mail : {email}\n"
+            f"Téléphone : {data.get('telephone', '')}\n"
+            f"Établissement : {data.get('etablissement', '')}\n"
+            f"Offre : {data.get('offre', '')}\n\n"
+            f"{message}"
+        )
+        try:
+            send_mail(
+                f"[SOMAPRO] Contact — {nom}",
+                corps,
+                getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@somapro.local"),
+                ["fabricedjerabe01@gmail.com"],
+                fail_silently=False,
+            )
+        except Exception:
+            return api_err(
+                "L'envoi a échoué. Réessayez ou écrivez à fabricedjerabe01@gmail.com.",
+                status.HTTP_502_BAD_GATEWAY,
+            )
+        return api_ok({"sent": True})
