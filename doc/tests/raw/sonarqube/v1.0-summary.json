@@ -1,0 +1,37 @@
+{
+  "version": "1.0 (avant corrections)",
+  "date": "2026-10-27T22:32Z",
+  "revision": "5f83f044",
+  "ncloc": "41548",
+  "files": "245",
+  "coverage": "36.0",
+  "bugs": "6",
+  "vulnerabilities": "285",
+  "code_smells": "526",
+  "duplicated_lines_density": "2.4",
+  "sqale_index_min": "5633",
+  "reliability_rating": "3.0",
+  "security_rating": "5.0",
+  "sqale_rating": "1.0",
+  "security_hotspots": "0",
+  "cognitive_complexity": "9063",
+  "complexity": "7967",
+  "quality_gate": "OK",
+  "issues_total": 817,
+  "issues_by_type": {
+    "types": {
+      "CODE_SMELL": 526,
+      "VULNERABILITY": 285,
+      "BUG": 6
+    }
+  },
+  "issues_by_severity": {
+    "severities": {
+      "MAJOR": 508,
+      "CRITICAL": 224,
+      "MINOR": 82,
+      "BLOCKER": 3,
+      "INFO": 0
+    }
+  }
+}

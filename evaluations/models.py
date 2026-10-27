@@ -221,7 +221,7 @@ class Question(models.Model):
         ('texte_ou_fichier', 'Réponse textuelle ou fichier'),
     ]
     
-    MODE_CORRECTION = [
+    MODE_CORRECTION_CHOICES = [
         ('automatique', 'Correction automatique'),
         ('manuelle', 'Correction manuelle'),
     ]
@@ -257,7 +257,7 @@ class Question(models.Model):
     type_question = models.CharField(max_length=30, choices=TYPE_CHOICES_EVALUATION)
     mode_correction = models.CharField(
         max_length=20, 
-        choices=MODE_CORRECTION,
+        choices=MODE_CORRECTION_CHOICES,
         default='automatique',
     )
     

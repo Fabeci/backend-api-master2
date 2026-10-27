@@ -6,7 +6,9 @@ Usage:
     python manage.py seed_data --seed-size=large
     python manage.py seed_data --seed-size=xlarge --flush
 """
+import os
 import random
+import secrets
 from datetime import date, timedelta
 
 from django.contrib.auth.hashers import make_password
@@ -304,7 +306,13 @@ class Command(BaseCommand):
         self.cfg = SIZE_CONFIGS[self.size]
         self._email_ctr = 1
         self._matricule_ctr = 10000
-        self._pw = make_password('Somapro2024!')
+        seed_password = os.environ.get('SEED_PASSWORD')
+        if not seed_password:
+            seed_password = secrets.token_urlsafe(12)
+            self.stdout.write(self.style.WARNING(
+                f'SEED_PASSWORD non défini — mot de passe généré pour les comptes de démonstration : {seed_password}'
+            ))
+        self._pw = make_password(seed_password)
 
         self.stdout.write(self.style.SUCCESS(f'\nSOMAP RO Seeder - taille: {self.size.upper()}'))
         self.stdout.write('-' * 60)

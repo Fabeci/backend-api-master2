@@ -139,7 +139,7 @@ class Streak(models.Model):
 
 
 class Badge(models.Model):
-    RARETE = [
+    RARETE_CHOICES = [
         ('commun','Commun'), ('peu_commun','Peu commun'),
         ('rare','Rare'), ('tres_rare','Très rare'), ('legendaire','Légendaire'),
     ]
@@ -152,7 +152,7 @@ class Badge(models.Model):
     nom         = models.CharField(max_length=128)
     description = models.TextField()
     categorie   = models.CharField(max_length=32, choices=CATEGORIES)
-    rarete      = models.CharField(max_length=16, choices=RARETE, default='commun')
+    rarete      = models.CharField(max_length=16, choices=RARETE_CHOICES, default='commun')
     icone       = models.CharField(max_length=64, blank=True)
     couleur     = models.CharField(max_length=16, blank=True, default='#00b69b')
     conditions  = models.JSONField(default=dict)

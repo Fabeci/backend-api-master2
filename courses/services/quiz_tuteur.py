@@ -257,7 +257,8 @@ def quiz_depuis_contenu(bloc) -> list[dict]:
 
     tous_mots = list(dict.fromkeys(_mots(texte)))
     questions: list[dict] = []
-    rng = random.Random(bloc.id or 1)
+    # Shuffle déterministe des options (reproductible, sans enjeu de sécurité).
+    rng = random.Random(bloc.id or 1)  # NOSONAR
 
     for phrase in phrases:
         candidats = [m for m in _mots(phrase) if len(m) >= 5]
@@ -275,7 +276,7 @@ def quiz_depuis_contenu(bloc) -> list[dict]:
             continue
 
         options = [correct, *distracteurs]
-        rng.shuffle(options)
+        rng.shuffle(options)  # NOSONAR — mélange reproductible des options, sans enjeu de sécurité
         enonce = re.sub(re.escape(correct), "______", phrase, count=1, flags=re.IGNORECASE)
         if "______" not in enonce:
             continue

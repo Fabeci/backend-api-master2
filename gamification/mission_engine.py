@@ -71,7 +71,7 @@ def generate_daily_missions(apprenant):
     if len(pool) < 3:
         pool = list(Mission.objects.filter(type_mission='quotidienne', est_active=True))
 
-    selected = random.sample(pool, min(3, len(pool)))
+    selected = random.SystemRandom().sample(pool, min(3, len(pool)))
     created  = []
 
     for mission in selected:
