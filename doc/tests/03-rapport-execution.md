@@ -88,3 +88,14 @@ Aucune correction n'a modifié une règle métier pour faire passer un test.
 - **Frontend** : 13 specs historiques cassées (hors périmètre de cette mission).
 - **Performance** : chiffres locaux (runserver + SQLite), non extrapolables.
 - **E2E** : les parcours UI ne sont pas validés de bout en bout.
+
+## 3.7 Preuve d'intégration continue (GitHub Actions)
+
+| Workflow | Run | Résultat |
+|---|---|---|
+| **CI backend** (check + 127 tests + couverture + artefact) | `40482831910` | **succès** ✅ |
+| **CI frontend** (build + garde-fou API + 33 tests critiques) | `40482877681` | **succès** ✅ |
+| **Deploy backend → cPanel (FTP)** | `40482831870` | **succès** ✅ |
+| **Deploy frontend → cPanel (FTP)** | `40482877814` | **succès** ✅ |
+
+Les tests sont donc **reproductibles en local et en CI**, sur chaque push `main`.
