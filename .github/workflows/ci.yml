@@ -28,10 +28,30 @@ jobs:
           DB_ENGINE: sqlite
           ALLOWED_HOSTS: 'localhost,testserver,127.0.0.1'
         run: python manage.py check
-      - name: Tests (périmètres, publication, corrigés, LMD)
+      - name: Installer coverage
+        run: pip install coverage
+
+      - name: Tests complets (unitaires + intégration + sécurité + IA)
         env:
           DJANGO_SECRET_KEY: ci-secret-key-not-for-prod
           DEBUG: 'True'
           DB_ENGINE: sqlite
           ALLOWED_HOSTS: 'localhost,testserver,127.0.0.1'
-        run: python manage.py test core.tests_security core.tests_rbac -v2
+        run: |
+          coverage run --source=core,courses,evaluations,users,academics,analytics,progress,notifications,resources,collaborations,feedback,gamification,locations,parametres \
+            manage.py test core courses evaluations users academics analytics progress notifications resources collaborations feedback gamification locations parametres -v2
+
+      - name: Rapport de couverture
+        run: |
+          coverage report -m
+          coverage html
+          coverage xml -o coverage.xml
+
+      - name: Publier la couverture (artefact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: couverture-backend
+          path: |
+            coverage.xml
+            htmlcov/
+          if-no-files-found: ignore
