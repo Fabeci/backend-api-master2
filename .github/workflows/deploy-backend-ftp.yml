@@ -1,0 +1,81 @@
+name: Deploy backend → cPanel (FTP)
+
+# Déploie le code par FTP puis dépose un drapeau `deploy.flag`.
+# Une tâche cron cPanel (5 min) exécute alors :
+#   pip install → migrate → collectstatic → restart Passenger.
+#
+# Secrets requis (Settings → Secrets → Actions) :
+#   FTP_SERVER, FTP_USERNAME, FTP_PASSWORD, FTP_SERVER_DIR (ex. /)
+#   FTP_PORT (optionnel, 21 par défaut)
+#
+# ⚠️ `.env`, la base SQLite, les médias et les statiques sont EXCLUS.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.py'
+      - 'requirements*.txt'
+      - 'passenger_wsgi.py'
+      - 'deploy/cpanel/**'
+      - '.github/workflows/deploy-backend-ftp.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Upload code + drapeau
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ secrets.FTP_PORT || 21 }}
+          protocol: ftp
+          local-dir: ./
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/__pycache__/**
+            **/*.pyc
+            **/.venv/**
+            **/venv/**
+            db.sqlite3
+            media/**
+            static/**
+            staticfiles/**
+            institution_logos/**
+            tmp/**
+            .env
+            feedback.zip
+            .vscode/**
+            .tmp-*/**
+
+      - name: Déclencher le déploiement (drapeau)
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
+        run: |
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > /tmp/deploy.flag
+          curl -sS --fail --ftp-create-dirs \
+            --user "$FTP_USERNAME:$FTP_PASSWORD" \
+            -T /tmp/deploy.flag "ftp://$FTP_SERVER${FTP_SERVER_DIR%/}/deploy.flag"
+          echo "✅ Code envoyé, drapeau déposé."
+
+      - name: Résumé
+        run: |
+          echo "### ✅ Backend envoyé" >> "$GITHUB_STEP_SUMMARY"
+          echo "La tâche cron cPanel va appliquer les migrations et redémarrer Passenger." >> "$GITHUB_STEP_SUMMARY"
