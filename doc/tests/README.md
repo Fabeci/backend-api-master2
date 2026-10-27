@@ -20,7 +20,7 @@ de la plateforme SOMAPRO (LMS).
 
 ## Commandes de reproduction
 
-### Backend — suite complète (127 tests)
+### Backend — suite complète (160 tests)
 
 ```bash
 docker compose run --rm --no-deps backend \
@@ -69,9 +69,9 @@ python3 scripts/tests/perf_api.py --duration 20 --concurrency 10
 
 | Catégorie | Résultat réel |
 |---|---|
-| Tests backend | **127 / 127 réussis** (81 s) |
+| Tests backend | **160 / 160 réussis** (58 s) |
 | Tests frontend critiques | **33 / 33 réussis** |
-| Couverture backend (code applicatif) | **40 %** global ; **77–98 %** sur les modules critiques |
+| Couverture backend (code applicatif) | **40 %** global ; **69–98 %** sur les modules critiques |
 | Sécurité (contrôles dynamiques) | **7 / 7 conformes** |
 | Charge locale (5 utilisateurs) | 32,2 req/s · p95 297 ms · **0 erreur** |
 | Charge locale (10 utilisateurs) | 32,1 req/s · p95 531 ms · **0 erreur** |

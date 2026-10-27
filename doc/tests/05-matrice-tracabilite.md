@@ -5,8 +5,8 @@
 | E1 | Authentification | login valide/invalide, jeton expiré/invalide | `core.tests_security`, `courses.tests_chat`, SEC-02/03/04 | ✅ |
 | E2 | Rôles et périmètres | chaque rôle ne voit que son périmètre | `core.tests_rbac`, `courses.tests_stats` | ✅ |
 | E3 | Gestion des cours | création/modification réservées au formateur | `core.tests_security` (formateur/module/cours) | ✅ |
-| E4 | Publication progressive | brouillon/programmé/publié, dates | `core.tests_security`, `core.tests_metier` (BE-01→07) | ✅ |
-| E5 | Progression | bloc terminé → déblocage, cascade | `courses.tests_parcours`, `core.tests_metier` (BE-08→10) | ✅ |
+| E4 | Publication progressive | brouillon/programmé/publié, dates, transitions module→séquence→bloc | `core.tests_security`, `core.tests_metier` (BE-01→07, BE-22→25) | ✅ |
+| E5 | Progression | bloc terminé → déblocage, cascade | `courses.tests_parcours`, `core.tests_metier` (BE-08→12) | ✅ |
 | E6 | Bloc verrouillé | accès refusé côté serveur | `courses.tests_parcours` | ✅ |
 | E7 | Quiz / résultats | score, seuils, chevauchement, correction | `courses.tests_p1`, `courses.tests_chat` (quiz) | ✅ |
 | E8 | Évaluations | validations de note, accessibilité, pourcentage | `core.tests_metier` (BE-16→19) | ✅ |
@@ -23,7 +23,7 @@
 | E19 | PWA / hors-ligne | cache des cours, repli réseau, purge | `offline-cache.interceptor.spec.ts` | ✅ |
 | E20 | Sécurité des données | pas de secret exposé, pas de fuite | `core.tests_security` + SEC-01→07 | ✅ |
 | E21 | Erreurs IA | 502 contrôlé, pas de panne | `courses.tests_chat` | ✅ |
-| E22 | Non-régression | suite reproductible | 127 tests backend + 33 frontend | ✅ |
+| E22 | Non-régression | suite reproductible | **160 tests backend** + 33 frontend | ✅ |
 | E23 | Performance | latence/débit des endpoints | `perf_api.py` (PERF-01/02) | ✅ (local) |
 | E24 | E2E navigateur | parcours UI complets | — | ❌ non exécuté |
 | E25 | Qualité IA cloud | exactitude/pertinence rédactionnelle | — | ❌ non exécuté |

@@ -2,7 +2,7 @@
 
 Légende : **R** = réussi · **É** = échoué · **B** = bloqué · **NE** = non exécuté.
 
-## 2.1 Backend — règles métier (unitaires) — `core/tests_metier.py` (17)
+## 2.1 Backend — règles métier (unitaires) — `core/tests_metier.py` (**50**)
 
 | ID | Fonctionnalité | Préconditions | Résultat attendu | Observé | Statut |
 |---|---|---|---|---|---|
@@ -40,7 +40,13 @@ Légende : **R** = réussi · **É** = échoué · **B** = bloqué · **NE** = n
 | BE-INT-06 | `courses.tests_stats` (tableau de bord, périmètre formateur) | 7 | R |
 | BE-INT-07 | `evaluations.tests_explication` (« Explique mon erreur ») | 6 | R |
 | BE-INT-08 | Autres applications (users, notifications, analytics, etc.) | 20 | R |
-| **Total** | | **127** | **R** |
+| BE-UNIT-09 | Étapes de publication module→séquence→bloc (`tests_metier`) | 4 | R |
+| BE-UNIT-10 | États d'un cours (dates, annulé, statut forcé) | 4 | R |
+| BE-UNIT-11 | Consultation/validation (seuils 60 %, scroll 80 %) et déblocage du bloc suivant | 6 | R |
+| BE-UNIT-12 | Validation des questions/réponses (parent exclusif, types, correction) | 8 | R |
+| BE-UNIT-13 | RBAC unitaire (anonyme, superuser, matrice, permission additive, surcharge) | 8 | R |
+| BE-UNIT-14 | Indicateurs (profil adaptatif sans activité) et suivi des évaluations | 3 | R |
+| **Total** | | **160** | **R** |
 
 ## 2.3 Frontend — specs critiques (Jasmine/Karma) — 33
 

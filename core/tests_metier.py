@@ -6,6 +6,7 @@
 # ============================================================================
 from datetime import timedelta
 
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
@@ -19,12 +20,18 @@ from academics.services.lmd import (
 from courses.models import (
     BlocContenu, BlocProgress, Cours, InscriptionCours, Module, Sequence,
 )
-from courses.publication import bloc_disponible, element_publie, filter_disponibles
+from courses.parcours_engine import bloc_est_valide, is_bloc_unlocked_for, validate_block
+from courses.publication import (
+    appliquer_etat_module, bloc_disponible, element_publie,
+    filter_disponibles, peut_publier_bloc, peut_publier_sequence,
+)
 from courses.services.progression import recompute_all_from_bloc
-from evaluations.models import Evaluation, PassageEvaluation
+from evaluations.models import Evaluation, PassageEvaluation, Question, Quiz, Reponse
 from locations.models import Pays
 from users.access_control import accessible_apprenants, user_can_access_apprenant
-from users.models import Apprenant, Formateur, Parent, UserRole
+from core.rbac import has_permission
+from analytics.models import BlocAnalyticsSummary, LearnerProfile
+from users.models import Apprenant, Formateur, Parent, RolePermissionOverride, User, UserRole
 
 
 class BaseMetierTests(TestCase):
@@ -345,3 +352,297 @@ class PerimetreParentTests(BaseMetierTests):
         autorises = accessible_apprenants(self.apprenant)
         ids = set(autorises.values_list("id", flat=True))
         self.assertEqual(ids, {self.apprenant.id})
+
+
+# ============================================================================
+# 6. ÉTATS D'UN COURS (planifié / en cours / terminé / annulé)
+# ============================================================================
+class CoursStatutTests(BaseMetierTests):
+    def _base(self):
+        return dict(institution=self.inst, annee_scolaire=self.annee,
+                    matiere=self.matiere, groupe=self.groupe, enseignant=self.formateur)
+
+    def test_statut_selon_les_dates(self):
+        today = timezone.localdate()
+        futur = Cours(titre="F", date_debut=today + timedelta(days=2),
+                      date_fin=today + timedelta(days=10), **self._base())
+        self.assertEqual(futur.statut_calcule, "planifie")
+
+        en_cours = Cours(titre="E", date_debut=today - timedelta(days=1),
+                         date_fin=today + timedelta(days=1), **self._base())
+        self.assertEqual(en_cours.statut_calcule, "en_cours")
+
+        termine = Cours(titre="T", date_debut=today - timedelta(days=10),
+                        date_fin=today - timedelta(days=1), **self._base())
+        self.assertEqual(termine.statut_calcule, "termine")
+
+    def test_statut_sans_dates(self):
+        self.assertEqual(self.cours.statut_calcule, "planifie")
+
+    def test_statut_force_respecte(self):
+        c = Cours(titre="Annulé", statut="annule", statut_force=True, **self._base())
+        self.assertEqual(c.statut_calcule, "annule")
+
+    def test_cours_annule_force_le_statut_a_la_sauvegarde(self):
+        matiere = Matiere.objects.create(institution=self.inst, nom="Annulation")
+        c = Cours.objects.create(
+            titre="Annulé", institution=self.inst, annee_scolaire=self.annee,
+            matiere=matiere, groupe=self.groupe, enseignant=self.formateur,
+            statut="annule", date_debut=timezone.localdate() - timedelta(days=1),
+            date_fin=timezone.localdate() + timedelta(days=1))
+        self.assertTrue(c.statut_force)
+        self.assertEqual(c.statut, "annule")
+
+
+# ============================================================================
+# 7. TRANSITIONS DE PUBLICATION (module → séquences → blocs)
+# ============================================================================
+class PublicationTransitionTests(BaseMetierTests):
+    def setUp(self):
+        super().setUp()
+        self.bloc = BlocContenu.objects.create(
+            sequence=self.sequence, titre="B", type_bloc="texte",
+            contenu_texte="x", etat_publication="brouillon")
+        self.sequence.etat_publication = "brouillon"
+        self.sequence.save(update_fields=["etat_publication"])
+        self.module.etat_publication = "brouillon"
+        self.module.save(update_fields=["etat_publication"])
+
+    def test_module_publie_aligne_sequences_et_blocs(self):
+        self.module.etat_publication = "publie"
+        self.module.save(update_fields=["etat_publication"])
+        appliquer_etat_module(self.module)
+
+        self.sequence.refresh_from_db()
+        self.bloc.refresh_from_db()
+        self.assertEqual(self.sequence.etat_publication, "publie")
+        self.assertEqual(self.bloc.etat_publication, "publie")
+        self.assertIsNotNone(self.bloc.date_publication_effective)
+
+    def test_module_programme_propage_la_date(self):
+        date = timezone.now() + timedelta(days=2)
+        self.module.etat_publication = "programme"
+        self.module.date_publication_programmee = date
+        self.module.save(update_fields=["etat_publication", "date_publication_programmee"])
+        appliquer_etat_module(self.module)
+
+        self.sequence.refresh_from_db()
+        self.bloc.refresh_from_db()
+        self.assertEqual(self.sequence.etat_publication, "programme")
+        self.assertEqual(self.bloc.date_publication_programmee, date)
+
+    def test_module_depublie(self):
+        self.module.etat_publication = "depublie"
+        self.module.save(update_fields=["etat_publication"])
+        appliquer_etat_module(self.module)
+        self.bloc.refresh_from_db()
+        self.assertEqual(self.bloc.etat_publication, "depublie")
+
+    def test_peut_publier_regles(self):
+        self.assertFalse(peut_publier_sequence(self.sequence))
+        self.module.etat_publication = "publie"
+        self.module.save(update_fields=["etat_publication"])
+        self.assertTrue(peut_publier_sequence(self.sequence))
+
+        self.assertFalse(peut_publier_bloc(self.bloc))  # séquence encore brouillon
+        self.sequence.etat_publication = "publie"
+        self.sequence.save(update_fields=["etat_publication"])
+        self.assertTrue(peut_publier_bloc(self.bloc))
+
+
+# ============================================================================
+# 8. CONSULTATION, VALIDATION ET DÉBLOCAGE DU BLOC SUIVANT
+# ============================================================================
+class ConsultationEtDeblocageTests(BaseMetierTests):
+    def setUp(self):
+        super().setUp()
+        self.b1 = BlocContenu.objects.create(
+            sequence=self.sequence, titre="B1", type_bloc="texte", contenu_texte="x",
+            ordre=1, est_obligatoire=True, duree_estimee_minutes=10)
+        self.b2 = BlocContenu.objects.create(
+            sequence=self.sequence, titre="B2", type_bloc="texte", contenu_texte="y",
+            ordre=2, est_obligatoire=True)
+
+    def test_consultation_temps_seuil(self):
+        summ = BlocAnalyticsSummary(apprenant=self.apprenant, bloc=self.b1,
+                                    duree_totale_sec=359)
+        self.assertFalse(bloc_est_valide(self.b1, None, summ))
+        summ.duree_totale_sec = 360
+        self.assertTrue(bloc_est_valide(self.b1, None, summ))
+
+    def test_consultation_scroll_seuil(self):
+        summ = BlocAnalyticsSummary(apprenant=self.apprenant, bloc=self.b1,
+                                    scroll_max_pct=79)
+        self.assertFalse(bloc_est_valide(self.b1, None, summ))
+        summ.scroll_max_pct = 80
+        self.assertTrue(bloc_est_valide(self.b1, None, summ))
+
+    def test_progress_termine_suffit(self):
+        prog = BlocProgress(apprenant=self.apprenant, bloc=self.b1, est_termine=True)
+        self.assertTrue(bloc_est_valide(self.b1, prog, None))
+
+    def test_premier_bloc_debloque_second_verrouille(self):
+        self.assertTrue(is_bloc_unlocked_for(self.apprenant, self.b1)[0])
+        unlocked, raison = is_bloc_unlocked_for(self.apprenant, self.b2)
+        self.assertFalse(unlocked)
+        self.assertTrue(raison)
+
+    def test_validation_du_premier_debloque_le_second(self):
+        BlocProgress.objects.create(apprenant=self.apprenant, bloc=self.b1,
+                                    est_termine=True)
+        res = validate_block(self.apprenant, self.b1)
+        self.assertTrue(res.get("ok"))
+        self.assertTrue(res.get("valide"))
+        self.assertTrue(is_bloc_unlocked_for(self.apprenant, self.b2)[0])
+
+    def test_valider_un_bloc_verrouille_refuse(self):
+        res = validate_block(self.apprenant, self.b2)
+        self.assertFalse(res.get("ok"))
+        self.assertTrue(res.get("raison"))
+
+
+# ============================================================================
+# 9. VALIDATION DES QUESTIONS ET RÉPONSES
+# ============================================================================
+class QuestionValidationTests(BaseMetierTests):
+    def setUp(self):
+        super().setUp()
+        self.evaluation = Evaluation.objects.create(
+            cours=self.cours, enseignant=self.formateur, titre="E",
+            type_evaluation="structuree", bareme=20,
+            date_debut=timezone.now() - timedelta(days=1),
+            date_fin=timezone.now() + timedelta(days=1),
+            est_publiee=True, coefficient=1, categorie="examen")
+
+    def test_question_sans_parent_invalide(self):
+        q = Question(enonce_texte="Q", type_question="choix_unique", points=1)
+        with self.assertRaises(ValidationError):
+            q.full_clean()
+
+    def test_question_avec_quiz_et_evaluation_invalide(self):
+        quiz = Quiz.objects.create(titre="Qz", sequence=self.sequence)
+        q = Question(enonce_texte="Q", type_question="choix_unique", points=1,
+                     quiz=quiz, evaluation=self.evaluation)
+        with self.assertRaises(ValidationError):
+            q.full_clean()
+
+    def test_quiz_refuse_question_textuelle(self):
+        quiz = Quiz.objects.create(titre="Qz", sequence=self.sequence)
+        q = Question(enonce_texte="Q", type_question="texte_long", points=1, quiz=quiz)
+        with self.assertRaises(ValidationError):
+            q.full_clean()
+
+    def test_question_choix_correction_manuelle_invalide(self):
+        q = Question(enonce_texte="Q", type_question="choix_unique", points=1,
+                     evaluation=self.evaluation, mode_correction="manuelle")
+        with self.assertRaises(ValidationError):
+            q.full_clean()
+
+    def test_question_textuelle_correction_auto_invalide(self):
+        q = Question(enonce_texte="Q", type_question="texte_long", points=1,
+                     evaluation=self.evaluation, mode_correction="automatique")
+        with self.assertRaises(ValidationError):
+            q.full_clean()
+
+    def test_save_definit_le_mode_de_correction(self):
+        texte = Question(enonce_texte="Q", type_question="texte_long", points=1,
+                         evaluation=self.evaluation)
+        texte.save()
+        self.assertEqual(texte.mode_correction, "manuelle")
+
+        choix = Question(enonce_texte="Q2", type_question="choix_unique", points=1,
+                         evaluation=self.evaluation)
+        choix.save()
+        self.assertEqual(choix.mode_correction, "automatique")
+
+    def test_reponse_sur_question_textuelle_refusee(self):
+        q = Question(enonce_texte="Q", type_question="texte_long", points=1,
+                     evaluation=self.evaluation)
+        q.save()
+        r = Reponse(question=q, texte="x", est_correcte=True)
+        with self.assertRaises(ValidationError):
+            r.full_clean()
+
+    def test_deux_bonnes_reponses_choix_unique_refusees(self):
+        q = Question(enonce_texte="Q", type_question="choix_unique", points=1,
+                     evaluation=self.evaluation)
+        q.save()
+        Reponse.objects.create(question=q, texte="A", est_correcte=True)
+        r2 = Reponse(question=q, texte="B", est_correcte=True)
+        with self.assertRaises(ValidationError):
+            r2.full_clean()
+
+
+# ============================================================================
+# 10. RBAC UNITAIRE
+# ============================================================================
+class RBACUnitTests(BaseMetierTests):
+    def test_anonyme_refuse(self):
+        self.assertFalse(has_permission(AnonymousUser(), "cours", "view"))
+
+    def test_superuser_autorise(self):
+        su = User.objects.create(email="su@metier.t", is_superuser=True)
+        self.assertTrue(has_permission(su, "admins", "delete"))
+
+    def test_formateur_cree_du_contenu(self):
+        self.assertTrue(has_permission(self.formateur, "cours", "create"))
+        self.assertTrue(has_permission(self.formateur, "modules", "edit"))
+
+    def test_formateur_pas_admin(self):
+        self.assertFalse(has_permission(self.formateur, "admins", "view"))
+
+    def test_apprenant_lecture_seule(self):
+        self.assertTrue(has_permission(self.apprenant, "cours", "view"))
+        self.assertFalse(has_permission(self.apprenant, "cours", "create"))
+
+    def test_permission_explicite_additive(self):
+        self.apprenant.permissions = ["admins.view"]
+        self.apprenant.save(update_fields=["permissions"])
+        self.assertTrue(has_permission(self.apprenant, "admins", "view"))
+
+    def test_surcharge_db_prioritaire(self):
+        RolePermissionOverride.objects.create(
+            role="Apprenant", resource="cours", action="create", allowed=True)
+        self.assertTrue(has_permission(self.apprenant, "cours", "create"))
+
+    def test_ressource_inconnue_refusee(self):
+        self.assertFalse(has_permission(self.formateur, "ressource_inexistante", "view"))
+
+
+# ============================================================================
+# 11. INDICATEURS PÉDAGOGIQUES (profil adaptatif)
+# ============================================================================
+class IndicateursTests(BaseMetierTests):
+    def test_profil_sans_activite(self):
+        profil = LearnerProfile.objects.create(apprenant=self.apprenant)
+        profil.recalculer()
+        self.assertEqual(profil.score_regularite, 0)
+        self.assertEqual(profil.score_engagement, 0)
+        self.assertIn(profil.type_contenu_prefere or "", ("", "texte"))
+
+
+# ============================================================================
+# 12. SUIVI DES ÉVALUATIONS
+# ============================================================================
+class EvaluationSuiviTests(BaseMetierTests):
+    def _eval(self, fin, publiee=True):
+        return Evaluation.objects.create(
+            cours=self.cours, enseignant=self.formateur, titre="E",
+            type_evaluation="structuree", bareme=20,
+            date_debut=timezone.now() - timedelta(days=2),
+            date_fin=fin, est_publiee=publiee, coefficient=1, categorie="examen")
+
+    def test_peut_soumettre_selon_date_fin(self):
+        fermee = self._eval(timezone.now() - timedelta(hours=1))
+        self.assertFalse(fermee.peut_soumettre())
+
+        ouverte = self._eval(timezone.now() + timedelta(hours=1))
+        self.assertTrue(ouverte.peut_soumettre())
+
+    def test_pourcentage_bareme_zero(self):
+        ev = self._eval(timezone.now() + timedelta(hours=1))
+        ev.bareme = 0
+        ev.save(update_fields=["bareme"])
+        passage = PassageEvaluation(
+            apprenant=self.apprenant, evaluation=ev, statut="corrige", note=10)
+        self.assertIsNone(passage.pourcentage())

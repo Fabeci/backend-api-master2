@@ -4,7 +4,7 @@
 
 | Catégorie | Exécutés | Réussis | Échoués | Bloqués | Non exécutés |
 |---|---|---|---|---|---|
-| Backend (unitaires + intégration + sécurité + IA) | **127** | **127** | 0 | 0 | 0 |
+| Backend (unitaires + intégration + sécurité + IA) | **160** | **160** | 0 | 0 | 0 |
 | Frontend (specs critiques) | **33** | **33** | 0 | 0 | 0 |
 | Sécurité (contrôles dynamiques) | **7** | **7** | 0 | 0 | 0 |
 | Performance (2 scénarios) | **2** | **2** | 0 | 0 | 0 |
@@ -14,7 +14,7 @@
 ## 3.2 Exécution backend
 
 ```
-Ran 127 tests in 81.099s
+Ran 160 tests in 58.092s
 OK
 ```
 
@@ -34,13 +34,16 @@ OK
 | `evaluations/views_explication.py` | **88 %** |
 | `courses/views_chat.py` | **85 %** |
 | `courses/services/chat_tuteur.py` | **78 %** |
-| `core/rbac.py` | **77 %** |
+| `core/rbac.py` | **81 %** |
 | `courses/services/quiz_tuteur.py` | **75 %** |
 | `courses/services/rag.py` | **70 %** |
+| `courses/parcours_engine.py` | **80 %** |
+| `analytics/models.py` | **85 %** |
+| `evaluations/models.py` | **72 %** |
 | `users/access_control.py` | **61 %** |
-| `courses/publication.py` | **49 %** |
+| `courses/publication.py` | **69 %** |
 
-Rapport complet : `raw/coverage-app.txt`.
+Rapports complets : `raw/coverage-app.txt`, `raw/coverage-app-v2.txt`.
 
 **Modules faiblement couverts (priorité)** : analytics (dashboards, engines),
 `academics/services/bulletin_pdf.py`, les serializers, les commandes de
