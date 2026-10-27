@@ -6,6 +6,7 @@
 #   POST /api/v1/inscriptions/importer/            (multipart) → création
 # =============================================================================
 
+import json
 import logging
 from collections import Counter
 
@@ -161,6 +162,17 @@ def _resolve(rows, cours, institution_id):
             ),
             "statut": statut,
             "message": message,
+            "candidats": (
+                [
+                    {
+                        "id": a.pk,
+                        "nom": f"{a.prenom or ''} {a.nom or ''}".strip(),
+                        "email": a.email or "",
+                    }
+                    for a in matches
+                ]
+                if statut == "ambigu" else []
+            ),
         })
 
     return out
@@ -260,20 +272,77 @@ class InscriptionImportCreateAPIView(APIView):
             default_institution_id(),
         )
 
+        # Résolutions manuelles des lignes ambiguës : {"12": 345, ...}
+        resolutions = request.data.get("resolutions") or {}
+        if isinstance(resolutions, str):
+            try:
+                resolutions = json.loads(resolutions)
+            except (TypeError, ValueError):
+                resolutions = {}
+        if isinstance(resolutions, dict) and resolutions:
+            resolved_ids = []
+            for key, value in resolutions.items():
+                try:
+                    resolved_ids.append(int(value))
+                except (TypeError, ValueError):
+                    continue
+            apprenants = Apprenant.objects.filter(pk__in=resolved_ids)
+            institution_id = default_institution_id()
+            if institution_id:
+                apprenants = apprenants.filter(institution_id=institution_id)
+            by_id = {a.pk: a for a in apprenants}
+            deja = set(
+                InscriptionCours.objects.filter(cours=cours)
+                .values_list("apprenant_id", flat=True)
+            )
+            for r in rows:
+                chosen = resolutions.get(str(r["ligne"]), resolutions.get(r["ligne"]))
+                try:
+                    chosen_id = int(chosen)
+                except (TypeError, ValueError):
+                    continue
+                appr = by_id.get(chosen_id)
+                if not appr:
+                    continue
+                r["apprenant_id"] = appr.pk
+                r["apprenant_nom"] = f"{appr.prenom or ''} {appr.nom or ''}".strip()
+                r["email"] = r.get("email") or appr.email or ""
+                if appr.pk in deja:
+                    r["statut"] = "deja_inscrit"
+                    r["message"] = "Déjà inscrit à ce cours (résolution manuelle)."
+                else:
+                    r["statut"] = "ok"
+                    r["message"] = "Sera inscrit (résolution manuelle)."
+
         created = 0
         skipped = 0
+        errors = []
+        created_rows = []
         for r in rows:
             if r["statut"] != "ok" or not r["apprenant_id"]:
+                if r["statut"] in ("introuvable", "ambigu", "invalide"):
+                    errors.append({
+                        "ligne": r["ligne"], "nom": r["nom"], "email": r.get("email") or "",
+                        "statut": r["statut"], "message": r["message"],
+                    })
                 continue
-            _, was_created = InscriptionCours.objects.get_or_create(
-                apprenant_id=r["apprenant_id"],
-                cours=cours,
-                defaults={"statut": "inscrit"},
-            )
-            if was_created:
-                created += 1
-            else:
-                skipped += 1
+            try:
+                _, was_created = InscriptionCours.objects.get_or_create(
+                    apprenant_id=r["apprenant_id"],
+                    cours=cours,
+                    defaults={"statut": "inscrit"},
+                )
+                if was_created:
+                    created += 1
+                    created_rows.append(r["ligne"])
+                else:
+                    skipped += 1
+            except Exception as exc:
+                logger.exception("Création d'inscription échouée (ligne %s)", r["ligne"])
+                errors.append({
+                    "ligne": r["ligne"], "nom": r["nom"], "email": r.get("email") or "",
+                    "statut": "erreur", "message": str(exc),
+                })
 
         stats = _stats(rows)
         return api_success(
@@ -285,6 +354,9 @@ class InscriptionImportCreateAPIView(APIView):
                 "created": created,
                 "skipped": skipped,
                 "stats": stats,
+                "rows": rows,
+                "errors": errors,
+                "created_rows": created_rows,
                 "warnings": res.get("warnings") or [],
             },
             status.HTTP_201_CREATED,

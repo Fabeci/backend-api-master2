@@ -4,6 +4,7 @@
 #   POST /api/v1/inscriptions-etab/importer/            (multipart) → création
 # =============================================================================
 
+import json
 import logging
 
 from rest_framework import permissions, status
@@ -138,6 +139,37 @@ class InscriptionEtabImportCreateAPIView(APIView):
         rows = import_inscriptions_etab.resolve(
             res.get("rows") or [], institution, annee
         )
+
+        resolutions = request.data.get("resolutions") or {}
+        if isinstance(resolutions, str):
+            try:
+                resolutions = json.loads(resolutions)
+            except (TypeError, ValueError):
+                resolutions = {}
+        if isinstance(resolutions, dict) and resolutions:
+            from users.models import Apprenant
+            ids = []
+            for v in resolutions.values():
+                try:
+                    ids.append(int(v))
+                except (TypeError, ValueError):
+                    continue
+            by_id = {a.pk: a for a in Apprenant.objects.filter(pk__in=ids, institution=institution)}
+            for r in rows:
+                chosen = resolutions.get(str(r["ligne"]), resolutions.get(r["ligne"]))
+                try:
+                    chosen_id = int(chosen)
+                except (TypeError, ValueError):
+                    continue
+                appr = by_id.get(chosen_id)
+                if not appr:
+                    continue
+                r["apprenant_id"] = appr.pk
+                r["apprenant_nom"] = f"{appr.prenom or ''} {appr.nom or ''}".strip()
+                r["email"] = r.get("email") or appr.email or ""
+                r["statut"] = "ok"
+                r["message"] = "Inscription à créer (résolution manuelle)."
+
         created = import_inscriptions_etab.create(rows, institution, annee)
 
         return api_success(
@@ -150,6 +182,8 @@ class InscriptionEtabImportCreateAPIView(APIView):
                 "created": created["created_inscriptions"],
                 "skipped": created["skipped"],
                 "accounts": created["created_accounts"],
+                "errors": created.get("errors") or [],
+                "rows": rows,
                 "stats": import_inscriptions_etab.stats(rows),
                 "warnings": res.get("warnings") or [],
             },

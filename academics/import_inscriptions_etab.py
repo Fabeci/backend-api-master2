@@ -127,6 +127,17 @@ def resolve(rows, institution, annee) -> list[dict]:
             ),
             "statut": statut,
             "message": message,
+            "candidats": (
+                [
+                    {
+                        "id": a.pk,
+                        "nom": f"{a.prenom or ''} {a.nom or ''}".strip(),
+                        "email": a.email or "",
+                    }
+                    for a in matches
+                ]
+                if statut == "ambigu" else []
+            ),
         })
 
     return out
@@ -152,51 +163,77 @@ def create(rows, institution, annee) -> dict:
     created_inscriptions = 0
     created_accounts = []
     skipped = 0
+    errors = []
 
     for r in rows:
-        if r["statut"] == "nouveau":
-            password = _temp_password()
-            apprenant = Apprenant(
-                email=r["email"],
-                nom=r["nom_famille"] or r["nom"][:30],
-                prenom=r["prenom"] or "",
-                institution=institution,
-                annee_scolaire_active=annee,
-                role=role,
-                is_active=True,
-            )
-            apprenant.set_password(password)
-            apprenant.save()
-            created_accounts.append({"email": apprenant.email, "password": password})
-            appr = apprenant
-
-        elif r["statut"] == "ok":
-            appr = Apprenant.objects.filter(pk=r["apprenant_id"]).first()
-            if appr is None:
-                skipped += 1
-                continue
-        else:
+        if r["statut"] not in ("nouveau", "ok"):
             skipped += 1
+            if r["statut"] in ("ambigu", "invalide"):
+                errors.append({
+                    "ligne": r.get("ligne"),
+                    "email": r.get("email") or "",
+                    "nom": r.get("nom") or "",
+                    "statut": r["statut"],
+                    "message": r.get("message") or "",
+                })
             continue
 
-        classe = Classe.objects.filter(pk=r["classe_id"]).first() if r.get("classe_id") else None
-        _, was_created = Inscription.objects.get_or_create(
-            apprenant=appr,
-            institution=institution,
-            annee_scolaire=annee,
-            defaults={
-                "classe": classe,
-                "statut": "actif",
-                "statut_paiement": "en_attente",
-            },
-        )
-        if was_created:
-            created_inscriptions += 1
-        else:
-            skipped += 1
+        try:
+            account_info = None
+            with transaction.atomic():
+                if r["statut"] == "nouveau":
+                    password = _temp_password()
+                    apprenant = Apprenant(
+                        email=r["email"],
+                        nom=r["nom_famille"] or r["nom"][:30],
+                        prenom=r["prenom"] or "",
+                        institution=institution,
+                        annee_scolaire_active=annee,
+                        role=role,
+                        is_active=True,
+                    )
+                    apprenant.set_password(password)
+                    apprenant.save()
+                    account_info = {"email": apprenant.email, "password": password}
+                    appr = apprenant
+                else:
+                    appr = Apprenant.objects.filter(pk=r["apprenant_id"]).first()
+                    if appr is None:
+                        skipped += 1
+                        errors.append({
+                            "ligne": r.get("ligne"), "email": r.get("email") or "",
+                            "nom": r.get("nom") or "", "statut": "introuvable",
+                            "message": "Apprenant introuvable.",
+                        })
+                        continue
+
+                classe = Classe.objects.filter(pk=r["classe_id"]).first() if r.get("classe_id") else None
+                _, was_created = Inscription.objects.get_or_create(
+                    apprenant=appr,
+                    institution=institution,
+                    annee_scolaire=annee,
+                    defaults={
+                        "classe": classe,
+                        "statut": "actif",
+                        "statut_paiement": "en_attente",
+                    },
+                )
+                if was_created:
+                    created_inscriptions += 1
+                else:
+                    skipped += 1
+            if account_info:
+                created_accounts.append(account_info)
+        except Exception as exc:
+            errors.append({
+                "ligne": r.get("ligne"), "email": r.get("email") or "",
+                "nom": r.get("nom") or "", "statut": "erreur",
+                "message": str(exc),
+            })
 
     return {
         "created_inscriptions": created_inscriptions,
         "created_accounts": created_accounts,
         "skipped": skipped,
+        "errors": errors,
     }

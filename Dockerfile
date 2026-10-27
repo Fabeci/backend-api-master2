@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         libjpeg62-turbo-dev \
         zlib1g-dev \
+        tesseract-ocr \
+        tesseract-ocr-fra \
+        poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Requirements nettoyés (UTF-8) — le requirements.txt d'origine est en UTF-16
