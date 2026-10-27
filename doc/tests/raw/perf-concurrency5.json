@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-27T09:28:58.414260+00:00",
+  "environnement": {
+    "base": "http://localhost:8000",
+    "serveur": "Django runserver (dev)",
+    "base_de_donnees": "SQLite",
+    "concurrence": 5,
+    "duree_s": 20.17
+  },
+  "requetes": {
+    "total": 650,
+    "succes": 650,
+    "erreurs": 0,
+    "taux_erreur_pct": 0.0,
+    "debit_req_s": 32.23
+  },
+  "latence_ms": {
+    "moyenne": 154.75,
+    "min": 56.1,
+    "p50": 137.85,
+    "p95": 297.22,
+    "p99": 365.9,
+    "max": 485.88
+  },
+  "endpoints": [
+    "/api/v1/cours/",
+    "/api/v1/progress/blocs/",
+    "/api/v1/annees-scolaires/",
+    "/api/v1/notifications/"
+  ],
+  "erreurs_echantillon": []
+}
