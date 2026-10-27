@@ -4,7 +4,7 @@ from django.db import models
 from django.utils.timezone import now, timedelta
 from locations.models import Pays
 import uuid
-import random
+import secrets
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, role=None, **extra_fields):
@@ -165,7 +165,7 @@ class VerificationCode(models.Model):
 
     @staticmethod
     def generate_code() -> str:
-        return f"{random.randint(0, 999999):06d}"
+        return f"{secrets.randbelow(1_000_000):06d}"
 
     @classmethod
     def create_activation_code(cls, user, ttl_minutes: int = 15):

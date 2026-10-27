@@ -7,7 +7,11 @@
 | `figures/pyramide-tests.svg` | Figure X.1 — Pyramide des tests et volumes exécutés | X.2.2 |
 | `figures/couverture-modules.svg` | Figure X.2 — Couverture des modules critiques | X.3.5 |
 | `figures/performance-latence.svg` | Figure X.3 — Latence des API selon la charge | X.6 |
-| `figures/pipeline-ci.svg` | Figure X.4 — Pipeline d'intégration continue | X.7 |
+| `figures/sonarqube-dashboard.png` | Figure X.4 — *Quality gate* SonarQube après corrections | X.7 |
+| `figures/pipeline-ci.svg` | Figure X.5 — Pipeline d'intégration continue | X.8 |
+
+> Annexes possibles : `figures/sonarqube-vulnerabilites.png` (2 findings
+> Docker résiduels) et `figures/sonarqube-bugs.png` (6 bugs identifiés).
 
 ### Conversion pour Word / LaTeX
 
@@ -137,6 +141,40 @@ Charge & Débit & Moyenne & p95 & p99 & Erreurs \\
 \end{tabular}
 \end{table}
 ```
+
+### Tableau X.6 — Analyse statique SonarQube (avant / après)
+
+```latex
+\begin{table}[htbp]
+\centering
+\caption{Analyse statique SonarQube : état initial (v1.0) et final (v1.2)}
+\begin{tabular}{lrr}
+\toprule
+Indicateur & v1.0 (avant) & v1.2 (après) \\
+\midrule
+Lignes de code analysées (NCLOC) & 41\,548 & 37\,352 \\
+Couverture & 36,0\,\% & 39,4\,\% \\
+Couverture du nouveau code & -- & 100\,\% \\
+Bugs & 6 & 6 \\
+Vulnérabilités & 285 & \textbf{2} \\
+Code smells & 526 & 430 \\
+dont bloquants & 3 & \textbf{0} \\
+Duplication & 2,4\,\% & 2,1\,\% \\
+Dette technique & 93,9\,h & \textbf{78,3\,h} \\
+Fiabilité & C & C \\
+Sécurité & E & \textbf{D} \\
+Maintenabilité & A & A \\
+Quality gate & OK & \textbf{Passed} \\
+\bottomrule
+\end{tabular}
+\end{table}
+```
+
+> Commentaire de soutenance : les 2 vulnérabilités restantes concernent
+> uniquement le `Dockerfile` de **développement** (COPY récursif, utilisateur
+> root) ; la production est déployée sur cPanel sans Docker. Elles sont
+> acceptées, justifiées et laissées **visibles** — un finding accepté doit
+> rester traçable.
 
 ## 3. Conseils de présentation
 

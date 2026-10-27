@@ -1,6 +1,6 @@
 # users/serializers.py
 
-import random
+import secrets
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth import get_user_model
@@ -81,10 +81,10 @@ def _normalize_or_generate_matricule(validated):
     if matricule is None:
         year = timezone.now().strftime("%y")
         for _ in range(10):
-            candidate = f"APP-{year}{random.randint(1000, 9999)}"
+            candidate = f"APP-{year}{1000 + secrets.randbelow(9000)}"
             if not Apprenant.objects.filter(matricule=candidate).exists():
                 return candidate
-        return f"APP-{year}{random.randint(10000, 99999)}"
+        return f"APP-{year}{10000 + secrets.randbelow(90000)}"
 
     return matricule
 

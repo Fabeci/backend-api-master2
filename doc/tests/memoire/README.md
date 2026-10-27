@@ -11,6 +11,7 @@ validation dans le mémoire et préparer la soutenance.
 | `03-slides-soutenance.md` | Trame de 10 diapositives + notes + démo + questions du jury |
 | `04-annexes.md` | Liste des annexes à joindre et consignes de mise en forme |
 | `figures/*.svg` | 4 figures générées à partir des chiffres réels |
+| `figures/sonarqube-*.png` | Captures SonarQube (dashboard, vulnérabilités, bugs) |
 
 ## Chiffres à utiliser (cohérence)
 
@@ -23,6 +24,9 @@ validation dans le mémoire et préparer la soutenance.
 | Couverture applicative | **40 %** |
 | Couverture modules critiques | **69–98 %** |
 | Contrôles de sécurité | **7 / 7** |
+| Analyse statique (SonarQube) | **285 → 2** vulnérabilités · **0** blocker · *gate* **Passed** |
+| Couverture SonarQube | **39,4 %** (100 % sur le nouveau code) |
+| Dette technique | **93,9 h → 78,3 h** |
 | Charge 5 utilisateurs | 32,2 req/s · p95 **297 ms** · 0 erreur |
 | Charge 10 utilisateurs | 32,1 req/s · p95 **531 ms** · 0 erreur |
 | E2E navigateur | **non exécuté** |

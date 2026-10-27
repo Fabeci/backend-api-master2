@@ -43,19 +43,27 @@
 - Analyse du goulot (runserver/SQLite), recommandations production.
 - Figure 3 : latences p50/p95/p99.
 
-### X.7 Intégration continue
+### X.7 Analyse statique (SonarQube)
+- Instance locale Community, 3 passes (v1.0 → v1.1 → v1.2).
+- 236 fichiers, 37 352 lignes ; *quality gate* **Passed**.
+- Vulnérabilités **285 → 2** (Docker de dev), blockers **3 → 0**.
+- Secret en dur supprimé, PRNG du code de vérification → `secrets`.
+- Dette **93,9 h → 78,3 h** ; couverture **39,4 %** (100 % sur le nouveau code).
+- Figure 5 : dashboard ; annexe : 2 findings Docker.
+
+### X.8 Intégration continue
 - Pipeline GitHub Actions : check → tests → couverture → artefact → déploiement.
 - Preuves : runs backend/frontend et déploiements (succès).
-- Figure 4 : pipeline.
+- Figure 6 : pipeline.
 
-### X.8 Limites et perspectives
+### X.9 Limites et perspectives
 - E2E navigateur non exécuté.
 - Validation IA sur fournisseur cloud non réalisée (mode `mock`).
 - Charge locale non extrapolable.
 - Couverture faible des dashboards analytiques et serializers.
 - Perspectives : Playwright, k6 sur préproduction, classificateur de périmètre IA.
 
-### X.9 Conclusion du chapitre
-- Ce qui est **prouvé** : 193 tests automatisés, couverture critique, sécurité, CI.
+### X.10 Conclusion du chapitre
+- Ce qui est **prouvé** : 193 tests automatisés, couverture critique, sécurité, analyse statique, CI.
 - Ce qui reste **à valider** : E2E, qualité IA cloud, charge production.
 - Apport méthodologique : démarche risk-based reproductible sur un LMS.
