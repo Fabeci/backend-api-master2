@@ -612,3 +612,59 @@ class ChatTuteurTests(TestCase):
         r2 = self.as_(self.appr).get(f"{API}/blocs/{self.bloc.id}/chat/")
         self.assertIn("difficulte", r2.data["data"])
         self.assertEqual(r2.data["data"]["difficulte"]["niveau"], "difficulte")
+
+    # ── Vidéo YouTube : transcription légère (sans ffmpeg/Whisper) ──────────
+    def test_youtube_video_id(self):
+        from courses.services.youtube_transcript import video_id
+        self.assertEqual(
+            video_id("https://www.youtube.com/watch?v=QnDWIZuWYW0"),
+            "QnDWIZuWYW0",
+        )
+        self.assertEqual(
+            video_id("https://youtu.be/QnDWIZuWYW0?t=30"), "QnDWIZuWYW0",
+        )
+        self.assertEqual(
+            video_id("https://www.youtube.com/embed/QnDWIZuWYW0"),
+            "QnDWIZuWYW0",
+        )
+        self.assertIsNone(video_id("https://vimeo.com/12345"))
+        self.assertIsNone(video_id(None))
+
+    def test_quiz_video_youtube_utilise_transcription(self):
+        from courses.services import quiz_tuteur, youtube_transcript
+
+        video = BlocContenu.objects.create(
+            sequence=self.sequence, titre="Vidéo Jinja2", type_bloc="video",
+            video_url="https://www.youtube.com/watch?v=QnDWIZuWYW0",
+        )
+        texte = (
+            "Flask utilise le moteur de templates Jinja2 pour rendre les pages HTML. "
+            "La fonction render_template transmet les variables Python au template. "
+            "Les formulaires sont traités avec l'objet request et la méthode POST. "
+        ) * 2
+
+        youtube_transcript._CACHE.clear()
+        with patch("courses.services.youtube_transcript._fetch",
+                   return_value=texte) as mocked:
+            self.assertIn("Jinja2", quiz_tuteur._texte_pour_quiz(video))
+            questions = quiz_tuteur.quiz_depuis_contenu(video)
+            self.assertGreaterEqual(len(questions), 2)
+
+        # Le cache évite un second appel réseau.
+        self.assertEqual(mocked.call_count, 1)
+
+    def test_quiz_video_sans_transcription_message(self):
+        from courses.services import quiz_tuteur, youtube_transcript
+
+        video = BlocContenu.objects.create(
+            sequence=self.sequence, titre="Vidéo Jinja2", type_bloc="video",
+            video_url="https://www.youtube.com/watch?v=QnDWIZuWYW0",
+        )
+        youtube_transcript._CACHE.clear()
+        conversation = type("Conv", (), {"bloc": video})()
+        with patch("courses.services.youtube_transcript._fetch", return_value=""):
+            questions, erreur, source = quiz_tuteur.generer_quiz(conversation)
+
+        self.assertEqual(questions, [])
+        self.assertIn("vidéo/audio", erreur)
+        self.assertEqual(source, "contenu")

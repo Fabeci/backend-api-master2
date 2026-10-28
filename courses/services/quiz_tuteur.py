@@ -224,6 +224,18 @@ def _texte_pour_quiz(bloc) -> str:
     except Exception:  # noqa: BLE001
         logger.debug("[quiz_tuteur] extraits documentaires indisponibles", exc_info=True)
 
+    # Vidéo/audio externe (YouTube) : on tente la transcription des sous-titres.
+    # Aucun téléchargement de média : uniquement le texte, si disponible.
+    if getattr(bloc, "type_bloc", "") in ("video", "audio"):
+        url = getattr(bloc, "video_url", None) or getattr(bloc, "audio_url", None)
+        try:
+            from . import youtube_transcript
+            transcription = youtube_transcript.recuperer(url)
+            if len(transcription.strip()) >= 60:
+                return transcription
+        except Exception:  # noqa: BLE001
+            logger.debug("[quiz_tuteur] transcription YouTube indisponible", exc_info=True)
+
     return texte
 
 

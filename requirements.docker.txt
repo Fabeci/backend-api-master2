@@ -101,3 +101,6 @@ pytesseract==0.3.13
 pdf2image==1.17.0
 psycopg[binary]==3.2.3
 PyMySQL==1.1.1
+
+# Transcription légère des vidéos YouTube (quiz tuteur, sans ffmpeg/Whisper)
+youtube-transcript-api==1.2.4
