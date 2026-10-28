@@ -71,8 +71,15 @@ def _prompt(conversation) -> str:
     if ctx["objectifs"]:
         lignes.append(f"OBJECTIFS : {ctx['objectifs']}")
 
-    if ctx["contenu_disponible"]:
-        lignes.append("CONTENU DU BLOC :\n" + ctx["contenu"][:2000])
+    # Le texte du bloc peut venir d'un document, d'une transcription locale ou
+    # des sous-titres YouTube : on l'utilise aussi pour le prompt LLM.
+    contenu = ctx["contenu"] if ctx["contenu_disponible"] else ""
+    transcription = _texte_pour_quiz(bloc)
+    if len(transcription) > len(contenu):
+        contenu = transcription
+
+    if contenu.strip():
+        lignes.append("CONTENU DU BLOC :\n" + contenu[:4000])
     else:
         lignes.append(
             "CONTENU DU BLOC : non disponible (média/fichier). "
@@ -197,11 +204,45 @@ def _phrases(texte: str) -> list[str]:
     ]
 
 
+_EN_STOPWORDS = {
+    "about", "after", "again", "all", "also", "and", "any", "are", "because",
+    "been", "before", "being", "but", "can", "could", "did", "does", "doing",
+    "down", "each", "even", "every", "from", "get", "got", "had", "has",
+    "have", "here", "how", "into", "its", "just", "like", "make", "many",
+    "more", "most", "much", "must", "now", "off", "once", "only", "other",
+    "our", "out", "over", "own", "same", "should", "some", "such", "than",
+    "that", "the", "their", "them", "then", "there", "these", "they", "this",
+    "those", "through", "too", "under", "until", "very", "was", "way",
+    "were", "what", "when", "where", "which", "while", "who", "why", "will",
+    "with", "would", "you", "your", "yours", "hey", "going", "gonna",
+    "want", "well", "right", "okay", "guys", "everybody", "something",
+    "things", "thing", "really", "actually", "let's", "you're", "we'll",
+    "we're", "i'm", "don't", "doesn't", "didn't", "isn't", "aren't",
+}
+
+
 def _mots(texte: str) -> list[str]:
     return [
         m for m in re.findall(r"[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'-]{4,}", texte or "")
-        if m.lower() not in STOPWORDS
+        if m.lower() not in STOPWORDS and m.lower() not in _EN_STOPWORDS
     ]
+
+
+def _fenetres(texte: str, taille: int = 200) -> list[str]:
+    """Découpe un texte sans ponctuation (sous-titres) en fenêtres lisibles."""
+    mots = (texte or "").split()
+    morceaux: list[str] = []
+    courant: list[str] = []
+    longueur = 0
+    for mot in mots:
+        if longueur + len(mot) + 1 > taille and courant:
+            morceaux.append(" ".join(courant))
+            courant, longueur = [], 0
+        courant.append(mot)
+        longueur += len(mot) + 1
+    if courant:
+        morceaux.append(" ".join(courant))
+    return [m for m in morceaux if 60 <= len(m) <= 300]
 
 
 
@@ -261,9 +302,16 @@ def quiz_depuis_contenu(bloc) -> list[dict]:
     """
     texte = _texte_pour_quiz(bloc)
     phrases = _phrases(texte)
-    if not phrases and len(texte.strip()) >= 40:
-        # Code source / texte sans ponctuation : on utilise le texte tel quel.
-        phrases = [texte.strip()[:260]]
+    if len(phrases) < NB_QUESTIONS and len(texte.strip()) >= 60:
+        # Sous-titres / transcriptions : souvent sans ponctuation. On complète
+        # avec des fenêtres de ~200 caractères pour avoir assez de candidats.
+        vues = set(phrases)
+        for fenetre in _fenetres(texte):
+            if fenetre not in vues:
+                phrases.append(fenetre)
+                vues.add(fenetre)
+            if len(phrases) >= NB_QUESTIONS * 4:
+                break
     if not phrases:
         return []
 
@@ -287,7 +335,12 @@ def quiz_depuis_contenu(bloc) -> list[dict]:
         if len(distracteurs) < 3:
             continue
 
-        options = [correct, *distracteurs]
+        options: list[str] = []
+        for mot in [correct, *distracteurs]:
+            if mot.lower() not in {o.lower() for o in options}:
+                options.append(mot)
+        if len(options) < NB_OPTIONS:
+            continue
         rng.shuffle(options)  # NOSONAR — mélange reproductible des options, sans enjeu de sécurité
         enonce = re.sub(re.escape(correct), "______", phrase, count=1, flags=re.IGNORECASE)
         if "______" not in enonce:
