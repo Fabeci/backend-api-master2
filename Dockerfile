@@ -1,5 +1,6 @@
 # ---- Backend Django / DRF — SOMAPRO ----
-FROM python:3.12-slim  # NOSONAR — image de développement local ; production = cPanel (utilisateur dédié, sans Docker)
+# Image de développement local ; production = cPanel (utilisateur dédié, sans Docker).
+FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -23,7 +24,8 @@ COPY requirements.docker.txt /app/requirements.docker.txt
 RUN pip install --no-cache-dir -r /app/requirements.docker.txt
 
 # Code applicatif (db.sqlite3 et media sont montés par docker-compose)
-COPY . /app/  # NOSONAR — .dockerignore exclut secrets/données ; image de dev non déployée
+# .dockerignore exclut secrets/données ; image de dev non déployée.
+COPY . /app/
 
 EXPOSE 8000
 
