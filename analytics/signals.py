@@ -353,25 +353,10 @@ def on_passage_quiz_saved(sender, instance, **kwargs):
     if seq is None or not getattr(instance, 'apprenant_id', None):
         return
     try:
-        from evaluations.models import PassageQuiz
-        from .models import SequenceAnalyticsSummary
+        # Agrège les quiz d'évaluation ET les quiz du tuteur (« Interroge-moi »).
+        from .services.quiz_summary import sync_sequence_quiz_summary
 
-        qs = PassageQuiz.objects.filter(
-            apprenant_id=instance.apprenant_id, quiz__sequence=seq,
-            termine=True, score__isnull=False,
-        )
-        scores = [float(s) for s in qs.values_list('score', flat=True)]
-        n = len(scores)
-        avg = int(max(0, min(100, round(sum(scores) / n)))) if n else 0
-
-        summ, _ = SequenceAnalyticsSummary.objects.get_or_create(
-            apprenant_id=instance.apprenant_id, sequence=seq,
-            defaults={'module': getattr(seq, 'module', None),
-                      'cours': getattr(getattr(seq, 'module', None), 'cours', None)},
-        )
-        summ.nb_quiz_passes = n
-        summ.score_moyen_quiz = avg
-        summ.save()   # → on_sequence_summary_saved_mastery (mastery + gap + profil)
+        summ, n, avg = sync_sequence_quiz_summary(instance.apprenant, seq)
         logger.info('[signals/quiz] seq=%s appr=%s quiz moyen=%s%% (%s passages)',
                     seq.pk, instance.apprenant_id, avg, n)
 

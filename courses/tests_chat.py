@@ -99,6 +99,11 @@ class ChatTuteurTests(TestCase):
 
         self.client = APIClient()
 
+        # Le throttle du chat utilise le cache : le vider après chaque test
+        # évite qu'un 429 ne « fuite » vers les classes de tests suivantes.
+        from django.core.cache import cache
+        self.addCleanup(cache.clear)
+
     def _make_apprenant(self, email, inscrit=True):
         user = Apprenant.objects.create(
             email=email, nom="Test", prenom="Apprenant",
@@ -668,3 +673,64 @@ class ChatTuteurTests(TestCase):
         self.assertEqual(questions, [])
         self.assertIn("vidéo/audio", erreur)
         self.assertEqual(source, "contenu")
+
+    # ── Effets pédagogiques après correction ────────────────────────────────
+    @patch("courses.services.quiz_tuteur.call_llm")
+    def test_quiz_corrige_met_a_jour_profil_et_xp(self, mocked):
+        from analytics.models import SequenceAnalyticsSummary
+        from courses.models import EvenementTuteur
+        from gamification.models import XPTransaction
+
+        mocked.return_value = {"content": QUIZ_JSON, "error": None,
+                               "provider": "mock", "model": "test"}
+        gen = self.as_(self.appr).post(f"{API}/blocs/{self.bloc.id}/chat/quiz/")
+        quiz_id = gen.data["data"]["quiz_id"]
+
+        # 2 bonnes réponses sur 3 → 66,7/100
+        r = self.as_(self.appr).post(
+            f"{API}/chat/quiz/{quiz_id}/corriger/",
+            {"reponses": [1, 1, 0]}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+
+        summ = SequenceAnalyticsSummary.objects.get(
+            apprenant=self.appr, sequence=self.sequence)
+        self.assertEqual(summ.nb_quiz_passes, 1)
+        self.assertEqual(summ.score_moyen_quiz, 67)
+
+        self.assertTrue(XPTransaction.objects.filter(
+            apprenant=self.appr, source='quiz_participe').exists())
+        self.assertTrue(XPTransaction.objects.filter(
+            apprenant=self.appr, source='quiz_reussi').exists())
+        self.assertFalse(XPTransaction.objects.filter(
+            apprenant=self.appr, source='quiz_parfait').exists())
+
+        evt = (EvenementTuteur.objects
+               .filter(type='quiz', metadata__evenement='quiz_termine')
+               .order_by('-id').first())
+        self.assertIsNotNone(evt)
+        self.assertEqual(evt.metadata.get('quiz_id'), quiz_id)
+        self.assertTrue(evt.metadata.get('reussi'))
+
+    @patch("courses.services.quiz_tuteur.call_llm")
+    def test_quiz_repris_ne_redonne_pas_xp(self, mocked):
+        from analytics.models import SequenceAnalyticsSummary
+        from gamification.models import XPTransaction
+
+        mocked.return_value = {"content": QUIZ_JSON, "error": None,
+                               "provider": "mock", "model": "test"}
+
+        for _ in range(2):
+            gen = self.as_(self.appr).post(f"{API}/blocs/{self.bloc.id}/chat/quiz/")
+            quiz_id = gen.data["data"]["quiz_id"]
+            r = self.as_(self.appr).post(
+                f"{API}/chat/quiz/{quiz_id}/corriger/",
+                {"reponses": [1, 1, 1]}, format="json")
+            self.assertEqual(r.status_code, 200, r.data)
+
+        self.assertEqual(
+            XPTransaction.objects.filter(
+                apprenant=self.appr, source='quiz_participe').count(), 1)
+        summ = SequenceAnalyticsSummary.objects.get(
+            apprenant=self.appr, sequence=self.sequence)
+        self.assertEqual(summ.nb_quiz_passes, 2)
+        self.assertEqual(summ.score_moyen_quiz, 100)
