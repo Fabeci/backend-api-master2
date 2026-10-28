@@ -46,6 +46,7 @@ from .adaptive_views import (
     BlocAideView,
     BlocGenererView,
     BlocAideReponseView,
+    BlocAideNettoyerView,
     RecommendationsView,
 )
 from .dashboard_api_views import (
@@ -253,6 +254,10 @@ urlpatterns = [
     path(
         'analytics/blocs/<int:bloc_id>/reponse-aide/',
         BlocAideReponseView.as_view(), name='bloc-reponse-aide',
+    ),
+    path(
+        'analytics/blocs/<int:bloc_id>/aides/',
+        BlocAideNettoyerView.as_view(), name='bloc-aides-nettoyer',
     ),
 
     # Recommendations

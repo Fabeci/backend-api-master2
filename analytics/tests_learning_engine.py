@@ -228,3 +228,60 @@ class Cas11SignauxRegroupes(_Base):
         seq_diags = [d for d in diags if d.sequence_id == self.seq.pk]
         self.assertEqual(len(seq_diags), 1)
         self.assertGreaterEqual(len(seq_diags[0].signal_types), 2)
+
+
+class BlocAideFeedbackEtNettoyage(_Base):
+    """Aide par bloc : feedback exposé + nettoyage des propositions."""
+
+    def setUp(self):
+        from rest_framework.test import APIClient
+        self.a = self.make_apprenant('aide-api@t.com')
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.a)
+        self.req = AIAnalysisRequest.objects.create(
+            apprenant=self.a, sequence=self.seq,
+            trigger='sequence_complexe', status='success',
+        )
+
+    def _contenu(self, titre='Templates Jinja2 et formulaires', **kw):
+        return ContenuGenere.objects.create(
+            ai_request=self.req, apprenant=self.a,
+            type_contenu='bloc_simplifie', titre=titre,
+            bloc_source=self.bloc1, sequence_source=self.seq, **kw,
+        )
+
+    def test_aide_expose_le_feedback(self):
+        c = self._contenu(a_aide=True)
+        r = self.client.get(f'/api/v1/analytics/blocs/{self.bloc1.pk}/aide/')
+        self.assertEqual(r.status_code, 200)
+        item = next(x for x in r.data['contenus'] if x['id'] == c.pk)
+        self.assertIs(item['a_aide'], True)
+
+    def test_nettoyage_supprime_uniquement_les_aides_de_l_apprenant(self):
+        c1 = self._contenu()
+        c2 = self._contenu(a_aide=False)
+        autre = self.make_apprenant('autre-aide@t.com')
+        req2 = AIAnalysisRequest.objects.create(
+            apprenant=autre, sequence=self.seq,
+            trigger='sequence_complexe', status='success',
+        )
+        c3 = ContenuGenere.objects.create(
+            ai_request=req2, apprenant=autre, type_contenu='bloc_simplifie',
+            titre='Autre apprenant', bloc_source=self.bloc1, sequence_source=self.seq,
+        )
+        r = self.client.delete(f'/api/v1/analytics/blocs/{self.bloc1.pk}/aides/')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data['supprimes'], 2)
+        self.assertFalse(ContenuGenere.objects.filter(pk__in=[c1.pk, c2.pk]).exists())
+        self.assertTrue(ContenuGenere.objects.filter(pk=c3.pk).exists())
+
+    def test_nettoyage_sans_aide(self):
+        r = self.client.delete(f'/api/v1/analytics/blocs/{self.bloc2.pk}/aides/')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data['supprimes'], 0)
+
+    def test_nettoyage_exige_authentification(self):
+        from rest_framework.test import APIClient
+        anon = APIClient()
+        r = anon.delete(f'/api/v1/analytics/blocs/{self.bloc1.pk}/aides/')
+        self.assertIn(r.status_code, (401, 403))

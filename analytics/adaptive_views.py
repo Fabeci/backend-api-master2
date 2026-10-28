@@ -916,6 +916,8 @@ class BlocAideView(APIView):
                 'type': c.type_contenu,
                 'consulte': c.a_ete_consulte,
                 'nouveau': (non_consulte is not None and c.pk == non_consulte.pk),
+                # Feedback « Ce contenu vous a-t-il aidé ? » (True / False / None)
+                'a_aide': c.a_aide,
             }
             for c in contenus[:10]
         ]
@@ -1081,6 +1083,41 @@ class BlocAideReponseView(APIView):
         # « Oui » → on délègue à la génération (mêmes garde-fous : bloc terminé,
         # anti-doublon, anti-flood).
         return BlocGenererView().post(request, bloc_id)
+
+
+class BlocAideNettoyerView(APIView):
+    """
+    DELETE /api/v1/analytics/blocs/<bloc_id>/aides/
+    Supprime les propositions d'aide de l'apprenant pour ce bloc.
+
+    Périmètre identique à la liste affichée par `BlocAideView` :
+      - les contenus rattachés au bloc ;
+      - à défaut, ceux rattachés à la séquence.
+    Seuls les contenus de l'apprenant connecté sont supprimés (anti-IDOR).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, bloc_id):
+        from courses.models import BlocContenu
+        from .models import ContenuGenere
+
+        apprenant = _get_apprenant(request)
+        if not apprenant:
+            return Response({'error': 'Apprenant introuvable'}, status=403)
+
+        bloc = get_object_or_404(
+            BlocContenu.objects.select_related('sequence__module__cours'), pk=bloc_id,
+        )
+
+        qs = ContenuGenere.objects.filter(apprenant=apprenant, bloc_source=bloc)
+        if not qs.exists():
+            qs = ContenuGenere.objects.filter(
+                apprenant=apprenant, sequence_source=bloc.sequence,
+            )
+
+        supprimes = qs.count()
+        qs.delete()
+        return Response({'status': 'ok', 'supprimes': supprimes})
 
 
 class RecommendationsView(APIView):
