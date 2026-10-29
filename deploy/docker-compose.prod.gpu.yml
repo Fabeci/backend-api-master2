@@ -1,0 +1,21 @@
+# ============================================================================
+# SOMAPRO — surcharge GPU pour Ollama (optionnelle)
+#
+# Utilisation :
+#   docker compose \
+#     -f deploy/docker-compose.prod.yml \
+#     -f deploy/docker-compose.prod.gpu.yml \
+#     --env-file deploy/.env.prod up -d
+#
+# Prérequis : GPU NVIDIA + NVIDIA Container Toolkit sur le VPS.
+# Sans GPU, utiliser uniquement docker-compose.prod.yml (mode CPU).
+# ============================================================================
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
