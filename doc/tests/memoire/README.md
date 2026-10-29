@@ -12,6 +12,8 @@ validation dans le mémoire et préparer la soutenance.
 | `04-annexes.md` | Liste des annexes à joindre et consignes de mise en forme |
 | `figures/*.svg` | 4 figures générées à partir des chiffres réels |
 | `figures/sonarqube-*.png` | Captures SonarQube (dashboard, vulnérabilités, bugs) |
+| `tableau-tests.html` | **Page web de synthèse** : 5 familles, tests exacts, résultats, gaps (menu vertical) |
+| `figures/apercu-tableau-tests.png` | Aperçu de la page de synthèse |
 
 ## Chiffres à utiliser (cohérence)
 

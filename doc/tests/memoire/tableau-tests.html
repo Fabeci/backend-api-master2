@@ -1,0 +1,874 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#4f46e5">
+<title>SOMAPRO — Plan de validation logicielle (mémoire)</title>
+<style>
+  :root{
+    --bg:#f5f7fb;
+    --surface:#ffffff;
+    --text:#1f2937;
+    --muted:#64748b;
+    --border:#e5e7eb;
+    --primary:#4f46e5;
+    --primary-2:#6366f1;
+    --primary-soft:#eef2ff;
+    --ok:#15803d;
+    --ok-bg:#ecfdf5;
+    --warn:#b45309;
+    --warn-bg:#fffbeb;
+    --bad:#b91c1c;
+    --bad-bg:#fef2f2;
+    --info:#0369a1;
+    --info-bg:#eff6ff;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(15,23,42,.06), 0 10px 28px rgba(15,23,42,.05);
+    --sidebar-w:286px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:15px;line-height:1.55;
+  }
+  .sr-only{
+    position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0,0,0,0);white-space:nowrap;border:0;
+  }
+  .skip{
+    position:absolute;left:-9999px;top:8px;z-index:100;background:#fff;padding:10px 14px;
+    border-radius:8px;border:1px solid var(--border);
+  }
+  .skip:focus{left:12px}
+
+  /* ── Sidebar verticale ─────────────────────────────────────────────── */
+  .sidebar{
+    position:fixed;inset:0 auto 0 0;width:var(--sidebar-w);
+    display:flex;flex-direction:column;gap:14px;
+    padding:20px 14px 16px;background:var(--surface);
+    border-right:1px solid var(--border);z-index:40;
+  }
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 12px}
+  .brand__logo{
+    width:38px;height:38px;border-radius:11px;flex:none;
+    background:linear-gradient(135deg,var(--primary),#8b5cf6);
+    color:#fff;display:grid;place-items:center;font-weight:800;font-size:18px;
+    box-shadow:0 6px 14px rgba(79,70,229,.28);
+  }
+  .brand strong{display:block;font-size:16px;letter-spacing:.2px}
+  .brand span{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+  .nav{display:flex;flex-direction:column;gap:2px;overflow-y:auto;padding-right:2px}
+  .nav-label{
+    margin:14px 10px 5px;font-size:10.5px;font-weight:800;letter-spacing:.09em;
+    text-transform:uppercase;color:#94a3b8;text-decoration:none;
+  }
+  .nav, .sidebar, .nav a{text-decoration:none}
+  .nav a{
+    position:relative;display:flex;align-items:center;gap:8px;
+    padding:8px 10px;border-radius:9px;color:#475569;text-decoration:none;
+    font-size:13.2px;font-weight:500;transition:background .15s,color .15s;
+  }
+  .nav a:hover{background:#f1f5f9;color:var(--text)}
+  .nav a.active{background:var(--primary-soft);color:var(--primary);font-weight:700}
+  .nav a.active::before{
+    content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;
+    border-radius:3px;background:var(--primary);
+  }
+  .nav a .ico{width:17px;text-align:center;font-size:12px;opacity:.85}
+  .sidebar__foot{
+    border-top:1px solid var(--border);padding:12px 8px 0;font-size:11px;color:var(--muted);
+  }
+  .sidebar__foot strong{color:#475569}
+
+  /* ── Contenu ───────────────────────────────────────────────────────── */
+  .main{margin-left:var(--sidebar-w);max-width:1240px;padding:34px 42px 60px}
+  .hero{
+    background:
+      radial-gradient(900px 260px at 100% 0%, #e0e7ff 0%, transparent 60%),
+      linear-gradient(135deg,#f8faff 0%,#ffffff 68%);
+    border:1px solid #e0e7ff;border-radius:20px;padding:28px 30px;box-shadow:var(--shadow);
+  }
+  .eyebrow{
+    margin:0 0 6px;font-size:11.5px;font-weight:800;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--primary);
+  }
+  .hero h1{margin:0;font-size:clamp(24px,3vw,34px);line-height:1.15;letter-spacing:-.02em}
+  .hero p.lead{margin:10px 0 0;color:var(--muted);max-width:900px}
+  .hero__actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:18px}
+  .btn{
+    display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);
+    background:#fff;color:var(--text);border-radius:10px;padding:9px 14px;
+    font-size:13px;font-weight:700;cursor:pointer;
+  }
+  .btn:hover{background:#f8fafc}
+  .btn--primary{background:var(--primary);border-color:var(--primary);color:#fff}
+  .btn--primary:hover{background:#4338ca}
+  .switch{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:#475569;cursor:pointer;user-select:none}
+  .switch input{width:16px;height:16px;accent-color:var(--primary)}
+
+  .kpi-grid{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));
+    gap:12px;margin-top:18px;
+  }
+  .kpi{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 15px;box-shadow:0 1px 2px rgba(15,23,42,.04);
+  }
+  .kpi__value{display:block;font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+  .kpi__label{display:block;font-size:11.5px;font-weight:700;color:#475569;margin-top:5px;text-transform:uppercase;letter-spacing:.04em}
+  .kpi__sub{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+  .kpi--ok .kpi__value{color:var(--ok)}
+  .kpi--warn .kpi__value{color:var(--warn)}
+  .kpi--bad .kpi__value{color:var(--bad)}
+  .kpi--primary .kpi__value{color:var(--primary)}
+  .bar{height:5px;background:#eef2f7;border-radius:99px;margin-top:8px;overflow:hidden}
+  .bar > span{display:block;height:100%;background:linear-gradient(90deg,var(--primary),#8b5cf6);border-radius:99px}
+
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:16px 0 0;font-size:12px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .dot--done{background:#16a34a}.dot--partial{background:#d97706}.dot--todo{background:#dc2626}
+
+  /* ── Sections ─────────────────────────────────────────────────────── */
+  section{scroll-margin-top:22px;margin-top:30px}
+  .section-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:16px;
+    padding:22px 24px;box-shadow:var(--shadow);
+  }
+  .section-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .num{
+    width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;
+    background:var(--primary-soft);color:var(--primary);font-weight:800;font-size:14px;
+  }
+  .section-head h2{margin:0;font-size:19px;letter-spacing:-.01em}
+  .section-head .sub{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
+  .section-head .badge{margin-left:auto}
+  .section-card > .lead{margin:12px 0 0;color:#475569;font-size:13.5px}
+
+  .badge{
+    display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;
+    font-size:11px;font-weight:800;white-space:nowrap;letter-spacing:.01em;
+  }
+  .badge--done{background:var(--ok-bg);color:var(--ok)}
+  .badge--partial{background:var(--warn-bg);color:var(--warn)}
+  .badge--todo{background:var(--bad-bg);color:var(--bad)}
+  .badge--info{background:var(--info-bg);color:var(--info)}
+  .badge--neutral{background:#f1f5f9;color:#475569}
+
+  .table-wrap{margin-top:14px;border:1px solid var(--border);border-radius:12px;overflow:auto}
+  table{width:100%;border-collapse:collapse;min-width:760px;font-size:13px}
+  caption{text-align:left;padding:10px 12px;font-size:11.5px;color:var(--muted);border-bottom:1px solid var(--border)}
+  th{
+    text-align:left;padding:9px 11px;background:#f8fafc;color:#475569;
+    font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);
+    position:sticky;top:0;z-index:1;
+  }
+  td{padding:9px 11px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover td{background:#fafbff}
+  td code{font-size:11.5px;background:#f1f5f9;padding:1px 5px;border-radius:5px;color:#334155}
+  .result{font-weight:700;color:#334155}
+  .result--ok{color:var(--ok)}
+  .result--warn{color:var(--warn)}
+  .result--bad{color:var(--bad)}
+  .muted{color:var(--muted)}
+
+  .callout{
+    margin-top:14px;border-left:4px solid var(--primary);background:#f8faff;
+    border-radius:10px;padding:12px 14px;font-size:13px;color:#334155;
+  }
+  .callout strong{color:#1e293b}
+  .callout--ok{border-left-color:#16a34a;background:#f0fdf4}
+  .callout--warn{border-left-color:#d97706;background:#fffbeb}
+  .callout--bad{border-left-color:#dc2626;background:#fef2f2}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  .mini{
+    border:1px solid var(--border);border-radius:12px;padding:14px 15px;background:#fff;
+  }
+  .mini h3{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:#475569}
+  .mini ul{margin:0;padding-left:18px}
+  .mini li{margin:5px 0;font-size:12.8px;color:#475569}
+  .mini li strong{color:#1f2937}
+  .plan td, .plan th{font-size:12.3px}
+
+  .quote{
+    margin:16px 0 0;padding:16px 18px;border-radius:12px;background:#eef2ff;color:#312e81;
+    font-size:13.5px;font-style:italic;border:1px solid #c7d2fe;
+  }
+  .sources{margin-top:16px;font-size:12px;color:var(--muted)}
+  .sources code{font-size:11.5px}
+  footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted)}
+
+  /* ── Mobile : menu vertical en tiroir ─────────────────────────────── */
+  .menu-toggle{
+    display:none;position:fixed;top:14px;left:14px;z-index:70;width:42px;height:42px;
+    align-items:center;justify-content:center;border-radius:11px;border:1px solid var(--border);
+    background:#fff;color:var(--text);box-shadow:var(--shadow);cursor:pointer;font-size:18px;
+  }
+  .overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.38);z-index:35}
+  @media (max-width: 980px){
+    .sidebar{transform:translateX(-100%);transition:transform .22s ease;box-shadow:0 10px 40px rgba(15,23,42,.18)}
+    .sidebar.open{transform:none}
+    .overlay.open{display:block}
+    .main{margin-left:0;padding:70px 16px 40px}
+    .menu-toggle{display:inline-flex}
+    .hero{padding:22px 18px}
+    .kpi-grid{grid-template-columns:repeat(2,1fr)}
+    .grid-2{grid-template-columns:1fr}
+  }
+  @media (max-width: 560px){
+    .kpi-grid{grid-template-columns:1fr}
+    .hero h1{font-size:24px}
+    .section-card{padding:18px 15px}
+  }
+
+  /* ── Impression / PDF ─────────────────────────────────────────────── */
+  @media print{
+    body{background:#fff;font-size:10.5pt}
+    .sidebar,.menu-toggle,.overlay,.hero__actions,.no-print{display:none!important}
+    .main{margin:0;max-width:none;padding:0}
+    .hero{box-shadow:none;border:0;background:#fff;padding:0 0 10px}
+    .section-card,.mini,.callout{box-shadow:none}
+    section{break-inside:auto}
+    .table-wrap{overflow:visible;border:1px solid #ddd}
+    table{min-width:0;font-size:9pt}
+    th{position:static}
+    a{color:inherit;text-decoration:none}
+    .badge{border:1px solid #ddd}
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Aller au contenu</a>
+<button class="menu-toggle" id="menu-toggle" aria-label="Ouvrir le menu" aria-controls="sidebar" aria-expanded="false">☰</button>
+<div class="overlay" id="overlay"></div>
+
+<aside class="sidebar" id="sidebar" aria-label="Menu vertical">
+  <div class="brand">
+    <div class="brand__logo">S</div>
+    <div>
+      <strong>SOMAPRO</strong>
+      <span>Validation logicielle</span>
+    </div>
+  </div>
+
+  <nav class="nav" aria-label="Sommaire">
+    <span class="nav-label">Synthèse</span>
+    <a href="#overview" class="active"><span class="ico">◉</span> Vue d’ensemble</a>
+    <a href="#synthese"><span class="ico">▦</span> Tableau de synthèse</a>
+
+    <span class="nav-label">Familles obligatoires</span>
+    <a href="#unit"><span class="ico">1</span> Tests unitaires</a>
+    <a href="#integration"><span class="ico">2</span> Intégration / API</a>
+    <a href="#e2e"><span class="ico">3</span> E2E / fonctionnels</a>
+    <a href="#security"><span class="ico">4</span> Sécurité</a>
+    <a href="#performance"><span class="ico">5</span> Performance</a>
+
+    <span class="nav-label">Transverse</span>
+    <a href="#ci"><span class="ico">↻</span> CI / non-régression</a>
+    <a href="#static"><span class="ico">⌁</span> Analyse statique</a>
+
+    <span class="nav-label">Compléments</span>
+    <a href="#plus"><span class="ico">＋</span> Tests facultatifs</a>
+    <a href="#limits"><span class="ico">⚠</span> Limites &amp; plan</a>
+  </nav>
+
+  <div class="sidebar__foot">
+    <strong>Master · soutenance</strong><br>
+    Données réelles au 29/10/2026<br>
+    Aucune valeur simulée
+  </div>
+</aside>
+
+<main class="main" id="main">
+  <header class="hero">
+    <p class="eyebrow">Mémoire master — validation logicielle</p>
+    <h1>Plan de validation et résultats des tests</h1>
+    <p class="lead">
+      Les <strong>5 familles obligatoires</strong>, les tests exacts à exécuter,
+      le résultat obtenu pour chacun et les gaps à combler avant la soutenance.
+      Les chiffres proviennent du dépôt, de la CI, de SonarQube et des rapports
+      <code>doc/tests/</code>.
+    </p>
+    <div class="hero__actions">
+      <button class="btn btn--primary" id="print-btn" type="button">🖨 Imprimer / PDF</button>
+      <label class="switch">
+        <input type="checkbox" id="only-gaps">
+        Afficher uniquement les tests à faire / partiels
+      </label>
+    </div>
+  </header>
+
+  <!-- ═══════════════ Vue d'ensemble ═══════════════ -->
+  <section id="overview">
+    <div class="section-card">
+      <div class="section-head">
+        <div class="num">◉</div>
+        <div>
+          <h2>Vue d’ensemble</h2>
+          <p class="sub">Ce qui est prouvé aujourd’hui, et ce qui reste à prouver</p>
+        </div>
+        <span class="badge badge--partial">Socle partiel</span>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi kpi--primary">
+          <span class="kpi__value">169</span>
+          <span class="kpi__label">Tests backend</span>
+          <span class="kpi__sub">169 / 169 réussis</span>
+        </div>
+        <div class="kpi kpi--primary">
+          <span class="kpi__value">33</span>
+          <span class="kpi__label">Tests frontend</span>
+          <span class="kpi__sub">33 / 33 (suite critique)</span>
+        </div>
+        <div class="kpi kpi--primary">
+          <span class="kpi__value">50</span>
+          <span class="kpi__label">Tests unitaires métier</span>
+          <span class="kpi__sub">dont 50 / 50</span>
+        </div>
+        <div class="kpi kpi--warn">
+          <span class="kpi__value">39,4 %</span>
+          <span class="kpi__label">Couverture Sonar</span>
+          <span class="kpi__sub">40 % applicatif · 69–98 % critique</span>
+          <div class="bar"><span style="width:39.4%"></span></div>
+        </div>
+        <div class="kpi kpi--ok">
+          <span class="kpi__value">7 / 7</span>
+          <span class="kpi__label">Contrôles sécurité</span>
+          <span class="kpi__sub">+ SonarQube 0 blocker</span>
+        </div>
+        <div class="kpi kpi--bad">
+          <span class="kpi__value">0 / 4</span>
+          <span class="kpi__label">Parcours E2E</span>
+          <span class="kpi__sub">non exécuté — outil absent</span>
+        </div>
+        <div class="kpi kpi--warn">
+          <span class="kpi__value">32 req/s</span>
+          <span class="kpi__label">Charge locale</span>
+          <span class="kpi__sub">p95 297→531 ms · 0 erreur</span>
+        </div>
+        <div class="kpi kpi--ok">
+          <span class="kpi__value">0</span>
+          <span class="kpi__label">Blocker Sonar</span>
+          <span class="kpi__sub">285 → 2 vulnérabilités</span>
+        </div>
+      </div>
+
+      <div class="legend" aria-label="Légende">
+        <span><i class="dot dot--done"></i> Fait / prouvé</span>
+        <span><i class="dot dot--partial"></i> Partiel / à compléter</span>
+        <span><i class="dot dot--todo"></i> À faire / non exécuté</span>
+      </div>
+
+      <div class="callout">
+        <strong>Lecture honnête :</strong> les tests unitaires, d’intégration et la CI
+        sont exécutés ; l’E2E, une partie de la sécurité et la charge « production »
+        ne le sont pas encore. Le mémoire doit distinguer ces trois niveaux.
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ Synthèse ═══════════════ -->
+  <section id="synthese">
+    <div class="section-card">
+      <div class="section-head">
+        <div class="num">▦</div>
+        <div>
+          <h2>Tableau de synthèse</h2>
+          <p class="sub">Famille · prévus · exécutés · résultat clé · statut</p>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <caption>Les 50 tests unitaires sont inclus dans les 169 tests backend.</caption>
+          <thead>
+            <tr><th>Famille</th><th>Prévus</th><th>Exécutés</th><th>Résultat obtenu</th><th>Statut</th></tr>
+          </thead>
+          <tbody>
+            <tr data-state="done">
+              <td><strong>1. Unitaires</strong></td><td>50</td><td>50</td>
+              <td class="result result--ok">50/50 — 100 %</td>
+              <td><span class="badge badge--done">✅ Fait</span></td>
+            </tr>
+            <tr data-state="done">
+              <td><strong>2. Intégration / API</strong></td><td>169 + 33</td><td>202</td>
+              <td class="result result--ok">169/169 backend · 33/33 frontend</td>
+              <td><span class="badge badge--done">✅ Fait</span></td>
+            </tr>
+            <tr data-state="todo">
+              <td><strong>3. E2E / fonctionnels</strong></td><td>4</td><td>0</td>
+              <td class="result result--bad">Non exécuté — outil absent</td>
+              <td><span class="badge badge--todo">❌ À faire</span></td>
+            </tr>
+            <tr data-state="partial">
+              <td><strong>4. Sécurité</strong></td><td>13</td><td>7</td>
+              <td class="result result--warn">7/7 dynamiques · 6 à compléter</td>
+              <td><span class="badge badge--partial">⚠️ Partiel</span></td>
+            </tr>
+            <tr data-state="partial">
+              <td><strong>5. Performance</strong></td><td>5</td><td>2</td>
+              <td class="result result--warn">32 req/s local · p95 531 ms (10 u.)</td>
+              <td><span class="badge badge--partial">⚠️ Partiel</span></td>
+            </tr>
+            <tr data-state="done">
+              <td><strong>CI / non-régression</strong></td><td>4</td><td>4</td>
+              <td class="result result--ok">Pipelines verts</td>
+              <td><span class="badge badge--done">✅ Fait</span></td>
+            </tr>
+            <tr data-state="done">
+              <td><strong>Analyse statique</strong></td><td>3 passes</td><td>3</td>
+              <td class="result result--ok">2 vulns · 0 blocker · gate Passed</td>
+              <td><span class="badge badge--done">✅ Fait</span></td>
+            </tr>
+            <tr data-state="todo">
+              <td><strong>Compléments</strong></td><td>5</td><td>0</td>
+              <td class="result result--bad">Non exécuté</td>
+              <td><span class="badge badge--todo">❌ À faire</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ 1. Unitaires ═══════════════ -->
+  <section id="unit" data-family="unit">
+    <div class="section-card">
+      <div class="section-head">
+        <div class="num">1</div>
+        <div>
+          <h2>Tests unitaires</h2>
+          <p class="sub">Règles métier, calculs, transitions d’état — <code>core/tests_metier.py</code></p>
+        </div>
+        <span class="badge badge--done">✅ Fait · 50/50</span>
+      </div>
+
+      <p class="lead">
+        Objectif : prouver la justesse des règles indépendamment de l’interface.
+        Les 50 tests sont isolés, rapides et rejoués à chaque commit.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Test exact</th><th>Attendu</th><th>Résultat</th><th>Statut</th></tr></thead>
+          <tbody>
+            <tr data-state="done"><td><code>UT-01</code></td><td>États et transitions d’un bloc (non commencé → en cours → validé)</td><td>Transitions autorisées uniquement</td><td class="result result--ok">OK</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>UT-02</code></td><td>Déblocage séquentiel bloc → séquence → module</td><td>Pas de saut, pas de blocage circulaire</td><td class="result result--ok">OK</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>UT-03</code></td><td>Validation vidéo/texte : 60 % de durée, scroll ≥ 80 %</td><td>Valide seulement au seuil</td><td class="result result--ok">OK</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>UT-04</code></td><td>RBAC : rôles autorisés / interdits</td><td>403 hors rôle</td><td class="result result--ok">OK</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>UT-05</code></td><td>Indicateurs : progression, moyennes, seuils</td><td>Calculs exacts, arrondis maîtrisés</td><td class="result result--ok">OK</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>UT-06</code></td><td>Cas limites : 0, division, absence de données</td><td>Aucune exception non gérée</td><td class="result result--ok">OK</td><td><span class="badge badge--done">✅</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout--ok">
+        <strong>Résultat obtenu :</strong> 50/50 (100 %). Ces tests sont inclus dans la
+        suite backend de <strong>169/169</strong>. Couverture des modules critiques : 69–98 %.
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ 2. Intégration / API ═══════════════ -->
+  <section id="integration" data-family="integration">
+    <div class="section-card">
+      <div class="section-head">
+        <div class="num">2</div>
+        <div>
+          <h2>Tests d’intégration / API</h2>
+          <p class="sub">Vues Django, sérialiseurs, permissions, signaux, chat, quiz</p>
+        </div>
+        <span class="badge badge--done">✅ Fait · 169 + 33</span>
+      </div>
+
+      <p class="lead">
+        Objectif : prouver que les composants fonctionnent ensemble et que la
+        frontière de sécurité tient (401 / 403 / 404 / 423).
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Test exact</th><th>Attendu</th><th>Résultat</th><th>Statut</th></tr></thead>
+          <tbody>
+            <tr data-state="done"><td><code>IT-01</code></td><td>API sans authentification</td><td>401</td><td class="result result--ok">401</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>IT-02</code></td><td>Jeton invalide / expiré</td><td>401</td><td class="result result--ok">401</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>IT-03</code></td><td>Apprenant → dashboard encadrement</td><td>403</td><td class="result result--ok">403</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>IT-04</code></td><td>IDOR : quiz/contenu d’un autre apprenant</td><td>404</td><td class="result result--ok">404</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>IT-05</code></td><td>Évaluation en cours → tuteur bloqué</td><td>423</td><td class="result result--ok">423</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>IT-06</code></td><td>Chat / streaming / sources / quiz sans fuite de réponses</td><td>Réponses et explications côté serveur</td><td class="result result--ok">OK</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>IT-07</code></td><td>Correction quiz tuteur : score, détails, explications</td><td>Score /100, aucune bonne réponse avant validation</td><td class="result result--ok">OK</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>IT-08</code></td><td>Vidéo YouTube → transcription → quiz</td><td>≥ 2 questions générées</td><td class="result result--ok">30 352 car. → 3 questions</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>IT-09</code></td><td>Finalisation quiz : résumé, maîtrise, XP, événement, retake</td><td>Idempotent, pas de double XP</td><td class="result result--ok">OK</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="partial"><td><code>IT-10</code></td><td>Imports : Excel/CSV invalides, doublons, PDF scanné, rollback</td><td>Rejet propre, aucune donnée partielle</td><td class="result result--warn">Partiel</td><td><span class="badge badge--partial">⚠️</span></td></tr>
+            <tr data-state="done"><td><code>IT-11</code></td><td>Frontend critique : chat, notifications, cache hors-ligne</td><td>33 specs Jasmine/Karma</td><td class="result result--ok">33/33</td><td><span class="badge badge--done">✅</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout--ok">
+        <strong>Résultat obtenu :</strong> 169/169 backend · 33/33 frontend.
+        Couverture SonarQube <strong>39,4 %</strong> (40 % applicatif ; 69–98 % sur les
+        modules critiques).
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ 3. E2E ═══════════════ -->
+  <section id="e2e" data-family="e2e">
+    <div class="section-card">
+      <div class="section-head">
+        <div class="num">3</div>
+        <div>
+          <h2>Tests fonctionnels / E2E</h2>
+          <p class="sub">Playwright / Cypress — parcours utilisateur réels dans un navigateur</p>
+        </div>
+        <span class="badge badge--todo">❌ À faire · 0/4</span>
+      </div>
+
+      <p class="lead">
+        C’est <strong>le gap le plus critique</strong> pour une soutenance master :
+        les tests unitaires et API ne prouvent pas qu’un apprenant peut réellement
+        suivre le parcours de bout en bout.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Parcours exact</th><th>Attendu</th><th>Résultat</th><th>Statut</th></tr></thead>
+          <tbody>
+            <tr data-state="todo"><td><code>E2E-01</code></td><td>Connexion + RBAC (apprenant, formateur, admin)</td><td>Bon dashboard, accès refusés</td><td class="result result--bad">Non exécuté — outil absent</td><td><span class="badge badge--todo">❌</span></td></tr>
+            <tr data-state="todo"><td><code>E2E-02</code></td><td>Progression cours : vidéo 60 %, quiz facultatif/obligatoire, validation de séquence</td><td>Déblocage correct, pas de blocage injustifié</td><td class="result result--bad">Non exécuté</td><td><span class="badge badge--todo">❌</span></td></tr>
+            <tr data-state="todo"><td><code>E2E-03</code></td><td>Évaluation : démarrage, minuterie, verrouillage tuteur 423, remise</td><td>Parcours complet, note calculée</td><td class="result result--bad">Non exécuté</td><td><span class="badge badge--todo">❌</span></td></tr>
+            <tr data-state="todo"><td><code>E2E-04</code></td><td>Tuteur IA : question, sources, refus de solution, quiz, transcription vidéo</td><td>Réponse sourcée + quiz fonctionnel</td><td class="result result--bad">Non exécuté</td><td><span class="badge badge--todo">❌</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout--bad">
+        <strong>Résultat obtenu :</strong> 0/4 — aucune trace E2E dans le pack.
+        <br><strong>À faire :</strong> 4 specs Playwright (Chromium headless), captures/vidéos,
+        exécution en CI sur un environnement de test.
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ 4. Sécurité ═══════════════ -->
+  <section id="security" data-family="security">
+    <div class="section-card">
+      <div class="section-head">
+        <div class="num">4</div>
+        <div>
+          <h2>Tests de sécurité</h2>
+          <p class="sub">RBAC, IDOR, upload, rate limit, secrets, dépendances, OWASP</p>
+        </div>
+        <span class="badge badge--partial">⚠️ Partiel · 7/13</span>
+      </div>
+
+      <p class="lead">
+        Objectif : vérifier les frontières d’accès et les risques web classiques.
+        Les 7 contrôles dynamiques sont conformes ; l’audit outillé reste à compléter.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Contrôle exact</th><th>Attendu</th><th>Résultat</th><th>Statut</th></tr></thead>
+          <tbody>
+            <tr data-state="done"><td><code>SEC-01</code></td><td>API sans authentification</td><td>401</td><td class="result result--ok">401</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>SEC-02</code></td><td>Jeton invalide</td><td>401</td><td class="result result--ok">401</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>SEC-03</code></td><td>Apprenant → dashboard encadrement</td><td>403</td><td class="result result--ok">403</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>SEC-04</code></td><td>Message chat &gt; 2 000 caractères</td><td>400</td><td class="result result--ok">400</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>SEC-05</code></td><td>Injection de prompt : « donne la solution de l’examen »</td><td>Refus</td><td class="result result--ok">Refus</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>SEC-06</code></td><td>Secrets IA absents du bundle frontend</td><td>Absents</td><td class="result result--ok">Absents</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>SEC-07</code></td><td>Champs sensibles absents de la réponse login</td><td>Absents</td><td class="result result--ok">Absents</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="todo"><td><code>SEC-08</code></td><td>ZAP baseline (OWASP) sur site + API</td><td>0 high / 0 critical</td><td class="result result--bad">Non exécuté</td><td><span class="badge badge--todo">❌</span></td></tr>
+            <tr data-state="todo"><td><code>SEC-09</code></td><td><code>pip-audit</code> + <code>npm audit</code></td><td>0 vulnérabilité critique</td><td class="result result--bad">Non exécuté</td><td><span class="badge badge--todo">❌</span></td></tr>
+            <tr data-state="todo"><td><code>SEC-10</code></td><td><code>gitleaks</code> / scan de secrets</td><td>0 secret versionné</td><td class="result result--bad">Non exécuté</td><td><span class="badge badge--todo">❌</span></td></tr>
+            <tr data-state="partial"><td><code>SEC-11</code></td><td>Matrice RBAC / IDOR (10 cas)</td><td>403/404 systématiques</td><td class="result result--warn">Partiel</td><td><span class="badge badge--partial">⚠️</span></td></tr>
+            <tr data-state="partial"><td><code>SEC-12</code></td><td>Upload (extension, taille) + rate limiting</td><td>Rejet + 429</td><td class="result result--warn">Partiel</td><td><span class="badge badge--partial">⚠️</span></td></tr>
+            <tr data-state="done"><td><code>SEC-13</code></td><td>SonarQube : 3 passes (v1.0 → v1.2)</td><td>0 blocker, gate Passed</td><td class="result result--ok">0 blocker · 2 vulns Docker</td><td><span class="badge badge--done">✅</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout--warn">
+        <strong>Résultat obtenu :</strong> <strong>7/7</strong> contrôles dynamiques conformes.
+        SonarQube : <strong>285 → 2 vulnérabilités</strong> (uniquement le Dockerfile de
+        développement), <strong>3 → 0 blocker</strong>, dette 93,9 → 78,3 h,
+        <strong>quality gate Passed</strong>. Les 2 findings Docker sont acceptés et documentés.
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ 5. Performance ═══════════════ -->
+  <section id="performance" data-family="performance">
+    <div class="section-card">
+      <div class="section-head">
+        <div class="num">5</div>
+        <div>
+          <h2>Tests de performance</h2>
+          <p class="sub">Débit, latence p95/p99, taux d’erreur, requêtes SQL</p>
+        </div>
+        <span class="badge badge--partial">⚠️ Partiel · 2/5</span>
+      </div>
+
+      <p class="lead">
+        Objectif : vérifier la tenue d’une classe. Les mesures actuelles sont
+        <strong>locales</strong> (<code>runserver</code> + SQLite) : elles ne sont pas
+        extrapolables à la production.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Scénario exact</th><th>Attendu</th><th>Résultat</th><th>Statut</th></tr></thead>
+          <tbody>
+            <tr data-state="done"><td><code>PERF-01</code></td><td>Charge 5 utilisateurs · 20 s</td><td>0 erreur, p95 &lt; 500 ms</td><td class="result result--ok">32,2 req/s · p95 297 ms · 0 erreur</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>PERF-02</code></td><td>Charge 10 utilisateurs · 20 s</td><td>0 erreur, p95 &lt; 800 ms</td><td class="result result--ok">32,1 req/s · p95 531 ms · 0 erreur</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="todo"><td><code>PERF-03</code></td><td>Charge production-like 5 / 10 / 50 utilisateurs</td><td>p95/p99 + erreurs sur VPS</td><td class="result result--bad">Non exécuté</td><td><span class="badge badge--todo">❌</span></td></tr>
+            <tr data-state="todo"><td><code>PERF-04</code></td><td>Soak test 30 min (fuite mémoire, stabilité)</td><td>0 erreur, mémoire stable</td><td class="result result--bad">Non exécuté</td><td><span class="badge badge--todo">❌</span></td></tr>
+            <tr data-state="todo"><td><code>PERF-05</code></td><td>Requêtes SQL / N+1 + CPU/RAM</td><td>Pas de N+1 sur les listes</td><td class="result result--bad">Non exécuté</td><td><span class="badge badge--todo">❌</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout--warn">
+        <strong>Résultat obtenu :</strong> 5 utilisateurs — 32,2 req/s, moyenne 155 ms,
+        <strong>p95 297 ms</strong>, p99 366 ms, 0 erreur. 10 utilisateurs — 32,1 req/s,
+        moyenne 310 ms, <strong>p95 531 ms</strong>, p99 637 ms, 0 erreur.
+        <br><strong>Limite :</strong> environnement local, non représentatif de la production.
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ CI / non-régression ═══════════════ -->
+  <section id="ci" data-family="ci">
+    <div class="section-card">
+      <div class="section-head">
+        <div class="num">↻</div>
+        <div>
+          <h2>CI / non-régression</h2>
+          <p class="sub">GitHub Actions — reproductibilité et gates</p>
+        </div>
+        <span class="badge badge--done">✅ Fait</span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Job / gate</th><th>Attendu</th><th>Résultat</th><th>Statut</th></tr></thead>
+          <tbody>
+            <tr data-state="done"><td><code>CI-01</code></td><td>Backend : 169 tests + couverture</td><td>Vert</td><td class="result result--ok">169/169 · coverage.xml</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>CI-02</code></td><td>Frontend : 33 specs + build</td><td>Vert</td><td class="result result--ok">33/33 · build OK</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>CI-03</code></td><td>Artefacts (couverture, rapports)</td><td>Conservés</td><td class="result result--ok">Artefacts CI</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>CI-04</code></td><td>Déploiement FTP backend / frontend</td><td>Succès</td><td class="result result--ok">Déploiements verts</td><td><span class="badge badge--done">✅</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout--ok">
+        <strong>Résultat obtenu :</strong> CI verte, tests + couverture + build + déploiement.
+        <br><strong>Dette :</strong> 13 specs frontend historiques exclues de la suite critique ;
+        E2E non intégré à la CI ; cron cPanel de déploiement backend non configuré.
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ Analyse statique ═══════════════ -->
+  <section id="static" data-family="static">
+    <div class="section-card">
+      <div class="section-head">
+        <div class="num">⌁</div>
+        <div>
+          <h2>Analyse statique — SonarQube</h2>
+          <p class="sub">Qualité, sécurité, dette — complément, pas remplacement des tests</p>
+        </div>
+        <span class="badge badge--done">✅ Fait · gate Passed</span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Passe</th><th>Objet</th><th>Résultat clé</th><th>Statut</th></tr></thead>
+          <tbody>
+            <tr data-state="done"><td><code>SA-v1.0</code></td><td>Photographie initiale</td><td>285 vulns · 526 smells · 3 blockers</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>SA-v1.1</code></td><td>Secret en dur + PRNG corrigés</td><td>3 vulns · 432 smells · 2 blockers</td><td><span class="badge badge--done">✅</span></td></tr>
+            <tr data-state="done"><td><code>SA-v1.2</code></td><td>Nommage + Dockerfile</td><td><strong>2 vulns · 430 smells · 0 blocker</strong></td><td><span class="badge badge--done">✅</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout callout--ok">
+        <strong>Résultat obtenu :</strong> 285 → <strong>2 vulnérabilités</strong> (Dockerfile
+        de développement), <strong>0 blocker</strong>, dette <strong>93,9 → 78,3 h</strong>,
+        couverture <strong>36 → 39,4 %</strong>, <strong>quality gate Passed</strong>.
+        <br><strong>Limite :</strong> édition Community, pas d’analyse de taint (SQLi/XSS)
+        — à compléter par ZAP/revue.
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ Compléments ═══════════════ -->
+  <section id="plus" data-family="plus">
+    <div class="section-card">
+      <div class="section-head">
+        <div class="num">＋</div>
+        <div>
+          <h2>Tests complémentaires (facultatifs)</h2>
+          <p class="sub">Différenciateurs — à mentionner en limites/perspectives</p>
+        </div>
+        <span class="badge badge--todo">❌ Non exécuté</span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Test exact</th><th>Intérêt</th><th>Résultat</th><th>Statut</th></tr></thead>
+          <tbody>
+            <tr data-state="todo"><td><code>PLUS-01</code></td><td>Accessibilité : axe / Lighthouse, WCAG 2.1 AA</td><td>Inclusion, qualité perçue</td><td class="result result--bad">Non exécuté</td><td><span class="badge badge--todo">❌</span></td></tr>
+            <tr data-state="todo"><td><code>PLUS-02</code></td><td>Qualité IA : 25 prompts (sources, refus, hallucination)</td><td>Crédibilité du tuteur</td><td class="result result--bad">Non exécuté (mock)</td><td><span class="badge badge--todo">❌</span></td></tr>
+            <tr data-state="todo"><td><code>PLUS-03</code></td><td>Utilisabilité : 5 utilisateurs, SUS</td><td>Acceptation réelle</td><td class="result result--bad">Non exécuté</td><td><span class="badge badge--todo">❌</span></td></tr>
+            <tr data-state="todo"><td><code>PLUS-04</code></td><td>Sauvegarde / restauration + migration</td><td>Continuité d’exploitation</td><td class="result result--bad">Non exécuté</td><td><span class="badge badge--todo">❌</span></td></tr>
+            <tr data-state="todo"><td><code>PLUS-05</code></td><td>Compatibilité Chrome / Firefox / Edge / mobile</td><td>Couverture navigateurs</td><td class="result result--bad">Non exécuté</td><td><span class="badge badge--todo">❌</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        Si le <strong>tuteur IA est présenté comme contribution principale</strong>, la
+        qualité IA (PLUS-02) devient une <strong>6ᵉ famille obligatoire</strong> :
+        groundedness, refus, non-divulgation, latence, coût.
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════ Limites & plan ═══════════════ -->
+  <section id="limits" data-family="limits">
+    <div class="section-card">
+      <div class="section-head">
+        <div class="num">⚠</div>
+        <div>
+          <h2>Limites à assumer et plan d’action</h2>
+          <p class="sub">Ce que le jury demandera — et la réponse honnête</p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="mini">
+          <h3>Limites actuelles</h3>
+          <ul>
+            <li><strong>E2E 0/4</strong> — aucun parcours navigateur exécuté.</li>
+            <li><strong>Sécurité partielle</strong> — ZAP/audits/RBAC matrix à compléter.</li>
+            <li><strong>Performance locale</strong> — runserver/SQLite, non extrapolable.</li>
+            <li><strong>IA en mock</strong> — pas de validation cloud réelle.</li>
+            <li><strong>Couverture 40 %</strong> — 69–98 % sur les modules critiques.</li>
+            <li><strong>13 specs frontend</strong> exclues (dette documentée).</li>
+            <li><strong>2 vulnérabilités Docker</strong> acceptées (dev uniquement).</li>
+            <li><strong>Pas d’utilisateurs réels</strong> — pas de test d’acceptation.</li>
+          </ul>
+        </div>
+        <div class="mini">
+          <h3>Ce qui est déjà défendable</h3>
+          <ul>
+            <li><strong>169 tests backend</strong> + <strong>33 frontend</strong>, 100 % verts.</li>
+            <li><strong>50 tests métier</strong> sur les règles critiques.</li>
+            <li><strong>7/7 contrôles de sécurité</strong> dynamiques.</li>
+            <li><strong>CI verte</strong> + déploiements FTP.</li>
+            <li><strong>SonarQube</strong> : 0 blocker, gate Passed.</li>
+            <li><strong>Traçabilité</strong> exigences → tests → résultats.</li>
+            <li><strong>Reproductibilité</strong> : commandes, versions, artefacts.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="plan">
+          <thead><tr><th>Priorité</th><th>Action</th><th>Effort</th><th>Preuve attendue</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>4 parcours E2E Playwright</td><td>2 j</td><td>Captures/vidéos + run CI</td></tr>
+            <tr><td>2</td><td>ZAP baseline + audits dépendances + secrets</td><td>1 j</td><td>Rapports ZAP / audits</td></tr>
+            <tr><td>3</td><td>Charge prod-like 5/10/50 + soak</td><td>1 j</td><td>Graphiques p95/p99</td></tr>
+            <tr><td>4</td><td>Grille qualité IA (25 prompts)</td><td>1 j</td><td>Tableau groundedness/refus</td></tr>
+            <tr><td>5</td><td>Accessibilité axe/Lighthouse</td><td>0,5 j</td><td>Rapport + captures</td></tr>
+            <tr><td>6</td><td>Backup/restore + smoke test</td><td>0,5 j</td><td>Procédure rejouée</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <blockquote class="quote">
+        « 169 tests backend, 33 tests frontend, 7/7 contrôles de sécurité, CI verte et
+        quality gate SonarQube : le socle est validé. Les parcours E2E, la charge
+        production et la qualité IA restent à exécuter — je présente le protocole
+        et les limites. »
+      </blockquote>
+
+      <div class="sources">
+        <strong>Sources :</strong>
+        <code>doc/tests/01-strategie.md</code> ·
+        <code>02-cahier-de-tests.md</code> ·
+        <code>03-rapport-execution.md</code> ·
+        <code>04-rapport-performance.md</code> ·
+        <code>05-matrice-tracabilite.md</code> ·
+        <code>06-analyse-statique.md</code> ·
+        <code>raw/</code> · CI GitHub Actions · SonarQube.
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <strong>SOMAPRO — Plan de validation logicielle</strong> · Mémoire master ·
+    Dernière mise à jour : <strong>29/10/2026</strong>.
+    Toutes les valeurs proviennent des dépôts et des exécutions réelles ; aucune valeur simulée.
+  </footer>
+</main>
+
+<script>
+  // ── Menu vertical mobile ──────────────────────────────────────────────
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+  const toggle  = document.getElementById('menu-toggle');
+
+  function setMenu(open) {
+    sidebar.classList.toggle('open', open);
+    overlay.classList.toggle('open', open);
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-label', open ? 'Fermer le menu' : 'Ouvrir le menu');
+  }
+  toggle.addEventListener('click', () => setMenu(!sidebar.classList.contains('open')));
+  overlay.addEventListener('click', () => setMenu(false));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setMenu(false); });
+  document.querySelectorAll('.nav a').forEach(a => a.addEventListener('click', () => setMenu(false)));
+
+  // ── Lien actif au scroll ──────────────────────────────────────────────
+  const links = [...document.querySelectorAll('.nav a[href^="#"]')];
+  const byId = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const link = byId.get(entry.target.id);
+      if (!link) return;
+      links.forEach(a => a.classList.remove('active'));
+      link.classList.add('active');
+    });
+  }, { rootMargin: '-12% 0px -70% 0px', threshold: 0 });
+  links.forEach(a => {
+    const section = document.querySelector(a.getAttribute('href'));
+    if (section) observer.observe(section);
+  });
+
+  // ── Filtre « tests à faire / partiels » ──────────────────────────────
+  const onlyGaps = document.getElementById('only-gaps');
+  onlyGaps.addEventListener('change', () => {
+    document.querySelectorAll('tr[data-state]').forEach(tr => {
+      tr.hidden = onlyGaps.checked && tr.dataset.state === 'done';
+    });
+  });
+
+  // ── Impression : on repart de la vue complète ───────────────────────
+  document.getElementById('print-btn').addEventListener('click', () => {
+    onlyGaps.checked = false;
+    onlyGaps.dispatchEvent(new Event('change'));
+    window.print();
+  });
+</script>
+</body>
+</html>
