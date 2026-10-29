@@ -17,6 +17,36 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
 
+  # ── Ollama : LLM local pour le tuteur, les quiz et la remédiation ────────
+  # Le port 11434 n'est PAS publié : seul le réseau Docker interne y accède.
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_KEEP_ALIVE: 30m
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+    volumes:
+      - ollama_models:/root/.ollama
+
+  # Télécharge le modèle une seule fois au démarrage (idempotent).
+  ollama-init:
+    image: ollama/ollama:latest
+    restart: "no"
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b-instruct}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        until ollama pull "$${OLLAMA_MODEL}"; do
+          echo "Ollama indisponible, nouvelle tentative dans 5 s...";
+          sleep 5;
+        done
+
   backend:
     build:
       context: ..
@@ -27,6 +57,7 @@ services:
       POSTGRES_PORT: 5432
       REDIS_URL: redis://redis:6379/0
       DEBUG: "False"
+      WHISPER_CACHE_DIR: /models/whisper
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
@@ -34,6 +65,7 @@ services:
     volumes:
       - media:/app/media
       - staticfiles:/app/staticfiles
+      - whisper_models:/models/whisper
     depends_on:
       - postgres
       - redis
@@ -91,3 +123,5 @@ volumes:
   pgdata:
   media:
   staticfiles:
+  ollama_models:
+  whisper_models:

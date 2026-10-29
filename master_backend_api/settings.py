@@ -325,6 +325,16 @@ OLLAMA_MODEL = config('OLLAMA_MODEL', default='qwen2.5:3b-instruct')
 # Fenêtre de contexte Ollama (tokens). 8192 évite la troncature sur longs prompts.
 OLLAMA_NUM_CTX = config('OLLAMA_NUM_CTX', default=8192, cast=int)
 
+# ── Transcription locale des vidéos/audios pour le RAG ─────────────────────
+# faster-whisper est optionnel : si absent, le tuteur continue avec le texte
+# du bloc et les documents indexés. Le modèle est téléchargé au premier usage.
+WHISPER_MODEL = config('WHISPER_MODEL', default='tiny')
+WHISPER_DEVICE = config('WHISPER_DEVICE', default='cpu')
+WHISPER_COMPUTE_TYPE = config('WHISPER_COMPUTE_TYPE', default='int8')
+WHISPER_LANGUAGE = config('WHISPER_LANGUAGE', default='fr')
+WHISPER_MAX_DURATION = config('WHISPER_MAX_DURATION', default=900, cast=int)
+WHISPER_CACHE_DIR = config('WHISPER_CACHE_DIR', default='')
+
 # ── Fournisseurs cloud optionnels (si le réseau est disponible) ──────────────
 GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
 GEMINI_MODEL = config('GEMINI_MODEL', default='gemini-2.0-flash')

@@ -114,7 +114,17 @@ class QuizSerializer(serializers.ModelSerializer):
         source='sequence.titre',
         read_only=True
     )
-    
+    tentatives_max = serializers.SerializerMethodField()
+
+    def get_tentatives_max(self, obj) -> int:
+        """Plafond effectif (établissement > global), configuré dans Paramètres."""
+        from parametres.services import evaluation_tentatives_max
+        institution = getattr(getattr(obj, 'sequence', None), 'institution', None)
+        try:
+            return int(evaluation_tentatives_max(institution) or 3)
+        except Exception:
+            return 3
+
     class Meta:
         model = Quiz
         fields = [
@@ -127,6 +137,7 @@ class QuizSerializer(serializers.ModelSerializer):
             'date_modification',
             'nombre_questions',
             'passages_count',
+            'tentatives_max',
         ]
         read_only_fields = ['id', 'date_creation', 'date_modification']
 
