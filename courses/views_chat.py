@@ -647,6 +647,11 @@ class QuizCorrectionAPIView(APIView):
             quiz.corrige_le = timezone.now()
             quiz.save(update_fields=["reponses", "score", "statut", "corrige_le"])
 
+            # Effets pédagogiques : résumé/maîtrise, XP, événements formateur.
+            # (uniquement à la première correction ; rejouer l'endpoint est idempotent)
+            from .services.quiz_finalisation import finaliser_quiz_tuteur
+            finaliser_quiz_tuteur(quiz)
+
         publiques = quiz_tuteur.questions_publiques(quiz.questions)
         for index, question in enumerate(quiz.questions):
             publiques[index]["bonne_reponse"] = question["bonne_reponse"]

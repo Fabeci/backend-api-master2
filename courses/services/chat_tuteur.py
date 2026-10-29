@@ -95,17 +95,17 @@ def contexte_bloc(bloc) -> dict:
 
     ressources = []
     if getattr(bloc, "lien_externe", None):
-        ressources.append("Lien externe (contenu non analysé)")
+        ressources.append("Lien externe (contenu non récupéré)")
     if getattr(bloc, "video_url", None):
-        ressources.append("Vidéo (contenu non analysé)")
+        ressources.append("Vidéo (transcription utilisée si disponible ; image non analysée)")
     if getattr(bloc, "audio_url", None):
-        ressources.append("Audio (contenu non analysé)")
+        ressources.append("Audio (transcription utilisée si disponible)")
     if getattr(bloc, "fichier", None):
         try:
             nom = str(bloc.fichier.name).split("/")[-1]
         except Exception:  # noqa: BLE001
             nom = "document"
-        ressources.append(f"Document joint « {nom} » (contenu non analysé)")
+        ressources.append(f"Document joint « {nom} » (texte indexé si le format est lisible)")
 
     try:
         for res in sequence.ressources_sequences.all()[:5]:

@@ -234,9 +234,10 @@ imposerait un utilisateur non-root incompatible avec les volumes montés
 (`db.sqlite3`, `media/`) et une liste de `COPY` explicite fragile à la
 maintenance. Les commentaires du `Dockerfile` tracent cette décision.
 
-> Remarque méthodologique : SonarQube **n'honore pas `# NOSONAR` dans un
-> `Dockerfile`** ; les deux findings restent donc visibles. C'est un choix
-> assumé : un finding accepté doit rester **traçable**, pas masqué.
+> Remarque méthodologique : un `# NOSONAR` en fin de ligne `FROM` **casse le
+> parseur Docker** ; le triage est donc porté par des commentaires dédiés, et
+> les deux findings restent **visibles**. Un finding accepté doit rester
+> **traçable**, pas masqué.
 
 ### 5.6 Les 430 code smells
 
