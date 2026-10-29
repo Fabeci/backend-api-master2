@@ -17,7 +17,6 @@ de la plateforme SOMAPRO (LMS).
 | `04-rapport-performance.md` | Charge réelle, latences, débit, analyse |
 | `05-matrice-tracabilite.md` | Exigences → tests → statut |
 | `06-analyse-statique.md` | Analyse SonarQube (3 passes, avant/après, triage) |
-| `memoire/tableau-tests.html` | **Page web de synthèse** : 5 familles, tests exacts, résultats (menu vertical) |
 | `raw/` | Sorties brutes (coverage, perf, sécurité, Karma, SonarQube) |
 
 ## Commandes de reproduction
