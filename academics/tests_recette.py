@@ -1,5 +1,7 @@
 """Tests de recette : département sans responsable, filière par département,
 paramètres généraux (langue / fuseau horaire)."""
+from unittest.mock import patch
+
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -35,6 +37,13 @@ class _RecetteBase(TestCase):
         )
 
     def setUp(self):
+        # Le filtrage mono-établissement lit le tenant : on l'aligne sur le test.
+        self._tenant_patch = patch(
+            "core.tenant.default_institution_id", return_value=self.institution.id,
+        )
+        self._tenant_patch.start()
+        self.addCleanup(self._tenant_patch.stop)
+
         self.client = APIClient()
         self.client.force_authenticate(user=self.admin)
 

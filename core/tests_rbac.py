@@ -32,6 +32,10 @@ class RBACMatrixTests(TestCase):
         self.assertTrue(has_permission(u, "parents", "create"))
         self.assertTrue(has_permission(u, "admins", "view"))
         self.assertTrue(has_permission(u, "users", "manage_permissions"))
+        # Vue d'ensemble « Cours & formations » : lecture autorisée.
+        self.assertTrue(has_permission(u, "evaluations", "view"))
+        self.assertTrue(has_permission(u, "planAction", "view"))
+        self.assertFalse(has_permission(u, "evaluations", "create"))
 
     def test_responsable_limited(self):
         u = self.users["Responsable"]

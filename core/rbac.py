@@ -97,14 +97,14 @@ ROLE_PERMISSIONS: dict = {
                     "create": _ADMIN_SA + _CONTENT_MAKERS + ["Apprenant"],
                     "edit":   _ADMIN_SA + ["Formateur"],
                     "delete": _ADMIN_SA + ["Formateur"]},
-    # ✅ Admin exclu (gestion des plans d'action interdite à ce profil).
-    "planAction":  {"view": ["SuperAdmin", "Responsable", "Formateur", "Apprenant", "Parent"],
+    # L'Admin peut LIRE (vue d'ensemble) ; la gestion reste réservée aux formateurs.
+    "planAction":  {"view": ["SuperAdmin", "Admin", "Responsable", "Formateur", "Apprenant", "Parent"],
                     "create": ["SuperAdmin", "Formateur"], "edit": ["SuperAdmin", "Formateur"], "delete": ["SuperAdmin", "Formateur"]},
-    "evaluations": {"view": ["SuperAdmin", "Responsable", "Formateur", "Apprenant", "Parent"],  # ✅ Admin exclu
+    "evaluations": {"view": ["SuperAdmin", "Admin", "Responsable", "Formateur", "Apprenant", "Parent"],
                     "create": _CONTENT_MAKERS, "edit": _CONTENT_MAKERS, "delete": _CONTENT_MAKERS},
-    "quiz":       {"view": ["SuperAdmin", "Responsable", "Formateur", "Apprenant"],  # ✅ Admin exclu
+    "quiz":       {"view": ["SuperAdmin", "Admin", "Responsable", "Formateur", "Apprenant"],
                    "create": _CONTENT_MAKERS, "edit": _CONTENT_MAKERS, "delete": _CONTENT_MAKERS},
-    "resultats":  {"view": ["SuperAdmin", "Responsable", "Formateur", "Apprenant", "Parent"],  # ✅ Admin exclu
+    "resultats":  {"view": ["SuperAdmin", "Admin", "Responsable", "Formateur", "Apprenant", "Parent"],
                    "create": ["Apprenant"], "edit": _CONTENT_MAKERS, "delete": ["Admin"]},
 }
 
