@@ -444,11 +444,13 @@ class AnneeScolaireSerializer(serializers.ModelSerializer):
 
 class DepartementSerializer(serializers.ModelSerializer):
     # ===== WRITE (IDs) =====
-    institution = serializers.PrimaryKeyRelatedField(
-        queryset=Institution.objects.all()
-    )
+    # L'établissement est déduit du compte connecté (jamais saisi dans le formulaire).
+    institution = serializers.PrimaryKeyRelatedField(read_only=True)
+    # Responsable facultatif : un département peut exister sans responsable.
     responsable_academique = serializers.PrimaryKeyRelatedField(
-        queryset=ResponsableAcademique.objects.all()
+        queryset=ResponsableAcademique.objects.all(),
+        required=False,
+        allow_null=True,
     )
 
     # ===== READ (labels) =====
@@ -477,30 +479,83 @@ class DepartementSerializer(serializers.ModelSerializer):
             "responsable_academique_label",
         ]
         read_only_fields = ["id"]
+
+    def validate(self, attrs):
+        from core.tenant import default_institution
+        user = self.context.get("request").user if self.context.get("request") else None
+        institution = (getattr(user, "institution", None) if user else None) or default_institution()
+        responsable = attrs.get(
+            "responsable_academique",
+            getattr(self.instance, "responsable_academique", None),
+        )
+        if responsable and institution and responsable.institution_id != institution.id:
+            raise serializers.ValidationError({
+                "responsable_academique":
+                    "Le responsable doit appartenir à votre établissement."
+            })
+        return attrs
         
 
 class FiliereSerializer(serializers.ModelSerializer):
+    departement = serializers.PrimaryKeyRelatedField(
+        queryset=Departement.objects.all(), required=False, allow_null=True,
+    )
+    departement_label = serializers.StringRelatedField(
+        source="departement", read_only=True
+    )
     domaine_etude_label = serializers.StringRelatedField(
         source="domaine_etude", read_only=True
     )
     domaine_etude = serializers.PrimaryKeyRelatedField(
-        queryset=DomaineEtude.objects.all()
+        queryset=DomaineEtude.objects.all(), required=False, allow_null=True,
     )
     institution = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Filiere
         fields = [
-            "id", "nom", "domaine_etude", "domaine_etude_label",
+            "id", "nom", "departement", "departement_label",
+            "domaine_etude", "domaine_etude_label",
             "institution", "description", "date_creation", "statut",
         ]
         read_only_fields = ["id", "date_creation"]
 
+    def validate(self, attrs):
+        from core.tenant import default_institution
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        institution = (getattr(user, "institution", None) if user else None) or default_institution()
+
+        departement = attrs.get(
+            "departement", getattr(self.instance, "departement", None),
+        )
+        domaine = attrs.get(
+            "domaine_etude", getattr(self.instance, "domaine_etude", None),
+        )
+
+        if departement and institution and departement.institution_id != institution.id:
+            raise serializers.ValidationError({
+                "departement": "Le département doit appartenir à votre établissement."
+            })
+        if domaine:
+            if institution and domaine.institution_id != institution.id:
+                raise serializers.ValidationError({
+                    "domaine_etude": "Le domaine d'étude doit appartenir à votre établissement."
+                })
+            if (departement and domaine.departement_id
+                    and domaine.departement_id != departement.id):
+                raise serializers.ValidationError({
+                    "domaine_etude": "Le domaine d'étude doit appartenir au département sélectionné."
+                })
+        return attrs
+
     def create(self, validated_data):
+        from core.tenant import default_institution
         request = self.context["request"]
         user = request.user
-        if not user.is_superuser:
-            validated_data["institution_id"] = user.institution_id
+        validated_data["institution"] = (
+            getattr(user, "institution", None) or default_institution()
+        )
         return super().create(validated_data)
     
 class GroupeSerializer(serializers.ModelSerializer):

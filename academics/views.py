@@ -548,7 +548,17 @@ class DepartementListCreateAPIView(APIView):
 
         serializer = DepartementSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        obj = serializer.save()
+
+        # L'établissement vient du compte connecté (mono-établissement).
+        from core.tenant import default_institution
+        institution = getattr(request.user, "institution", None) or default_institution()
+        if not institution:
+            return api_error(
+                "Aucun établissement associé à votre compte.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        obj = serializer.save(institution=institution)
         return api_success("Département créé avec succès", DepartementSerializer(obj).data, status.HTTP_201_CREATED)
 
 

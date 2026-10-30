@@ -309,16 +309,21 @@ class Departement(models.Model):
     )
     responsable_academique = models.ForeignKey(
         "users.ResponsableAcademique",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="departements",
+        null=True,
+        blank=True,
     )
     est_actif = models.BooleanField(default=True)
     date_debut_validite = models.DateField(null=True, blank=True)
     date_fin_validite = models.DateField(null=True, blank=True)
 
     def clean(self):
+        # Le responsable est facultatif : un département peut être créé sans lui.
+        if not self.responsable_academique_id:
+            return
         inst_user = getattr(self.responsable_academique, "institution", None)
-        if inst_user and inst_user != self.institution:
+        if inst_user and self.institution_id and inst_user.pk != self.institution_id:
             raise ValidationError(
                 "Le responsable académique doit appartenir à la même institution que le département."
             )
@@ -382,11 +387,20 @@ class Filiere(models.Model):
         null=True,
         blank=True,
     )
+    departement = models.ForeignKey(
+        "Departement",
+        on_delete=models.SET_NULL,
+        related_name="filieres",
+        null=True,
+        blank=True,
+    )
     nom = models.CharField(max_length=255)
     domaine_etude = models.ForeignKey(
         DomaineEtude,
-        on_delete=models.CASCADE,
-        related_name="filieres"
+        on_delete=models.SET_NULL,
+        related_name="filieres",
+        null=True,
+        blank=True,
     )
     description = models.TextField(null=True, blank=True)
     date_creation = models.DateTimeField(auto_now_add=True)
@@ -409,8 +423,14 @@ class Filiere(models.Model):
         ordering = ["nom"]
 
     def clean(self):
-        if self.domaine_etude and self.domaine_etude.institution_id != self.institution_id:
-            raise ValidationError("La filière et son domaine d'étude doivent appartenir à la même institution.")
+        if self.departement and self.institution_id and self.departement.institution_id != self.institution_id:
+            raise ValidationError("La filière et son département doivent appartenir à la même institution.")
+        if self.domaine_etude:
+            if self.domaine_etude.institution_id != self.institution_id:
+                raise ValidationError("La filière et son domaine d'étude doivent appartenir à la même institution.")
+            if (self.departement_id and self.domaine_etude.departement_id
+                    and self.domaine_etude.departement_id != self.departement_id):
+                raise ValidationError("Le domaine d'étude doit appartenir au département sélectionné.")
 
     def save(self, *args, **kwargs):
         self.full_clean()
