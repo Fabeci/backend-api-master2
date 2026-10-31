@@ -200,6 +200,32 @@ def auto_statut_cours(sender, instance, **kwargs):
             pass
 
 
+@receiver(pre_save, sender=Cours)
+def _cours_capture_ancienne_date(sender, instance, **kwargs):
+    """Mémorise l'ancienne date de début pour la cascade de publication."""
+    if instance.pk:
+        instance._old_date_debut = (
+            Cours.objects.filter(pk=instance.pk)
+            .values_list("date_debut", flat=True)
+            .first()
+        )
+    else:
+        instance._old_date_debut = None
+
+
+@receiver(post_save, sender=Cours)
+def _cours_cascade_date(sender, instance, created, **kwargs):
+    """Si la date du cours change, décale les contenus encore programmés
+    à l'ancienne date (sans toucher aux overrides explicites)."""
+    if created:
+        return
+    ancienne = getattr(instance, "_old_date_debut", None)
+    if ancienne == instance.date_debut or instance.date_debut is None:
+        return
+    from .publication import appliquer_date_cours
+    transaction.on_commit(lambda: appliquer_date_cours(instance, ancienne))
+
+
 @receiver(pre_save, sender=BlocContenu)
 def auto_duree_estimee_bloc(sender, instance, **kwargs):
     """Pré-remplit la durée estimée d'un bloc si elle n'est pas fournie."""

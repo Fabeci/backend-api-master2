@@ -1,6 +1,9 @@
 # courses/serializers.py
 
+from datetime import datetime, time
+
 from rest_framework import serializers
+from django.utils import timezone
 from academics.models import Groupe, Matiere, Institution, AnneeScolaire
 from users.models import Apprenant, Formateur
 from users.serializers import ApprenantSerializer, FormateurSerializer
@@ -23,6 +26,22 @@ from .models import (
     BlocContenu,
     RessourceSequence,
 )
+
+
+def _publication_defaut_pour_cours(cours):
+    """Un contenu créé sous un cours futur naît « programmé » à la date du cours.
+
+    Le formateur peut ensuite remplacer ce choix (brouillon, publié, autre date).
+    """
+    if not cours or not getattr(cours, "date_debut", None):
+        return {}
+    if cours.date_debut <= timezone.localdate():
+        return {}
+    date_pub = timezone.make_aware(datetime.combine(cours.date_debut, time.min))
+    return {
+        "etat_publication": "programme",
+        "date_publication_programmee": date_pub,
+    }
 
 
 # ============================================================================
@@ -191,6 +210,14 @@ class ModuleSerializer(serializers.ModelSerializer):
                 attrs["date_publication_effective"] = now
         return attrs
 
+    def create(self, validated_data):
+        if "etat_publication" not in self.initial_data:
+            validated_data.update(
+                _publication_defaut_pour_cours(validated_data.get("cours"))
+            )
+        return super().create(validated_data)
+
+
 class BlocContenuSerializer(serializers.ModelSerializer):
     """
     Serializer universel pour lecture ET écriture (PUT/PATCH/GET).
@@ -286,6 +313,16 @@ class BlocContenuSerializer(serializers.ModelSerializer):
                     )
         return attrs
 
+    def create(self, validated_data):
+        seq = validated_data.get("sequence")
+        if "etat_publication" not in self.initial_data:
+            validated_data.update(
+                _publication_defaut_pour_cours(
+                    getattr(getattr(seq, "module", None), "cours", None)
+                )
+            )
+        return super().create(validated_data)
+
 
 class BlocContenuCreateSerializer(serializers.ModelSerializer):
     """Serializer dédié à la création."""
@@ -358,6 +395,17 @@ class BlocContenuCreateSerializer(serializers.ModelSerializer):
                     or getattr(getattr(seq, "module", None), "etat_publication", None) != "publie"):
                 attrs["etat_publication"] = "brouillon"
         return attrs
+
+    def create(self, validated_data):
+        seq = validated_data.get("sequence")
+        if "etat_publication" not in self.initial_data:
+            validated_data.update(
+                _publication_defaut_pour_cours(
+                    getattr(getattr(seq, "module", None), "cours", None)
+                )
+            )
+        return super().create(validated_data)
+
 
 class RessourceSequenceSerializer(serializers.ModelSerializer):
     """Serializer pour les ressources/pièces jointes"""
@@ -464,6 +512,17 @@ class SequenceSerializer(serializers.ModelSerializer):
                         {"etat_publication": "Le module doit être publié avant de publier une séquence."}
                     )
         return attrs
+
+    def create(self, validated_data):
+        module = validated_data.get("module")
+        if "etat_publication" not in self.initial_data:
+            validated_data.update(
+                _publication_defaut_pour_cours(
+                    getattr(module, "cours", None)
+                )
+            )
+        return super().create(validated_data)
+
 
 class SequenceDetailSerializer(serializers.ModelSerializer):
     """Serializer détaillé avec blocs et ressources"""

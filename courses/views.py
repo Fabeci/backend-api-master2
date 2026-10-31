@@ -518,6 +518,11 @@ class ModuleSequencesAPIView(APIView):
                 Module.objects.all(), request, 'Module', inclure_indisponibles=True
             )
             module = get_object_or_404(module_qs, pk=module_id)
+            if _cours_non_ouvert(request, module.cours):
+                return api_error(
+                    "Ce cours n'a pas encore commencé. Son contenu sera accessible à partir de sa date de début.",
+                    http_status=status.HTTP_403_FORBIDDEN,
+                )
             sequences = Sequence.objects.filter(module=module).order_by('id')
             sequences = filter_queryset_by_role(sequences, request, 'Sequence', inclure_indisponibles=True)
             serializer = SequenceSerializer(sequences, many=True)

@@ -9,6 +9,8 @@
 # La disponibilité ne s'applique JAMAIS à l'encadrement (formateur/responsable/
 # admin) : ils prévisualisent et gèrent leurs contenus, brouillons compris.
 # ============================================================================
+from datetime import datetime, time
+
 from django.db.models import Q
 from django.utils import timezone
 
@@ -32,7 +34,8 @@ def element_publie(obj) -> bool:
 
 
 def module_disponible(m) -> bool:
-    return bool(m) and element_publie(m)
+    # Un module ne s'ouvre jamais avant le début du cours, même s'il est publié.
+    return bool(m) and element_publie(m) and cours_commence(getattr(m, "cours", None))
 
 
 def sequence_disponible(s) -> bool:
@@ -91,18 +94,31 @@ def _q_date(prefix: str = "") -> Q:
             | Q(**{f"{prefix}date_publication_programmee__lte": timezone.now()}))
 
 
+def _q_cours(prefix: str = "") -> Q:
+    """Le cours parent doit être commencé et non annulé."""
+    today = timezone.localdate()
+    return (
+        (Q(**{f"{prefix}date_debut__isnull": True})
+         | Q(**{f"{prefix}date_debut__lte": today}))
+        & ~Q(**{f"{prefix}statut": "annule"})
+    )
+
+
 def filter_disponibles(queryset, model_name: str):
     """Restreint un queryset aux éléments DISPONIBLES (cascade parents incluse)."""
     if model_name == "Module":
-        return queryset.filter(etat_publication="publie").filter(_q_date())
+        return (queryset.filter(etat_publication="publie")
+                .filter(_q_date()).filter(_q_cours("cours__")))
     if model_name == "Sequence":
         return (queryset.filter(etat_publication="publie", module__etat_publication="publie")
-                .filter(_q_date()).filter(_q_date("module__")))
+                .filter(_q_date()).filter(_q_date("module__"))
+                .filter(_q_cours("module__cours__")))
     if model_name == "BlocContenu":
         return (queryset.filter(etat_publication="publie", est_visible=True,
                                 sequence__etat_publication="publie",
                                 sequence__module__etat_publication="publie")
-                .filter(_q_date()).filter(_q_date("sequence__")).filter(_q_date("sequence__module__")))
+                .filter(_q_date()).filter(_q_date("sequence__")).filter(_q_date("sequence__module__"))
+                .filter(_q_cours("sequence__module__cours__")))
     if model_name == "Session":
         return (queryset.exclude(statut="annulee")
                 .filter(Q(date_debut__isnull=True) | Q(date_debut__lte=timezone.now())))
@@ -160,6 +176,56 @@ def appliquer_etat_sequence(sequence) -> None:
     else:  # brouillon / depublie
         blocs.update(etat_publication=etat, date_publication_programmee=None,
                      date_publication_effective=None)
+
+
+def _date_debut_datetime(date_debut):
+    """DateField du cours → datetime local à 00:00 (aware)."""
+    if date_debut is None:
+        return None
+    if isinstance(date_debut, datetime):
+        return date_debut if timezone.is_aware(date_debut) else timezone.make_aware(date_debut)
+    return timezone.make_aware(datetime.combine(date_debut, time.min))
+
+
+def appliquer_date_cours(cours, ancienne_date=None) -> None:
+    """Décale les contenus encore PROGRAMMÉS à l'ancienne date du cours.
+
+    Ne touche jamais aux brouillons, aux contenus publiés, ni aux contenus
+    programmés volontairement à une autre date. C'est un simple alignement
+    par défaut, pas un écrasement des choix du formateur.
+    """
+    from .models import BlocContenu, Module, Sequence
+
+    nouvelle_date = _date_debut_datetime(getattr(cours, "date_debut", None))
+    if nouvelle_date is None:
+        return
+
+    def _filtre_ancienne_date(qs):
+        if ancienne_date is None:
+            return qs.filter(date_publication_programmee__isnull=True)
+        return qs.filter(
+            Q(date_publication_programmee__isnull=True)
+            | Q(date_publication_programmee__date=ancienne_date)
+        )
+
+    modules = Module.objects.filter(cours=cours, etat_publication="programme")
+    _filtre_ancienne_date(modules).update(
+        date_publication_programmee=nouvelle_date
+    )
+
+    sequences = Sequence.objects.filter(
+        module__cours=cours, etat_publication="programme"
+    )
+    _filtre_ancienne_date(sequences).update(
+        date_publication_programmee=nouvelle_date
+    )
+
+    blocs = BlocContenu.objects.filter(
+        sequence__module__cours=cours, etat_publication="programme"
+    )
+    _filtre_ancienne_date(blocs).update(
+        date_publication_programmee=nouvelle_date
+    )
 
 
 def peut_publier_sequence(seq) -> bool:
