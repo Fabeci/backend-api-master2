@@ -4,6 +4,8 @@ from django.db import models
 class Pays(models.Model):
     nom = models.CharField(max_length=100)
     code = models.CharField(max_length=3, unique=True)
+    # Code ISO 3166-1 alpha-2 (ex. SN pour le Sénégal), utilisé par le sélecteur ville.
+    iso2 = models.CharField(max_length=2, blank=True, null=True)
 
     def __str__(self):
         return self.nom

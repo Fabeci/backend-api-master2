@@ -3,6 +3,7 @@
 # Extraction d'une LISTE D'APPRENANTS depuis un document, pour créer des
 # inscriptions à un cours :
 #   - CSV / Excel (.csv, .xlsx) : colonnes email / nom / prénom / matricule
+#     (+ classe / filière facultatives pour les inscriptions établissement)
 #   - Word (.docx) : paragraphes + tableaux
 #   - PDF : lignes de texte
 #   - TXT : une entrée par ligne
@@ -26,11 +27,13 @@ _HEADER_KEYS = {
     "apprenant_id": {"apprenant", "apprenant id", "id", "matricule", "identifiant", "num", "numero"},
     "cours": {"cours", "course", "formation"},
     "classe": {"classe", "classe nom", "groupe", "niveau"},
+    "filiere": {"filiere", "filiere nom", "filière", "filière nom"},
 }
 
 _SKIP_WORDS = {
     "liste", "inscription", "inscriptions", "apprenant", "apprenants", "etudiant", "etudiants",
     "email", "mail", "courriel", "nom", "prenom", "matricule", "cours", "classe", "groupe",
+    "filiere",
 }
 
 
@@ -93,6 +96,7 @@ def _rows_to_learners(rows: list[list[str]]) -> list[dict]:
         aid = cell("apprenant_id")
         cours = cell("cours")
         classe = cell("classe")
+        filiere = cell("filiere")
 
         mapped = {i for i in idx.values() if i is not None}
         texts = [
@@ -121,6 +125,7 @@ def _rows_to_learners(rows: list[list[str]]) -> list[dict]:
             "apprenant_id": aid,
             "cours": cours,
             "classe": classe,
+            "filiere": filiere,
             "raw": " | ".join(r),
         })
     return out

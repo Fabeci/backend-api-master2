@@ -7,7 +7,7 @@ BASE="${BASE:-http://localhost:8000}"
 EMAIL="${EMAIL:-chat.test@example.com}"
 PASSWORD="${PASSWORD:-Test@1234}"
 BLOC="${BLOC:-1742}"
-DIST="${DIST:-../master-frontend/dist/tagus/browser}"
+DIST="${DIST:-../master-frontend/dist/somapro/browser}"
 
 echo "=== 1. Secrets exposés dans le bundle ==="
 for p in "sk-ant" "ANTHROPIC_API_KEY" "OPENAI_API_KEY" "AI_PROVIDER"; do

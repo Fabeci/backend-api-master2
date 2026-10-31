@@ -1,4 +1,5 @@
 # users/views.py
+import hashlib
 import logging
 from django.contrib.auth.tokens import default_token_generator
 from django.db.models import Q
@@ -23,9 +24,22 @@ class LoginRateThrottle(AnonRateThrottle):
     """5 tentatives par minute par IP sur le login."""
     scope = 'login'
 
+
+class PasswordResetRateThrottle(AnonRateThrottle):
+    scope = 'password_reset'
+
+
+class ResendCodeRateThrottle(AnonRateThrottle):
+    scope = 'resend_code'
+
+
+class VerifyEmailRateThrottle(AnonRateThrottle):
+    scope = 'verify_email'
+
 from users.permissions import IsAdminOrHigher
 from users.utils import BaseModelViewSet
 from core.rbac import RBACPermission
+from core.recaptcha import verify_recaptcha
 
 from courses.models import InscriptionCours, Cours
 from users.models import Formateur as FormateurModel
@@ -134,6 +148,7 @@ class RegisterAPIView(APIView):
 
 class VerifyEmailAPIView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [VerifyEmailRateThrottle]
 
     def post(self, request):
         serializer = VerifyEmailSerializer(data=request.data)
@@ -143,8 +158,11 @@ class VerifyEmailAPIView(APIView):
 
 class ResendCodeAPIView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ResendCodeRateThrottle]
 
     def post(self, request):
+        if not verify_recaptcha(request.data.get("recaptcha_token"), "resend_code", request.META.get("REMOTE_ADDR")):
+            return api_error("Vérification anti-robot échouée. Réessayez.", http_status=status.HTTP_400_BAD_REQUEST)
         serializer = ResendCodeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         return api_success("Nouveau code d'activation envoyé par email.", data=serializer.save())
@@ -158,10 +176,22 @@ class UserLoginAPIView(APIView):
         from django.core.cache import cache
         from parametres.services import securite_tentatives_login_max
 
+        if not verify_recaptcha(request.data.get("recaptcha_token"), "login", request.META.get("REMOTE_ADDR")):
+            return api_error(
+                "Vérification anti-robot échouée. Réessayez.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # ✅ Verrouillage après N tentatives échouées (Paramètres → Sécurité).
         email = str(request.data.get("email") or "").strip().lower()
         maxi  = securite_tentatives_login_max()
-        cle   = f"login_fail:{email}" if email else f"login_fail_ip:{request.META.get('REMOTE_ADDR', '')}"
+        # Clé de cache sûre : l'email brut peut contenir espaces/quotes et
+        # casser certains backends (memcached) ou produire des clés trop longues.
+        email_key = hashlib.sha256(email.encode("utf-8")).hexdigest()[:40]
+        ip_key = hashlib.sha256(
+            str(request.META.get("REMOTE_ADDR", "")).encode("utf-8")
+        ).hexdigest()[:40]
+        cle = f"login_fail:{email_key}" if email else f"login_fail_ip:{ip_key}"
         if maxi and cache.get(cle, 0) >= maxi:
             return api_error(
                 "Trop de tentatives échouées. Réessayez dans quelques minutes.",
@@ -219,6 +249,7 @@ class UserLoginAPIView(APIView):
                     "nom":                      user.nom,
                     "prenom":                   user.prenom,
                     "telephone":                user.telephone,
+                    "ville":                    getattr(user, "ville", None),
                     "photo":                    photo_url,          # ✅
                     "role":                     getattr(user.role, "name", None),
                     "permissions":              list(getattr(user, "permissions", []) or []),
@@ -698,8 +729,11 @@ class ChangePasswordAPIView(APIView):
         
 class PasswordResetAPIView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [PasswordResetRateThrottle]
 
     def post(self, request):
+        if not verify_recaptcha(request.data.get("recaptcha_token"), "password_reset", request.META.get("REMOTE_ADDR")):
+            return api_error("Vérification anti-robot échouée. Réessayez.", http_status=status.HTTP_400_BAD_REQUEST)
         email = request.data.get('email', '').strip().lower()
         if not email:
             return api_error("L'adresse email est requise.")

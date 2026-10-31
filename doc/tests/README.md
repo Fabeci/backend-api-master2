@@ -17,11 +17,12 @@ de la plateforme SOMAPRO (LMS).
 | `04-rapport-performance.md` | Charge réelle, latences, débit, analyse |
 | `05-matrice-tracabilite.md` | Exigences → tests → statut |
 | `06-analyse-statique.md` | Analyse SonarQube (3 passes, avant/après, triage) |
+| `07-tests-securite.md` | Tests d'attaques : SQLi, XSS, IDOR, mass assignment, auth, upload, CORS, dépendances |
 | `raw/` | Sorties brutes (coverage, perf, sécurité, Karma, SonarQube) |
 
 ## Commandes de reproduction
 
-### Backend — suite complète (160 tests)
+### Backend — suite complète (201 tests)
 
 ```bash
 docker compose run --rm --no-deps backend \
@@ -56,6 +57,9 @@ docker compose exec -e CHROME_BIN=/usr/bin/chromium frontend \
 ### Sécurité
 
 ```bash
+python manage.py test core.tests_attaques \
+  --settings=master_backend_api.test_settings -v2
+
 bash scripts/tests/security_checks.sh
 ```
 
@@ -83,10 +87,11 @@ python3 scripts/tests/perf_api.py --duration 20 --concurrency 10
 
 | Catégorie | Résultat réel |
 |---|---|
-| Tests backend | **160 / 160 réussis** (58 s) |
+| Tests backend | **201 / 201 réussis** (176 s) |
 | Tests frontend critiques | **33 / 33 réussis** |
 | Couverture backend (code applicatif) | **40 %** global ; **69–98 %** sur les modules critiques |
-| Sécurité (contrôles dynamiques) | **7 / 7 conformes** |
+| Sécurité (tests d'attaque) | **19 / 19 réussis** — voir `07-tests-securite.md` |
+| Audit dépendances | **35 vulnérabilités npm**, **198 avis pip** — plan de montée de version à prévoir |
 | Analyse statique (SonarQube) | **2 vulnérabilités** (Docker de dev) · **0 blocker** · *quality gate* **Passed** · couverture **39,4 %** |
 | Charge locale (5 utilisateurs) | 32,2 req/s · p95 297 ms · **0 erreur** |
 | Charge locale (10 utilisateurs) | 32,1 req/s · p95 531 ms · **0 erreur** |

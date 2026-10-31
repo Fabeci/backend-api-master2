@@ -57,7 +57,11 @@ class ParametresPlateformeView(APIView):
         if ser.is_valid():
             ser.save()
             return api_ok(ser.data)
-        return api_err(str(ser.errors), status.HTTP_400_BAD_REQUEST)
+        # Erreurs structurées : le frontend peut afficher le message du champ.
+        return Response(
+            {'success': False, 'errors': ser.errors},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
 
 # ─── Paramètres institution (Admin) ──────────────────────────────────────────
@@ -89,7 +93,10 @@ class ParametresInstitutionView(APIView):
         if ser.is_valid():
             ser.save()
             return api_ok(ser.data)
-        return api_err(str(ser.errors), status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'success': False, 'errors': ser.errors},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
 
 # ─── Intégrations (statut des connecteurs configurés côté serveur) ───────────

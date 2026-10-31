@@ -60,6 +60,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name="Photo de profil"
     )
     pays_residence = models.ForeignKey(Pays, on_delete=models.CASCADE, related_name='users', null=True)
+    ville = models.CharField(max_length=120, null=True, blank=True)
     is_active = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=now)
     is_staff = models.BooleanField(default=False)

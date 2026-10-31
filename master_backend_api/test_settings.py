@@ -31,5 +31,16 @@ CELERY_RESULT_BACKEND = 'cache+memory://'
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 
-# ── Email : boîte mémoire (aucun envoi réel) ───────────────────────────────
-EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+# ── Anti-robot : jamais d'appel réseau Google pendant les tests ─────────────
+RECAPTCHA_ENABLED = False
+
+# ── Email : SMTP réel si EMAIL_REAL_ENABLED=True, sinon boîte mémoire ────────
+from decouple import config as _env  # noqa: E402
+
+if _env('EMAIL_REAL_ENABLED', default=False, cast=bool):
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+
+# Les erreurs SMTP doivent être visibles dans les logs (le wrapper ne casse pas la création).
+EMAIL_FAIL_SILENTLY = False

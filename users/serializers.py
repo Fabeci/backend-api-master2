@@ -37,32 +37,94 @@ from .security import validate_password_strength
 # Helpers
 # =============================================================================
 
+def _request_user(serializer):
+    request = getattr(serializer, "context", {}).get("request")
+    return getattr(request, "user", None)
+
+
+def _is_superadmin(user):
+    return bool(user and getattr(user, "is_superuser", False))
+
+
+def _is_admin(user):
+    role = getattr(getattr(user, "role", None), "name", None)
+    return _is_superadmin(user) or role == "Admin"
+
+
+def _is_self_edit(serializer, instance):
+    user = _request_user(serializer)
+    return bool(
+        user
+        and getattr(user, "is_authenticated", False)
+        and getattr(user, "pk", None) == getattr(instance, "pk", None)
+    )
+
+
+def _retirer_champs_structurels(validated_data, champs):
+    """Empêche un utilisateur de s'auto-attribuer un périmètre via son profil."""
+    for champ in champs:
+        validated_data.pop(champ, None)
+    return validated_data
 
 
 def _envoyer_code_activation(user):
-    """Génère un code d'activation et l'envoie par e-mail (best-effort).
+    """Génère un code d'activation et envoie un email HTML SOMAPRO (code + lien)."""
+    import logging
+    from pathlib import Path
+    from urllib.parse import urlencode
 
-    Utilisé par les créations de comptes côté admin : sans code, un compte
-    créé inactif n'était activable par AUCUN écran.
-    """
+    from django.conf import settings
+    from django.template.loader import render_to_string
+
+    from core.mailer import safe_send_mail
+    from users.models import VerificationCode
+
+    logger = logging.getLogger("somapro.mail")
     try:
-        from users.models import VerificationCode
-        from core.mailer import safe_send_mail
-        from django.conf import settings
         v = VerificationCode.create_activation_code(user)
-        safe_send_mail(
-            subject="Somapro - Code d'activation de votre compte",
-            message=(
-                f"Bonjour,\n\nVotre compte a été créé.\n"
-                f"Code d'activation : {v.code} (valide 15 minutes).\n\n"
-                f"Utilisez la page « Confirmer mon e-mail » pour activer votre compte."
-            ),
+        base = (getattr(settings, "FRONTEND_BASE_URL", "http://localhost:4200") or "").rstrip("/")
+        activation_url = f"{base}/connexion/confirmer-email?{urlencode({'email': user.email, 'code': v.code})}"
+
+        role_raw = getattr(getattr(user, "role", None), "name", "") or ""
+        role_label = {
+            "Admin": "administrateur",
+            "ResponsableAcademique": "responsable académique",
+            "Formateur": "formateur",
+            "Apprenant": "apprenant",
+            "Parent": "parent",
+        }.get(role_raw, role_raw or "utilisateur")
+
+        context = {
+            "prenom": user.prenom or "",
+            "nom": user.nom or "",
+            "role_label": role_label,
+            "code": v.code,
+            "activation_url": activation_url,
+        }
+        html_message = render_to_string("emails/activation_compte.html", context)
+        text_message = (
+            f"Bonjour {user.prenom or ''} {user.nom or ''},\n\n"
+            f"Votre compte {role_label} sur SOMAPRO a bien été créé.\n"
+            f"Définissez votre mot de passe et activez votre compte via ce lien :\n{activation_url}\n\n"
+            f"Ou saisissez le code d'activation : {v.code} (valide 15 minutes).\n\n"
+            "Si vous n'êtes pas à l'origine de cette création, ignorez cet email."
+        )
+
+        logo = Path(settings.BASE_DIR) / "static" / "email" / "logo-somapro.png"
+        sent = safe_send_mail(
+            subject="Activez votre compte SOMAPRO",
+            message=text_message,
             from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
             recipient_list=[user.email],
+            html_message=html_message,
+            inline_images=[("logo_somapro", str(logo))] if logo.exists() else None,
         )
-    except Exception:
-        pass
-
+        if not sent:
+            logger.warning("[activation] email non envoyé à %s", user.email)
+        return sent
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[activation] échec d'envoi à %s : %s", getattr(user, "email", "?"), exc)
+        return 0
 
 def _get_or_create_role(role_name: str) -> UserRole:
     """Récupère ou crée un rôle utilisateur"""
@@ -297,6 +359,9 @@ class UserLoginSerializer(serializers.Serializer):
 class VerifyEmailSerializer(serializers.Serializer):
     email = serializers.EmailField()
     code  = serializers.CharField(min_length=6, max_length=6)
+    # Optionnel : permet à l'utilisateur de définir lui-même son mot de passe
+    # lors de l'activation (comptes créés par un admin).
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True, min_length=8)
 
     def validate(self, data):
         user = get_user_model().objects.filter(email=data["email"]).first()
@@ -319,11 +384,16 @@ class VerifyEmailSerializer(serializers.Serializer):
     def create(self, validated):
         user = validated["user"]
         vc   = validated["vc"]
+        password = (validated.get("password") or "").strip()
+        if password:
+            validate_password_strength(password)
+            user.set_password(password)
         vc.is_used = True
         vc.save(update_fields=["is_used"])
         user.is_active = True
-        user.save(update_fields=["is_active"])
-        return {"message": "Email vérifié. Votre compte est maintenant actif."}
+        fields = ["is_active"] + (["password"] if password else [])
+        user.save(update_fields=fields)
+        return {"message": "Compte activé. Vous pouvez vous connecter avec votre mot de passe."}
 
 
 class ResendCodeSerializer(serializers.Serializer):
@@ -336,14 +406,7 @@ class ResendCodeSerializer(serializers.Serializer):
         if user.is_active:
             return {"message": "Ce compte est déjà actif."}
 
-        v = VerificationCode.create_activation_code(user)
-        safe_send_mail(
-            subject="Somapro - Nouveau code d'activation",
-            message=f"Votre nouveau code d'activation est : {v.code} (valide 15 minutes).",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=None,
-        )
+        _envoyer_code_activation(user)
         return {"message": "Nouveau code envoyé par email."}
 
 
@@ -417,6 +480,7 @@ class BaseUserCrudSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "email", "nom", "prenom", "telephone",
+            "ville",
             "photo",
             "role",
             "permissions",
@@ -507,11 +571,15 @@ class AdminCrudSerializer(BaseUserCrudSerializer):
         admin.role     = _get_or_create_role("Admin")
         admin.is_staff = True
         admin.save()
-        _envoyer_code_activation(admin)
+        if not admin.is_active:
+            _envoyer_code_activation(admin)
         return admin
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        # Un admin ne peut pas déplacer son propre compte vers un autre établissement.
+        if _is_self_edit(self, instance) and not _is_superadmin(_request_user(self)):
+            _retirer_champs_structurels(validated_data, ["institution"])
         self._apply_password(instance, validated_data)
         for k, v in validated_data.items():
             setattr(instance, k, v)
@@ -572,11 +640,15 @@ class ParentCrudSerializer(BaseUserCrudSerializer):
             parent.set_unusable_password()
         parent.role = _get_or_create_role("Parent")
         parent.save()
-        _envoyer_code_activation(parent)
+        if not parent.is_active:
+            _envoyer_code_activation(parent)
         return parent
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        # Un parent ne peut pas changer son établissement via son profil.
+        if _is_self_edit(self, instance) and not _is_admin(_request_user(self)):
+            _retirer_champs_structurels(validated_data, ["institution"])
         self._apply_password(instance, validated_data)
         for k, v in validated_data.items():
             setattr(instance, k, v)
@@ -678,7 +750,8 @@ class ApprenantCrudSerializer(BaseUserCrudSerializer):
 
         apprenant.role = _get_or_create_role("Apprenant")
         apprenant.save()
-        _envoyer_code_activation(apprenant)
+        if not apprenant.is_active:
+            _envoyer_code_activation(apprenant)
 
         if annee_scolaire or classe:
             institution = getattr(apprenant, "institution", None)
@@ -699,6 +772,14 @@ class ApprenantCrudSerializer(BaseUserCrudSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        # Un apprenant ne peut pas s'auto-affecter à une autre classe/groupe,
+        # ni changer de tuteur ou de matricule via son profil.
+        if _is_self_edit(self, instance) and not _is_admin(_request_user(self)):
+            _retirer_champs_structurels(validated_data, [
+                "groupe", "tuteur", "inscription_classe",
+                "inscription_annee_scolaire", "matricule",
+            ])
+
         self._apply_password(instance, validated_data)
 
         annee_scolaire = validated_data.pop("inscription_annee_scolaire", None)
@@ -716,14 +797,34 @@ class ApprenantCrudSerializer(BaseUserCrudSerializer):
                 institution = getattr(annee_scolaire, "institution", None)
             if not institution and classe:
                 institution = getattr(classe, "institution", None)
-            Inscription.objects.create(
-                apprenant=instance,
-                institution=institution,
-                annee_scolaire=annee_scolaire,
-                classe=classe,
-                statut="actif",
-                statut_paiement="en_attente",
-            )
+
+            # ✅ Mise à jour de l'inscription existante (et non création en double).
+            inscription = None
+            if annee_scolaire is not None:
+                inscription = Inscription.objects.filter(
+                    apprenant=instance, annee_scolaire=annee_scolaire
+                ).first()
+            if inscription is None:
+                inscription = Inscription.objects.filter(apprenant=instance).order_by('-id').first()
+
+            if inscription is not None:
+                if annee_scolaire is not None:
+                    inscription.annee_scolaire = annee_scolaire
+                if classe is not None:
+                    inscription.classe = classe
+                if institution is not None:
+                    inscription.institution = institution
+                inscription.statut = "actif"
+                inscription.save()
+            else:
+                Inscription.objects.create(
+                    apprenant=instance,
+                    institution=institution,
+                    annee_scolaire=annee_scolaire,
+                    classe=classe,
+                    statut="actif",
+                    statut_paiement="en_attente",
+                )
 
         return instance
 
@@ -789,7 +890,8 @@ class FormateurCrudSerializer(BaseUserCrudSerializer):
             formateur.set_unusable_password()
         formateur.role = _get_or_create_role("Formateur")
         formateur.save()
-        _envoyer_code_activation(formateur)
+        if not formateur.is_active:
+            _envoyer_code_activation(formateur)
 
         # ✅ M2M assignés après le save()
         formateur.institutions.set(institutions)
@@ -799,6 +901,13 @@ class FormateurCrudSerializer(BaseUserCrudSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        # Un formateur ne peut pas s'ajouter lui-même à des groupes,
+        # spécialités ou établissements via son profil.
+        if _is_self_edit(self, instance) and not _is_admin(_request_user(self)):
+            _retirer_champs_structurels(
+                validated_data, ["institutions", "specialites", "groupes"]
+            )
+
         self._apply_password(instance, validated_data)
 
         institutions = validated_data.pop("institutions", None)
@@ -894,11 +1003,16 @@ class ResponsableAcademiqueCrudSerializer(BaseUserCrudSerializer):
             responsable.set_unusable_password()
         responsable.role = _get_or_create_role("ResponsableAcademique")
         responsable.save()
-        _envoyer_code_activation(responsable)
+        if not responsable.is_active:
+            _envoyer_code_activation(responsable)
         return responsable
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        # Un responsable ne peut pas changer lui-même de département/établissement
+        # (cela élargirait son périmètre d'accès).
+        if _is_self_edit(self, instance) and not _is_admin(_request_user(self)):
+            _retirer_champs_structurels(validated_data, ["institution", "departement"])
         self._apply_password(instance, validated_data)
         for k, v in validated_data.items():
             setattr(instance, k, v)

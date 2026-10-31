@@ -16,9 +16,12 @@ logger = logging.getLogger(__name__)
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 WORDS_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ'’\-]+")
 
+ROLE_ADMIN = "Admin"
 ROLE_FORMATEUR = "Formateur"
 ROLE_RESPONSABLE = "ResponsableAcademique"
-ROLES_VALIDES = {ROLE_FORMATEUR, ROLE_RESPONSABLE}
+ROLE_APPRENANT = "Apprenant"
+ROLE_PARENT = "Parent"
+ROLES_VALIDES = {ROLE_ADMIN, ROLE_FORMATEUR, ROLE_RESPONSABLE, ROLE_APPRENANT, ROLE_PARENT}
 
 _ROLE_ALIASES = {
     "formateur": ROLE_FORMATEUR, "formatrice": ROLE_FORMATEUR,
@@ -26,6 +29,10 @@ _ROLE_ALIASES = {
     "responsable": ROLE_RESPONSABLE, "responsable academique": ROLE_RESPONSABLE,
     "responsable pédagogique": ROLE_RESPONSABLE, "responsable pedagogique": ROLE_RESPONSABLE,
     "academic manager": ROLE_RESPONSABLE,
+    "admin": ROLE_ADMIN, "administrateur": ROLE_ADMIN, "administrator": ROLE_ADMIN,
+    "apprenant": ROLE_APPRENANT, "apprenante": ROLE_APPRENANT, "etudiant": ROLE_APPRENANT,
+    "étudiant": ROLE_APPRENANT, "eleve": ROLE_APPRENANT, "élève": ROLE_APPRENANT, "student": ROLE_APPRENANT,
+    "parent": ROLE_PARENT, "tuteur": ROLE_PARENT, "parent tuteur": ROLE_PARENT,
 }
 
 _HEADER_KEYS = {
@@ -36,11 +43,16 @@ _HEADER_KEYS = {
     "telephone": {"telephone", "tel", "phone", "mobile", "numero"},
     "password": {"password", "mot de passe", "motdepasse", "mdp"},
     "departement": {"departement", "department", "dept"},
+    "matricule": {"matricule", "matricule etudiant", "matricule élève", "student id"},
+    "classe": {"classe", "class", "classe nom"},
+    "groupe": {"groupe", "group"},
+    "tuteur_email": {"tuteur email", "email tuteur", "parent email", "email parent"},
 }
 
 _SKIP = {
     "liste", "utilisateurs", "formateurs", "responsables", "email", "mail",
     "nom", "prenom", "role", "fonction", "telephone", "departement",
+    "matricule", "classe", "groupe", "tuteur", "parent",
 }
 
 
@@ -125,6 +137,10 @@ def _rows_to_users(rows, defaut=ROLE_FORMATEUR) -> list[dict]:
             "telephone": cell("telephone"),
             "password": cell("password"),
             "departement": cell("departement"),
+            "matricule": cell("matricule"),
+            "classe": cell("classe"),
+            "groupe": cell("groupe"),
+            "tuteur_email": cell("tuteur_email"),
             "raw": " | ".join(r),
         })
     return out
@@ -157,7 +173,8 @@ def _lines_to_users(lines, defaut=ROLE_FORMATEUR) -> list[dict]:
             out.append({
                 "email": key, "nom": nom, "prenom": prenom,
                 "role": role, "telephone": "", "password": "",
-                "departement": "", "raw": s,
+                "departement": "", "matricule": "", "classe": "",
+                "groupe": "", "tuteur_email": "", "raw": s,
             })
     return out
 

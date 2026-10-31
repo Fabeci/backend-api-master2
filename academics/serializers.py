@@ -95,6 +95,7 @@ class InstitutionSerializer(serializers.ModelSerializer):
             "nom",
             "pays",
             "pays_id",
+            "ville",
             "adresse",
             "telephone_1",
             "telephone_2",
@@ -407,16 +408,27 @@ class InstitutionSerializer(serializers.ModelSerializer):
     
     
 class DomaineEtudeSerializer(serializers.ModelSerializer):
+    institution_display = serializers.StringRelatedField(source="institution", read_only=True)
     departement_label = serializers.StringRelatedField(
         source="departement.nom", read_only=True
     )
     class Meta:
         model = DomaineEtude
         fields = '__all__'
+        extra_kwargs = {"institution": {"required": False}}
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not validated_data.get("institution") and user and not user.is_superuser:
+            if getattr(user, "institution_id", None):
+                validated_data["institution_id"] = user.institution_id
+        return super().create(validated_data)
         
 
 class MatiereSerializer(serializers.ModelSerializer):
     institution = serializers.PrimaryKeyRelatedField(read_only=True)
+    institution_nom = serializers.StringRelatedField(source="institution", read_only=True)
 
     class Meta:
         model = Matiere
@@ -431,12 +443,25 @@ class MatiereSerializer(serializers.ModelSerializer):
         
         
 class SpecialiteSerializer(serializers.ModelSerializer):
+    institution_display = serializers.StringRelatedField(source="institution", read_only=True)
+
     class Meta:
         model = Specialite
         fields = '__all__'
+        extra_kwargs = {"institution": {"required": False}}
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not validated_data.get("institution") and user and not user.is_superuser:
+            if getattr(user, "institution_id", None):
+                validated_data["institution_id"] = user.institution_id
+        return super().create(validated_data)
         
         
 class AnneeScolaireSerializer(serializers.ModelSerializer):
+    institution_display = serializers.StringRelatedField(source="institution", read_only=True)
+
     class Meta:
         model = AnneeScolaire
         fields = '__all__'
@@ -497,6 +522,7 @@ class DepartementSerializer(serializers.ModelSerializer):
         
 
 class FiliereSerializer(serializers.ModelSerializer):
+    institution_display = serializers.StringRelatedField(source="institution", read_only=True)
     departement = serializers.PrimaryKeyRelatedField(
         queryset=Departement.objects.all(), required=False, allow_null=True,
     )
@@ -516,7 +542,7 @@ class FiliereSerializer(serializers.ModelSerializer):
         fields = [
             "id", "nom", "departement", "departement_label",
             "domaine_etude", "domaine_etude_label",
-            "institution", "description", "date_creation", "statut",
+            "institution", "institution_display", "description", "date_creation", "statut",
         ]
         read_only_fields = ["id", "date_creation"]
 
@@ -559,6 +585,7 @@ class FiliereSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
     
 class GroupeSerializer(serializers.ModelSerializer):
+    institution_display = serializers.StringRelatedField(source="institution", read_only=True)
     enseignants = serializers.PrimaryKeyRelatedField(
         queryset=Formateur.objects.all(),
         many=True,
@@ -567,7 +594,23 @@ class GroupeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Groupe
-        fields = ["id", "nom", "description", "institution", "classe", "enseignants", "annee_scolaire"]
+        fields = ["id", "nom", "description", "institution", "institution_display", "classe", "enseignants", "annee_scolaire"]
+        extra_kwargs = {"institution": {"required": False}}
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not validated_data.get("institution"):
+            classe = validated_data.get("classe")
+            annee = validated_data.get("annee_scolaire")
+            inst_id = (
+                getattr(classe, "institution_id", None)
+                or getattr(annee, "institution_id", None)
+                or getattr(user, "institution_id", None)
+            )
+            if inst_id:
+                validated_data["institution_id"] = inst_id
+        return super().create(validated_data)
 
 
 class ClasseSerializer(serializers.ModelSerializer):
@@ -584,6 +627,107 @@ class ClasseSerializer(serializers.ModelSerializer):
     # ✅ Labels lecture seule pour annee_scolaire et institution
     annee_scolaire_display = serializers.StringRelatedField(source="annee_scolaire", read_only=True)
     institution_display    = serializers.StringRelatedField(source="institution",    read_only=True)
+    # Effectif réel de la classe (inscriptions rattachées)
+    effectif = serializers.SerializerMethodField()
+
+    def get_effectif(self, obj):
+        try:
+            return obj.inscriptions.count()
+        except Exception:
+            return 0
+
+    def _request_user(self):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if user is not None and getattr(user, "is_authenticated", False):
+            return user
+        return None
+
+    def _institution_cible(self, attrs):
+        """Institution de la classe : compte courant, instance existante ou payload."""
+        user = self._request_user()
+        if user is not None and not getattr(user, "is_superuser", False):
+            if getattr(user, "institution", None) is not None:
+                return user.institution
+
+        institution = attrs.get("institution")
+        if institution is None and self.instance is not None:
+            institution = self.instance.institution
+        if institution is None and user is not None:
+            institution = getattr(user, "institution", None)
+        return institution
+
+    def validate(self, attrs):
+        institution = self._institution_cible(attrs)
+        user = self._request_user()
+
+        # Un admin d'établissement ne peut pas créer/déplacer une classe
+        # vers un autre établissement (protection contre le mass assignment).
+        demande = attrs.get("institution")
+        if (
+            demande is not None
+            and user is not None
+            and not getattr(user, "is_superuser", False)
+            and getattr(user, "institution_id", None)
+            and demande.id != user.institution_id
+        ):
+            raise serializers.ValidationError({
+                "institution": [
+                    "Vous ne pouvez pas rattacher une classe à un autre établissement."
+                ]
+            })
+
+        # Une classe ne peut regrouper que des filières de son établissement.
+        filieres = attrs.get("filieres")
+        if filieres is not None and institution is not None:
+            hors_etab = [
+                f.nom for f in filieres
+                if (
+                    getattr(f, "institution_id", None) is not None
+                    and f.institution_id != institution.id
+                )
+            ]
+            if hors_etab:
+                raise serializers.ValidationError({
+                    "filieres": [
+                        "Filière(s) hors établissement : " + ", ".join(hors_etab)
+                    ]
+                })
+
+        # Idem pour les matières.
+        matieres = attrs.get("matieres")
+        if matieres is not None and institution is not None:
+            hors_etab = [
+                m.nom for m in matieres
+                if (
+                    getattr(m, "institution_id", None) is not None
+                    and m.institution_id != institution.id
+                )
+            ]
+            if hors_etab:
+                raise serializers.ValidationError({
+                    "matieres": [
+                        "Matière(s) hors établissement : " + ", ".join(hors_etab)
+                    ]
+                })
+
+        # L'année scolaire doit appartenir au même établissement.
+        annee = attrs.get("annee_scolaire")
+        if annee is None and self.instance is not None:
+            annee = self.instance.annee_scolaire
+        if (
+            annee is not None
+            and institution is not None
+            and getattr(annee, "institution_id", None) is not None
+            and annee.institution_id != institution.id
+        ):
+            raise serializers.ValidationError({
+                "annee_scolaire": [
+                    "L'année scolaire n'appartient pas à l'établissement de la classe."
+                ]
+            })
+
+        return attrs
 
     class Meta:
         model = Classe
@@ -600,6 +744,7 @@ class ClasseSerializer(serializers.ModelSerializer):
             # ✅ Labels en lecture
             "annee_scolaire_display",
             "institution_display",
+            "effectif",
 
             # write
             "filieres",
@@ -619,16 +764,112 @@ class InscriptionSerializer(serializers.ModelSerializer):
     institution_display    = serializers.StringRelatedField(source='institution',    read_only=True)
     annee_scolaire_display = serializers.StringRelatedField(source='annee_scolaire', read_only=True)
     classe_display         = serializers.StringRelatedField(source='classe',         read_only=True)
+    filiere                = serializers.PrimaryKeyRelatedField(
+        queryset=Filiere.objects.all(), required=False, allow_null=True,
+    )
+    filiere_display        = serializers.StringRelatedField(source='filiere', read_only=True)
+
+    def _request_user(self):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if user is not None and getattr(user, "is_authenticated", False):
+            return user
+        return None
+
+    def _institution_cible(self, attrs):
+        user = self._request_user()
+        if user is not None and not getattr(user, "is_superuser", False):
+            if getattr(user, "institution", None) is not None:
+                return user.institution
+
+        institution = attrs.get("institution")
+        if institution is None and self.instance is not None:
+            institution = self.instance.institution
+        if institution is None and user is not None:
+            institution = getattr(user, "institution", None)
+        return institution
+
+    def validate(self, attrs):
+        institution = self._institution_cible(attrs)
+        user = self._request_user()
+
+        apprenant = attrs.get("apprenant", getattr(self.instance, "apprenant", None))
+        if (
+            apprenant is not None
+            and institution is not None
+            and getattr(apprenant, "institution_id", None) is not None
+            and apprenant.institution_id != institution.id
+        ):
+            raise serializers.ValidationError({
+                "apprenant": [
+                    "L'apprenant n'appartient pas à la même institution que l'inscription."
+                ]
+            })
+
+        demande = attrs.get("institution")
+        if (
+            demande is not None
+            and user is not None
+            and not getattr(user, "is_superuser", False)
+            and getattr(user, "institution_id", None)
+            and demande.id != user.institution_id
+        ):
+            raise serializers.ValidationError({
+                "institution": [
+                    "Vous ne pouvez pas rattacher une inscription à un autre établissement."
+                ]
+            })
+        classe = attrs.get("classe", getattr(self.instance, "classe", None))
+        filiere = attrs.get("filiere", getattr(self.instance, "filiere", None))
+
+        if classe is not None and institution is not None:
+            if classe.institution_id != institution.id:
+                raise serializers.ValidationError({
+                    "classe": [
+                        "La classe n'appartient pas à la même institution que l'inscription."
+                    ]
+                })
+            annee = attrs.get("annee_scolaire", getattr(self.instance, "annee_scolaire", None))
+            if (
+                annee is not None
+                and classe.annee_scolaire_id
+                and classe.annee_scolaire_id != annee.id
+            ):
+                raise serializers.ValidationError({
+                    "classe": [
+                        "La classe n'appartient pas à la même année scolaire que l'inscription."
+                    ]
+                })
+
+        if filiere is not None:
+            if (
+                institution is not None
+                and filiere.institution_id is not None
+                and filiere.institution_id != institution.id
+            ):
+                raise serializers.ValidationError({
+                    "filiere": [
+                        "La filière n'appartient pas à la même institution que l'inscription."
+                    ]
+                })
+            if classe is not None and not classe.filieres.filter(pk=filiere.pk).exists():
+                raise serializers.ValidationError({
+                    "filiere": [
+                        "La filière ne fait pas partie des filières de la classe."
+                    ]
+                })
+
+        return attrs
 
     class Meta:
         model  = Inscription
         fields = [
             'id',
             # IDs en écriture
-            'apprenant', 'institution', 'annee_scolaire', 'classe',
+            'apprenant', 'institution', 'annee_scolaire', 'classe', 'filiere',
             # Labels en lecture
             'apprenant_display', 'institution_display',
-            'annee_scolaire_display', 'classe_display',
+            'annee_scolaire_display', 'classe_display', 'filiere_display',
             'statut', 'statut_paiement',
         ]
 

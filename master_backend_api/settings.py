@@ -233,9 +233,20 @@ REST_FRAMEWORK = {
         'anon': '200/hour',
         'user': '2000/hour',
         'login': '5/minute',   # scope utilisé sur UserLoginAPIView
+        'password_reset': '3/minute',
+        'resend_code': '3/minute',
+        'verify_email': '10/minute',
         'chat_tuteur': '40/hour',  # assistant pédagogique (chat par bloc)
     },
 }
+
+# ── reCAPTCHA v3 (anti-bot / brute force) ───────────────────────────────────
+RECAPTCHA_ENABLED   = config('RECAPTCHA_ENABLED', default=False, cast=bool)
+RECAPTCHA_SITE_KEY  = config('RECAPTCHA_SITE_KEY', default='')
+RECAPTCHA_SECRET_KEY = config('RECAPTCHA_SECRET_KEY', default='')
+RECAPTCHA_MIN_SCORE = config('RECAPTCHA_MIN_SCORE', default=0.5, cast=float)
+# En cas d'indisponibilité de Google : False = sécurité (refus), True = disponibilité.
+RECAPTCHA_FAIL_OPEN = config('RECAPTCHA_FAIL_OPEN', default=False, cast=bool)
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')

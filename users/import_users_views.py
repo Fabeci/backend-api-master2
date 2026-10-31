@@ -21,15 +21,21 @@ from courses.views import api_error, api_success
 from users import import_users
 from users.models import Formateur, ResponsableAcademique, User
 from users.serializers import (
+    AdminCrudSerializer,
+    ApprenantCrudSerializer,
     FormateurCrudSerializer,
+    ParentCrudSerializer,
     ResponsableAcademiqueCrudSerializer,
 )
 
 logger = logging.getLogger(__name__)
 
 MAX_SIZE = 10 * 1024 * 1024
+ROLE_ADMIN = import_users.ROLE_ADMIN
 ROLE_FORMATEUR = import_users.ROLE_FORMATEUR
 ROLE_RESPONSABLE = import_users.ROLE_RESPONSABLE
+ROLE_APPRENANT = import_users.ROLE_APPRENANT
+ROLE_PARENT = import_users.ROLE_PARENT
 
 
 def _role_name(request):
@@ -110,13 +116,13 @@ def _resolve(rows, institution, actor_role):
                 statut, message = "invalide", "Adresse email invalide."
             else:
                 if role not in import_users.ROLES_VALIDES:
-                    statut, message = "invalide", "Rôle invalide (Formateur ou Responsable)."
+                    statut, message = "invalide", "Rôle invalide (Admin, Responsable, Formateur, Apprenant ou Parent)."
                 elif email in existing:
                     statut, message = "existe", "Un compte avec cet email existe déjà."
-                elif role == ROLE_RESPONSABLE and actor_role == "Responsable":
-                    statut, message = "role_interdit", "Seul un administrateur peut créer un responsable."
+                elif role in (ROLE_ADMIN, ROLE_RESPONSABLE) and actor_role == "Responsable":
+                    statut, message = "role_interdit", "Seul un administrateur peut créer un admin ou un responsable."
                 else:
-                    statut, message = "ok", "Compte à créer."
+                    statut, message = "ok", "Compte à créer ; email d'activation à envoyer."
 
         if dep_name and not dep and statut not in ("invalide", "existe"):
             message += f" Département « {dep_name} » introuvable (laissé vide)."
@@ -131,6 +137,10 @@ def _resolve(rows, institution, actor_role):
             "telephone": row.get("telephone") or "",
             "departement": dep.nom if dep else (dep_name or ""),
             "departement_id": dep.pk if dep else None,
+            "matricule": (row.get("matricule") or "").strip(),
+            "classe": (row.get("classe") or "").strip(),
+            "groupe": (row.get("groupe") or "").strip(),
+            "tuteur_email": (row.get("tuteur_email") or "").strip().lower(),
             "password_fourni": bool(row.get("password")),
             "statut": statut,
             "message": message,
@@ -238,43 +248,66 @@ class UtilisateurImportCreateAPIView(APIView):
             if r["statut"] != "ok":
                 continue
 
-            password = import_users.temp_password()
+            # Comptes créés SANS mot de passe : l'utilisateur le définira via
+            # l'email d'activation (compte inactif, code + lien).
             common = {
                 "email": r["email"],
                 "nom": r["nom_famille"],
                 "prenom": r["prenom"],
                 "telephone": r["telephone"],
-                "password": password,
-                "is_active": True,
                 "annee_scolaire_active_id": annee.id,
             }
 
             try:
-                if r["role"] == ROLE_RESPONSABLE:
+                if r["role"] == ROLE_ADMIN:
+                    serializer = AdminCrudSerializer(data={**common, "institution_id": institution.id})
+                elif r["role"] == ROLE_RESPONSABLE:
                     data = {**common, "institution_id": institution.id}
                     if r.get("departement_id"):
                         data["departement_id"] = r["departement_id"]
                     serializer = ResponsableAcademiqueCrudSerializer(data=data)
+                elif r["role"] == ROLE_PARENT:
+                    serializer = ParentCrudSerializer(data={**common, "institution_id": institution.id})
+                elif r["role"] == ROLE_APPRENANT:
+                    from academics.models import Classe
+                    data = {**common, "inscription_annee_scolaire": annee.id}
+                    if r.get("matricule"):
+                        data["matricule"] = r["matricule"]
+                    if r.get("classe"):
+                        classe = Classe.objects.filter(institution=institution, nom__iexact=r["classe"]).first()
+                        if classe:
+                            data["inscription_classe"] = classe.id
+                    if r.get("tuteur_email"):
+                        parent = User.objects.filter(email__iexact=r["tuteur_email"]).first()
+                        if parent:
+                            from users.models import Parent
+                            p = Parent.objects.filter(pk=parent.pk).first()
+                            if p:
+                                data["tuteur_id"] = p.pk
+                    serializer = ApprenantCrudSerializer(data=data)
                 else:
-                    data = {**common, "institution_ids": [institution.id]}
-                    serializer = FormateurCrudSerializer(data=data)
+                    serializer = FormateurCrudSerializer(data={**common, "institution_ids": [institution.id]})
 
                 serializer.is_valid(raise_exception=True)
                 user = serializer.save()
 
-                # Le FK `institution` de base n'est pas exposé par le serializer Formateur.
+                # FK institution / année (non exposés par certains serializers).
                 if r["role"] == ROLE_FORMATEUR:
                     Formateur.objects.filter(pk=user.pk).update(
                         institution=institution, annee_scolaire_active=annee
                     )
                     if hasattr(user, "institutions"):
                         user.institutions.add(institution)
+                elif r["role"] == ROLE_APPRENANT:
+                    from users.models import Apprenant
+                    Apprenant.objects.filter(pk=user.pk).update(
+                        institution=institution, annee_scolaire_active=annee
+                    )
 
                 created += 1
                 accounts.append({
                     "email": r["email"],
                     "role": r["role"],
-                    "password": password,
                 })
             except ValidationError as exc:
                 errors.append({"ligne": r["ligne"], "email": r["email"], "message": exc.detail})
@@ -283,7 +316,7 @@ class UtilisateurImportCreateAPIView(APIView):
                 errors.append({"ligne": r["ligne"], "email": r["email"], "message": str(exc)})
 
         return api_success(
-            f"{created} compte(s) créé(s)" + (f", {len(errors)} erreur(s)." if errors else "."),
+            f"{created} compte(s) créé(s) — email d'activation envoyé" + (f", {len(errors)} erreur(s)." if errors else "."),
             {
                 "created": created,
                 "accounts": accounts,

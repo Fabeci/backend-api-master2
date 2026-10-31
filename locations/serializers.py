@@ -4,7 +4,7 @@ from .models import Pays, Ville, Quartier
 class PaysSerializer(serializers.ModelSerializer):
     class Meta:
         model = Pays
-        fields = ['id', 'nom', 'code']
+        fields = ['id', 'nom', 'code', 'iso2']
 
 class VilleSerializer(serializers.ModelSerializer):
     pays = PaysSerializer()  # Sérialisation du pays

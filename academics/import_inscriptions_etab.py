@@ -14,7 +14,7 @@ import string
 from django.db import transaction
 from django.db.models import Q
 
-from academics.models import Classe, Inscription
+from academics.models import Classe, Filiere, Inscription
 from courses import import_inscriptions
 from users.models import Apprenant, UserRole
 
@@ -75,6 +75,11 @@ def resolve(rows, institution, annee) -> list[dict]:
     ):
         classes[import_inscriptions._norm(c.nom)] = c
 
+    filieres = {
+        import_inscriptions._norm(f.nom): f
+        for f in Filiere.objects.filter(institution=institution)
+    }
+
     registered = set(
         Inscription.objects.filter(institution=institution, annee_scolaire=annee)
         .values_list("apprenant_id", flat=True)
@@ -86,6 +91,9 @@ def resolve(rows, institution, annee) -> list[dict]:
         nom, prenom = _split_name(row.get("nom") or "", row.get("prenom") or "")
         classe_name = (row.get("classe") or "").strip()
         classe = classes.get(import_inscriptions._norm(classe_name)) if classe_name else None
+
+        filiere_name = (row.get("filiere") or "").strip()
+        filiere = filieres.get(import_inscriptions._norm(filiere_name)) if filiere_name else None
 
         matches = _match(row, by_email, by_name)
 
@@ -113,6 +121,22 @@ def resolve(rows, institution, annee) -> list[dict]:
         if classe_name and not classe and statut != "invalide":
             message += f" Classe « {classe_name} » introuvable (laissée vide)."
 
+        if filiere_name and not filiere and statut != "invalide":
+            message += f" Filière « {filiere_name} » introuvable (laissée vide)."
+        elif filiere and classe and not classe.filieres.filter(pk=filiere.pk).exists():
+            message += (
+                f" Filière « {filiere.nom} » hors de la classe « {classe.nom} » "
+                "(laissée vide)."
+            )
+            filiere = None
+        elif not filiere_name and classe:
+            classe_filieres = list(classe.filieres.all()[:2])
+            if len(classe_filieres) == 1:
+                # Classe à filière unique : on la déduit.
+                filiere = classe_filieres[0]
+            elif len(classe_filieres) > 1:
+                message += " Classe à plusieurs filières : précisez la filière."
+
         out.append({
             "ligne": i,
             "nom": f"{prenom} {nom}".strip() or row.get("raw") or email,
@@ -121,6 +145,8 @@ def resolve(rows, institution, annee) -> list[dict]:
             "prenom": prenom,
             "classe": classe.nom if classe else (classe_name or ""),
             "classe_id": classe.pk if classe else None,
+            "filiere": filiere.nom if filiere else (filiere_name or ""),
+            "filiere_id": filiere.pk if filiere else None,
             "apprenant_id": appr.pk if appr else None,
             "apprenant_nom": (
                 f"{appr.prenom or ''} {appr.nom or ''}".strip() if appr else ""
@@ -208,12 +234,17 @@ def create(rows, institution, annee) -> dict:
                         continue
 
                 classe = Classe.objects.filter(pk=r["classe_id"]).first() if r.get("classe_id") else None
+                filiere = (
+                    Filiere.objects.filter(pk=r["filiere_id"]).first()
+                    if r.get("filiere_id") else None
+                )
                 _, was_created = Inscription.objects.get_or_create(
                     apprenant=appr,
                     institution=institution,
                     annee_scolaire=annee,
                     defaults={
                         "classe": classe,
+                        "filiere": filiere,
                         "statut": "actif",
                         "statut_paiement": "en_attente",
                     },

@@ -11,6 +11,7 @@ from locations.models import Pays
 class Institution(models.Model):
     nom = models.CharField(max_length=200)
     pays = models.ForeignKey(Pays, on_delete=models.CASCADE, related_name="etablissements")
+    ville = models.CharField(max_length=120, null=True, blank=True)
     adresse = models.CharField(max_length=255, null=True, blank=True)
     date_creation = models.DateTimeField(auto_now_add=True)
     telephone_1 = models.CharField(max_length=15, null=True, blank=True)
@@ -237,6 +238,15 @@ class Inscription(models.Model):
         null=True,
         blank=True,
     )
+    # Filière suivie par l'apprenant dans la classe.
+    # Nullable : une classe peut être transversale (plusieurs filières).
+    filiere = models.ForeignKey(
+        "Filiere",
+        on_delete=models.SET_NULL,
+        related_name="inscriptions",
+        null=True,
+        blank=True,
+    )
 
     statut = models.CharField(
         max_length=20,
@@ -266,6 +276,16 @@ class Inscription(models.Model):
         ]
 
     def clean(self):
+        if (
+            self.apprenant_id
+            and self.institution_id
+            and getattr(self.apprenant, "institution_id", None) is not None
+            and self.apprenant.institution_id != self.institution_id
+        ):
+            raise ValidationError(
+                "L'apprenant n'appartient pas à la même institution que l'inscription."
+            )
+
         # ✅ Ne vérifier que si les deux sont renseignés ET que l'année a une institution
         if (
             self.annee_scolaire_id
@@ -285,7 +305,30 @@ class Inscription(models.Model):
             ):
                 raise ValidationError("La classe choisie n'appartient pas à la même année scolaire que l'inscription.")
 
+        if self.filiere:
+            if (
+                self.institution_id
+                and self.filiere.institution_id is not None
+                and self.filiere.institution_id != self.institution_id
+            ):
+                raise ValidationError(
+                    "La filière choisie n'appartient pas à la même institution que l'inscription."
+                )
+            if self.classe_id and not self.classe.filieres.filter(pk=self.filiere_id).exists():
+                raise ValidationError(
+                    "La filière choisie ne fait pas partie des filières de la classe."
+                )
+
     def save(self, *args, **kwargs):
+        # Classe à filière unique : on renseigne automatiquement la filière
+        # de l'inscription (sans écraser un choix explicite).
+        if not self.filiere_id and self.classe_id:
+            filieres = list(self.classe.filieres.all()[:2])
+            if len(filieres) == 1:
+                self.filiere = filieres[0]
+                update_fields = kwargs.get("update_fields")
+                if update_fields is not None and "filiere" not in update_fields:
+                    kwargs["update_fields"] = list(update_fields) + ["filiere"]
         self.full_clean()
         return super().save(*args, **kwargs)
 

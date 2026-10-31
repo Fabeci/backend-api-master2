@@ -281,13 +281,13 @@ class GroupeListCreateAPIView(APIView):
                 http_status=status.HTTP_403_FORBIDDEN
             )
 
-        serializer = GroupeSerializer(data=request.data)
+        # L'institution est déduite du compte AVANT validation (le champ peut être requis).
+        data = request.data.copy() if hasattr(request.data, "copy") else dict(request.data)
+        if not request.user.is_superuser and not data.get("institution"):
+            data["institution"] = request.user.institution_id
+
+        serializer = GroupeSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-
-        # Auto-assigner l'institution si non fournie
-        if not request.user.is_superuser and "institution" not in request.data:
-            serializer.validated_data["institution_id"] = request.user.institution_id
-
         groupe = serializer.save()
         return api_success("Groupe créé avec succès", GroupeSerializer(groupe).data, status.HTTP_201_CREATED)
 
@@ -372,10 +372,10 @@ class ClasseListCreateAPIView(APIView):
                 http_status=status.HTTP_403_FORBIDDEN
             )
 
-        serializer = ClasseSerializer(data=request.data)
+        serializer = ClasseSerializer(data=request.data, context={"request": request})
         if serializer.is_valid():
-            # Auto-assigner l'institution
-            if not request.user.is_superuser and "institution" not in request.data:
+            # L'établissement est TOUJOURS celui du compte (mono-établissement).
+            if not request.user.is_superuser:
                 serializer.validated_data["institution_id"] = request.user.institution_id
 
             obj = serializer.save()
@@ -406,8 +406,10 @@ class ClasseDetailAPIView(APIView):
         if not can_modify_academic_resource(request.user, classe, "Classe"):
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
-        serializer = ClasseSerializer(classe, data=request.data)
+        serializer = ClasseSerializer(classe, data=request.data, context={"request": request})
         if serializer.is_valid():
+            if not request.user.is_superuser:
+                serializer.validated_data["institution_id"] = request.user.institution_id
             serializer.save()
             return api_success("Classe mise à jour", serializer.data, status.HTTP_200_OK)
         return api_error("Erreur de validation", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)
@@ -418,8 +420,10 @@ class ClasseDetailAPIView(APIView):
         if not can_modify_academic_resource(request.user, classe, "Classe"):
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
-        serializer = ClasseSerializer(classe, data=request.data, partial=True)
+        serializer = ClasseSerializer(classe, data=request.data, partial=True, context={"request": request})
         if serializer.is_valid():
+            if not request.user.is_superuser:
+                serializer.validated_data["institution_id"] = request.user.institution_id
             serializer.save()
             return api_success("Classe mise à jour partiellement", serializer.data, status.HTTP_200_OK)
         return api_error("Erreur de validation", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)
@@ -468,22 +472,26 @@ class FiliereListCreateAPIView(APIView):
 
 
 class FiliereDetailAPIView(APIView):
-    """Détail d'une filière"""
+    """Détail d'une filière (filtré par établissement)."""
     permission_classes = [permissions.IsAuthenticated, RBACPermission]
 
-    def get_object(self, pk):
-        return get_object_or_404(Filiere, pk=pk)
+    def get_object(self, pk, request):
+        return get_filtered_academic_object(Filiere, pk, request, "Filiere")
+
+    def _peut_modifier(self, request, filiere):
+        return (
+            request.user.is_superuser
+            or can_modify_academic_resource(request.user, filiere, "Filiere")
+        )
 
     def get(self, request, pk):
-        filiere = self.get_object(pk)
+        filiere = self.get_object(pk, request)
         serializer = FiliereSerializer(filiere, context={"request": request})
         return api_success("Filière trouvée", serializer.data, status.HTTP_200_OK)
 
     def put(self, request, pk):
-        filiere = self.get_object(pk)
-
-        role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
+        filiere = self.get_object(pk, request)
+        if not self._peut_modifier(request, filiere):
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
         serializer = FiliereSerializer(filiere, data=request.data, context={"request": request})
@@ -497,10 +505,8 @@ class FiliereDetailAPIView(APIView):
         return api_error("Erreur de validation", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)
 
     def patch(self, request, pk):
-        filiere = self.get_object(pk)
-
-        role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
+        filiere = self.get_object(pk, request)
+        if not self._peut_modifier(request, filiere):
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
         serializer = FiliereSerializer(filiere, data=request.data, partial=True, context={"request": request})
@@ -514,10 +520,8 @@ class FiliereDetailAPIView(APIView):
         return api_error("Erreur de validation", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
-        filiere = self.get_object(pk)
-
-        role_name = request.user.role.name if hasattr(request.user, "role") and request.user.role else None
-        if not request.user.is_superuser and role_name not in ["Admin", "ResponsableAcademique"]:
+        filiere = self.get_object(pk, request)
+        if not self._peut_modifier(request, filiere):
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
         filiere.delete()
@@ -634,10 +638,10 @@ class InscriptionListCreateAPIView(APIView):
                 http_status=status.HTTP_403_FORBIDDEN
             )
 
-        serializer = InscriptionSerializer(data=request.data)
+        serializer = InscriptionSerializer(data=request.data, context={"request": request})
         if serializer.is_valid():
-            # Auto-assigner l'institution
-            if not request.user.is_superuser and "institution" not in request.data:
+            # L'établissement est TOUJOURS celui du compte (mono-établissement).
+            if not request.user.is_superuser:
                 serializer.validated_data["institution_id"] = request.user.institution_id
 
             obj = serializer.save()
@@ -662,8 +666,10 @@ class InscriptionDetailAPIView(APIView):
         if not can_modify_academic_resource(request.user, obj, "Inscription"):
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
-        serializer = InscriptionSerializer(obj, data=request.data)
+        serializer = InscriptionSerializer(obj, data=request.data, context={"request": request})
         if serializer.is_valid():
+            if not request.user.is_superuser:
+                serializer.validated_data["institution_id"] = request.user.institution_id
             serializer.save()
             return api_success("Inscription mise à jour", serializer.data, status.HTTP_200_OK)
         return api_error("Erreur de validation", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)
@@ -674,8 +680,10 @@ class InscriptionDetailAPIView(APIView):
         if not can_modify_academic_resource(request.user, obj, "Inscription"):
             return api_error("Accès refusé", http_status=status.HTTP_403_FORBIDDEN)
 
-        serializer = InscriptionSerializer(obj, data=request.data, partial=True)
+        serializer = InscriptionSerializer(obj, data=request.data, partial=True, context={"request": request})
         if serializer.is_valid():
+            if not request.user.is_superuser:
+                serializer.validated_data["institution_id"] = request.user.institution_id
             serializer.save()
             return api_success("Inscription mise à jour partiellement", serializer.data, status.HTTP_200_OK)
         return api_error("Erreur de validation", errors=serializer.errors, http_status=status.HTTP_400_BAD_REQUEST)
