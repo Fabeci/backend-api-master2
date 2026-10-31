@@ -79,7 +79,8 @@ class _Base(TestCase):
         cls.apprenant = Apprenant.objects.create(
             email='apprenant.pub@example.com', nom='Fall', prenom='Awa',
             role=role_apprenant,
-            institution=cls.inst, groupe=cls.groupe, is_active=True,
+            institution=cls.inst, groupe=cls.groupe,
+            annee_scolaire_active=cls.annee, is_active=True,
         )
         InscriptionCours.objects.create(
             apprenant=cls.apprenant, cours=cls.cours, statut='en_cours',
@@ -126,6 +127,15 @@ class CoursFuturInaccessibleTests(_Base):
         self.cours.save()
         self.cours = Cours.objects.get(pk=self.cours.pk)
         self.module = Module.objects.select_related('cours').get(pk=self.module.pk)
+        InscriptionCours.objects.update_or_create(
+            apprenant=self.apprenant,
+            cours=self.cours,
+            defaults={
+                'statut': 'en_cours',
+                'institution': self.inst,
+                'annee_scolaire': self.annee,
+            },
+        )
         self.assertEqual(self.cours.date_debut, self.aujourdhui - timedelta(days=1))
 
         self.assertTrue(module_disponible(self.module))
