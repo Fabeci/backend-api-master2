@@ -7,6 +7,7 @@ Vérifie :
   à l'ancienne date, sans écraser un override explicite.
 """
 from datetime import datetime, time, timedelta
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.utils import timezone
@@ -88,6 +89,17 @@ class _Base(TestCase):
         )
 
     def setUp(self):
+        # Aligne le contexte mono-établissement sur l'établissement du test.
+        self._p_inst = patch(
+            'core.tenant.default_institution_id', return_value=self.inst.id,
+        )
+        self._p_annee = patch(
+            'core.tenant.default_annee_scolaire', return_value=self.annee,
+        )
+        self._p_inst.start()
+        self._p_annee.start()
+        self.addCleanup(self._p_inst.stop)
+        self.addCleanup(self._p_annee.stop)
         self.client = APIClient()
 
     def _refresh(self):
