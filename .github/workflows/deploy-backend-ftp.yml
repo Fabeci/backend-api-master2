@@ -79,3 +79,50 @@ jobs:
         run: |
           echo "### ✅ Backend envoyé" >> "$GITHUB_STEP_SUMMARY"
           echo "La tâche cron cPanel va appliquer les migrations et redémarrer Passenger." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Vérifier la configuration email
+        id: mail
+        if: success()
+        env:
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: |
+          FROM="${MAIL_FROM:-$SMTP_USERNAME}"
+          if [ -n "$SMTP_SERVER" ] && [ -n "$MAIL_TO" ] && [ -n "$FROM" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Notifications email non configurées (secrets SMTP_SERVER, MAIL_TO et MAIL_FROM/SMTP_USERNAME manquants)."
+          fi
+
+      - name: Notifier le succès par email
+        id: notify
+        if: success() && steps.mail.outputs.enabled == 'true'
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT || 587 }}
+          secure: ${{ secrets.SMTP_SECURE || 'false' }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "✅ SOMAPRO — backend déployé sur cPanel"
+          to: ${{ secrets.MAIL_TO }}
+          from: ${{ secrets.MAIL_FROM || secrets.SMTP_USERNAME }}
+          body: |
+            Le backend SOMAPRO a été envoyé avec succès sur cPanel.
+
+            Dépôt  : ${{ github.repository }}
+            Branche : ${{ github.ref_name }}
+            Commit  : ${{ github.sha }}
+            Auteur  : ${{ github.actor }}
+            Run     : ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Le drapeau deploy.flag a été déposé : la tâche cron cPanel va appliquer
+            les migrations et redémarrer Passenger.
+
+      - name: Signaler un échec de notification
+        if: steps.notify.outcome == 'failure'
+        run: echo "::warning::Le déploiement a réussi, mais l'email de notification n'a pas pu être envoyé. Vérifiez les secrets SMTP."
