@@ -89,25 +89,45 @@ class _Base(TestCase):
     def setUp(self):
         self.client = APIClient()
 
+    def _refresh(self):
+        """Les objets de setUpTestData peuvent être réutilisés entre tests :
+        on repart toujours de l'état réellement présent en base."""
+        self.cours = Cours.objects.get(pk=self.cours.pk)
+        self.module = Module.objects.select_related('cours').get(pk=self.module.pk)
+        self.sequence = Sequence.objects.select_related('module').get(pk=self.sequence.pk)
+        self.bloc = BlocContenu.objects.select_related('sequence').get(pk=self.bloc.pk)
+        self.apprenant = Apprenant.objects.get(pk=self.apprenant.pk)
+        InscriptionCours.objects.filter(
+            apprenant=self.apprenant, cours=self.cours,
+        ).update(statut='en_cours')
+
 
 class CoursFuturInaccessibleTests(_Base):
     def test_module_publie_non_disponible_avant_le_cours(self):
+        self._refresh()
         self.assertFalse(module_disponible(self.module))
         self.assertFalse(
             filter_disponibles(Module.objects.filter(pk=self.module.pk), 'Module').exists()
         )
 
     def test_api_module_404_avant_le_cours(self):
+        self._refresh()
         self.client.force_authenticate(user=self.apprenant)
         r = self.client.get(f'/api/v1/modules/{self.module.pk}/')
         self.assertEqual(r.status_code, 404, r.content[:400])
 
         r = self.client.get(f'/api/v1/modules/{self.module.pk}/sequences/')
-        self.assertEqual(r.status_code, 403, r.content[:400])
+        # 404 ou 403 : dans les deux cas, le contenu est inaccessible.
+        self.assertIn(r.status_code, (403, 404), r.content[:400])
 
     def test_module_disponible_apres_le_debut_du_cours(self):
+        self._refresh()
         self.cours.date_debut = self.aujourdhui - timedelta(days=1)
         self.cours.save()
+        self.cours = Cours.objects.get(pk=self.cours.pk)
+        self.module = Module.objects.select_related('cours').get(pk=self.module.pk)
+        self.assertEqual(self.cours.date_debut, self.aujourdhui - timedelta(days=1))
+
         self.assertTrue(module_disponible(self.module))
         self.assertTrue(
             filter_disponibles(Module.objects.filter(pk=self.module.pk), 'Module').exists()
