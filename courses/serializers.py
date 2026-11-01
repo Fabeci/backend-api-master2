@@ -88,6 +88,8 @@ class CoursSerializer(serializers.ModelSerializer):
             "volume_horaire",
             "date_debut",
             "date_fin",
+            "objectifs",
+            "prerequis",
             "statut",
             "statut_calcule",
             "statut_force",
@@ -168,6 +170,7 @@ class ModuleSerializer(serializers.ModelSerializer):
     cours = serializers.PrimaryKeyRelatedField(queryset=Cours.objects.all())
     institution_nom = serializers.CharField(source="institution.nom", read_only=True)
     annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
+    duree_totale_minutes = serializers.SerializerMethodField()
 
     class Meta:
         model = Module
@@ -177,15 +180,27 @@ class ModuleSerializer(serializers.ModelSerializer):
             "etat_publication", "date_publication_programmee", "date_publication_effective",
             "titre",
             "description",
+            "objectifs",
+            "prerequis",
             "cours",
             "ordre",
             "duree_estimee",
+            "duree_totale_minutes",
             "institution",
             "institution_nom",
             "annee_scolaire",
             "annee_scolaire_nom"
         ]
         read_only_fields = ["institution", "annee_scolaire"]
+
+    def get_duree_totale_minutes(self, obj):
+        return obj.duree_totale_minutes
+
+    def to_representation(self, instance):
+        """La durée affichée est toujours celle calculée depuis les blocs."""
+        data = super().to_representation(instance)
+        data["duree_estimee"] = instance.duree_totale_minutes
+        return data
 
 # ============================================================================
 # BLOCS DE CONTENU
@@ -244,7 +259,7 @@ class BlocContenuSerializer(serializers.ModelSerializer):
             'contenu_texte', 'contenu_html', 'contenu_markdown',
             'video_url', 'audio_url', 'image', 'fichier',
             'lien_externe', 'code_source', 'langage_code',
-            'objectifs', 'duree_estimee_minutes',
+            'objectifs', 'prerequis', 'duree_estimee_minutes',
             'est_obligatoire', 'est_visible',
             # ✅ Publication progressive
             'etat_publication', 'date_publication_programmee', 'date_publication_effective',
@@ -264,6 +279,7 @@ class BlocContenuSerializer(serializers.ModelSerializer):
             'code_source':           {'required': False, 'allow_null': True, 'allow_blank': True},
             'langage_code':          {'required': False, 'allow_null': True, 'allow_blank': True},
             'objectifs':             {'required': False, 'allow_null': True, 'allow_blank': True},
+            'prerequis':             {'required': False, 'allow_null': True, 'allow_blank': True},
             # IntegerField → allow_null uniquement (pas allow_blank)
             'duree_estimee_minutes': {'required': False, 'allow_null': True},
             # BooleanField → required uniquement
@@ -340,7 +356,7 @@ class BlocContenuCreateSerializer(serializers.ModelSerializer):
             'contenu_texte', 'contenu_html', 'contenu_markdown',
             'video_url', 'audio_url', 'image', 'fichier',
             'lien_externe', 'code_source', 'langage_code',
-            'objectifs', 'duree_estimee_minutes',
+            'objectifs', 'prerequis', 'duree_estimee_minutes',
             'est_obligatoire', 'est_visible',
             'etat_publication', 'date_publication_programmee',
         ]
@@ -351,6 +367,7 @@ class BlocContenuCreateSerializer(serializers.ModelSerializer):
             'code_source':           {'required': False, 'allow_null': True, 'allow_blank': True},
             'langage_code':          {'required': False, 'allow_null': True, 'allow_blank': True},
             'objectifs':             {'required': False, 'allow_null': True, 'allow_blank': True},
+            'prerequis':             {'required': False, 'allow_null': True, 'allow_blank': True},
             'duree_estimee_minutes': {'required': False, 'allow_null': True},
             'est_obligatoire':       {'required': False},
             'est_visible':           {'required': False},
@@ -466,6 +483,8 @@ class SequenceSerializer(serializers.ModelSerializer):
     module = serializers.PrimaryKeyRelatedField(queryset=Module.objects.all())
     institution_nom = serializers.CharField(source="institution.nom", read_only=True)
     annee_scolaire_nom = serializers.CharField(source="annee_scolaire.annee_format_classique", read_only=True)
+    duree_estimee = serializers.SerializerMethodField()
+    duree_totale_minutes = serializers.SerializerMethodField()
 
     class Meta:
         model = Sequence
@@ -475,14 +494,24 @@ class SequenceSerializer(serializers.ModelSerializer):
             'etat_publication', 'date_publication_programmee', 'date_publication_effective',
             'titre',
             'description',
+            'objectifs',
+            'prerequis',
             'ordre',
             'module',
+            'duree_estimee',
+            'duree_totale_minutes',
             'institution',
             'institution_nom',
             'annee_scolaire',
             'annee_scolaire_nom'
         ]
         read_only_fields = ["institution", "annee_scolaire"]
+
+    def get_duree_estimee(self, obj):
+        return obj.duree_totale_minutes
+
+    def get_duree_totale_minutes(self, obj):
+        return obj.duree_totale_minutes
 
     def validate(self, attrs):
         etat = attrs.get("etat_publication", getattr(self.instance, "etat_publication", None))
@@ -541,7 +570,7 @@ class SequenceDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sequence
         fields = [
-            'id', 'titre', 'description', 'ordre', 'module', 'module_titre',
+            'id', 'titre', 'description', 'objectifs', 'prerequis', 'ordre', 'module', 'module_titre',
             'institution', 'institution_nom',
             'annee_scolaire', 'annee_scolaire_nom',
             'nombre_blocs', 'nombre_ressources', 'duree_totale_minutes',
@@ -556,10 +585,7 @@ class SequenceDetailSerializer(serializers.ModelSerializer):
         return obj.ressources_sequences.count()
     
     def get_duree_totale_minutes(self, obj):
-        return sum(
-            bloc.duree_estimee_minutes 
-            for bloc in obj.blocs_contenu.all()
-        )
+        return obj.duree_totale_minutes
 
 
 # ============================================================================

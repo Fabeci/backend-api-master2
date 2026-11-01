@@ -2,6 +2,7 @@
 # courses/models.py
 
 from django.db import models
+from django.db.models import Sum
 from django.core.validators import MinValueValidator, MaxValueValidator
 from academics.models import Groupe, Matiere, Institution, AnneeScolaire
 from users.models import Apprenant, Formateur
@@ -25,6 +26,8 @@ class Cours(models.Model):
     volume_horaire = models.IntegerField(default=0, help_text="Volume horaire prévu en heures")
     date_debut = models.DateField(null=True, blank=True)
     date_fin = models.DateField(null=True, blank=True)
+    objectifs = models.TextField(blank=True, null=True, verbose_name="Objectifs pédagogiques")
+    prerequis = models.TextField(blank=True, null=True, verbose_name="Prérequis")
     statut = models.CharField(
         max_length=20,
         choices=[
@@ -195,6 +198,8 @@ ETAT_PUBLICATION_CHOICES = [
 class Module(models.Model):
     titre = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
+    objectifs = models.TextField(blank=True, null=True, verbose_name="Objectifs pédagogiques")
+    prerequis = models.TextField(blank=True, null=True, verbose_name="Prérequis")
     cours = models.ForeignKey(Cours, on_delete=models.CASCADE, related_name="modules")
     ordre = models.PositiveIntegerField(default=0, verbose_name="Ordre d'affichage")
     duree_estimee = models.PositiveIntegerField(
@@ -239,6 +244,14 @@ class Module(models.Model):
     def __str__(self):
         return self.titre
 
+    @property
+    def duree_totale_minutes(self) -> int:
+        """Durée du module = somme des durées estimées de tous ses blocs."""
+        total = self.sequences.aggregate(
+            total=Sum("blocs_contenu__duree_estimee_minutes")
+        )["total"]
+        return int(total or 0)
+
     def save(self, *args, **kwargs):
         # Héritage automatique depuis le cours
         if self.cours:
@@ -254,6 +267,8 @@ class Module(models.Model):
 class Sequence(models.Model):
     titre = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
+    objectifs = models.TextField(blank=True, null=True, verbose_name="Objectifs pédagogiques")
+    prerequis = models.TextField(blank=True, null=True, verbose_name="Prérequis")
     ordre = models.PositiveIntegerField(default=0, verbose_name="Ordre d'affichage")
     module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name="sequences")
 
@@ -303,6 +318,14 @@ class Sequence(models.Model):
 
     def __str__(self):
         return self.titre
+
+    @property
+    def duree_totale_minutes(self) -> int:
+        """Durée de la séquence = somme des durées estimées de ses blocs."""
+        total = self.blocs_contenu.aggregate(
+            total=Sum("duree_estimee_minutes")
+        )["total"]
+        return int(total or 0)
 
     def save(self, *args, **kwargs):
         # Héritage automatique depuis le module
@@ -427,6 +450,7 @@ class BlocContenu(models.Model):
 
     # Métadonnées
     objectifs = models.TextField(blank=True, null=True, verbose_name="Objectifs pédagogiques")
+    prerequis = models.TextField(blank=True, null=True, verbose_name="Prérequis")
     duree_estimee_minutes = models.PositiveIntegerField(
         default=0,
         verbose_name="Durée estimée (minutes)"

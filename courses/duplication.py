@@ -27,7 +27,7 @@ def copier_module(module_src: Module, cours_cible) -> Module:
         description=module_src.description,
         cours=cours_cible,
         ordre=module_src.ordre,
-        duree_estimee=module_src.duree_estimee,
+        duree_estimee=module_src.duree_totale_minutes,
         institution=institution,
         annee_scolaire=annee,
         etat_publication="brouillon",
