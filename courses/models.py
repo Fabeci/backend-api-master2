@@ -896,6 +896,7 @@ class Participation(models.Model):
     statut = models.CharField(
         max_length=20,
         choices=[
+            ("en_attente", "En attente"),
             ("present", "Présent"),
             ("absent", "Absent"),
             ("retard", "Retard"),

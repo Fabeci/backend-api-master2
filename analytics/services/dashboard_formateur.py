@@ -83,7 +83,10 @@ class DashboardFormateurService(BaseDashboardService):
             soumis=Count('id', filter=Q(statut='soumis')),
             corriges=Count('id', filter=Q(statut='corrige')),
         )
-        part_agg = part_qs.aggregate(total=Count('id'), presents=Count('id', filter=Q(statut='present')))
+        part_agg = part_qs.aggregate(
+            total=Count('id', filter=~Q(statut='en_attente')),
+            presents=Count('id', filter=Q(statut='present')),
+        )
 
         nb_cours             = cours_agg['total']
         en_cours             = cours_agg['en_cours']
@@ -172,7 +175,7 @@ class DashboardFormateurService(BaseDashboardService):
         for c in cours_qs.filter(statut='en_cours').order_by('titre'):
             p_c  = part_qs.filter(session__cours=c)
             pres = p_c.filter(statut='present').count()
-            tot  = p_c.count()
+            tot  = p_c.exclude(statut='en_attente').count()
             pres_par_cours.append({
                 'cours': c.titre or f'Cours #{c.id}',
                 'taux': self._pct(pres, tot),
@@ -272,7 +275,7 @@ class DashboardFormateurService(BaseDashboardService):
             backlog_c = pass_c.filter(statut='soumis').count()
             part_c    = part_qs.filter(session__cours=c)
             pres_c    = part_c.filter(statut='present').count()
-            taux_pc   = self._pct(pres_c, part_c.count())
+            taux_pc   = self._pct(pres_c, part_c.exclude(statut='en_attente').count())
             nb_blocs  = BlocContenu.objects.filter(sequence__module__cours=c).count()
             jamais    = nb_blocs - BlocAnalyticsSummary.objects.filter(
                 bloc__sequence__module__cours=c, nb_ouvertures__gt=0

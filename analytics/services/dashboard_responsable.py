@@ -54,7 +54,10 @@ class DashboardResponsableService(BaseDashboardService):
             termines=Count('id', filter=Q(statut='termine')),
             en_retard=Count('id', filter=Q(statut__in=['en_cours', 'planifie'], date_fin__lt=today.isoformat())),
         )
-        part_agg = part_qs.aggregate(total=Count('id'), presents=Count('id', filter=Q(statut='present')))
+        part_agg = part_qs.aggregate(
+            total=Count('id', filter=~Q(statut='en_attente')),
+            presents=Count('id', filter=Q(statut='present')),
+        )
         pass_agg = pass_qs.aggregate(
             total=Count('id'),
             soumis=Count('id', filter=Q(statut='soumis')),

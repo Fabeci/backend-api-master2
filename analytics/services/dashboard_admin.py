@@ -86,7 +86,7 @@ class DashboardAdminService(BaseDashboardService):
             soumis=Count('id', filter=Q(statut='soumis')),
             corriges=Count('id', filter=Q(statut='corrige')),
         )
-        part_total = part_qs.count()
+        part_total = part_qs.exclude(statut='en_attente').count()
         presents   = part_qs.filter(statut='present').count()
         taux_pres  = self._pct(presents, part_total)
 
