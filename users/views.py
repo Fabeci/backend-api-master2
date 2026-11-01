@@ -7,7 +7,7 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.conf import settings
-from .models import User
+from .models import User, ImpersonationLog
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -275,6 +275,115 @@ class LogoutAPIView(APIView):
     def post(self, request):
         Token.objects.filter(user=request.user).delete()
         return api_success("Déconnexion réussie. Le token a été invalidé.")
+
+
+class ImpersonateUserAPIView(APIView):
+    """Connexion admin « en tant que » un autre compte (support / recette).
+
+    Sécurité :
+    - réservé au rôle Admin (ou superuser) ;
+    - même établissement ;
+    - interdit de cibler un autre Admin/SuperAdmin (sauf superuser) ;
+    - interdit de cibler son propre compte ;
+    - chaque bascule est journalisée.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, user_id):
+        requester = request.user
+        requester_role = getattr(getattr(requester, "role", None), "name", None)
+
+        if not (requester.is_superuser or requester_role == "Admin"):
+            return api_error(
+                "Seul un administrateur peut utiliser la connexion en tant que.",
+                http_status=status.HTTP_403_FORBIDDEN,
+            )
+
+        target = User.objects.select_related("role", "institution").filter(pk=user_id).first()
+        if target is None:
+            return api_error("Utilisateur introuvable.", http_status=status.HTTP_404_NOT_FOUND)
+        if target.pk == requester.pk:
+            return api_error(
+                "Vous êtes déjà connecté à ce compte.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not target.is_active:
+            return api_error(
+                "Ce compte est inactif : connexion impossible.",
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        target_role = getattr(getattr(target, "role", None), "name", None)
+        if not requester.is_superuser and (
+            target.is_superuser or target_role in ("Admin", "SuperAdmin")
+        ):
+            return api_error(
+                "Un administrateur ne peut pas se connecter en tant qu'un autre administrateur.",
+                http_status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if (
+            not requester.is_superuser
+            and requester.institution_id
+            and target.institution_id
+            and requester.institution_id != target.institution_id
+        ):
+            return api_error(
+                "Cet utilisateur n'appartient pas à votre établissement.",
+                http_status=status.HTTP_403_FORBIDDEN,
+            )
+
+        token, _ = Token.objects.get_or_create(user=target)
+
+        try:
+            ImpersonationLog.objects.create(
+                admin=requester,
+                target=target,
+                ip=request.META.get("REMOTE_ADDR"),
+                user_agent=(request.META.get("HTTP_USER_AGENT") or "")[:255],
+            )
+        except Exception:
+            logger.exception("Impossible d'enregistrer l'audit d'impersonation")
+
+        logger.warning(
+            "[impersonation] admin=%s (%s) -> user=%s (%s)",
+            requester.pk, requester.email, target.pk, target.email,
+        )
+
+        photo_url = None
+        if getattr(target, "photo", None):
+            try:
+                photo_url = request.build_absolute_uri(target.photo.url)
+            except Exception:
+                photo_url = None
+
+        return api_success(
+            f"Connexion en tant que {target.prenom or ''} {target.nom or ''}".strip(),
+            {
+                "token": token.key,
+                "impersonation": True,
+                "user": {
+                    "id": target.pk,
+                    "email": target.email,
+                    "nom": target.nom,
+                    "prenom": target.prenom,
+                    "telephone": getattr(target, "telephone", None),
+                    "photo": photo_url,
+                    "role": target_role,
+                    "institution_id": target.institution_id,
+                    "annee_scolaire_active_id": getattr(target, "annee_scolaire_active_id", None),
+                    "is_active": target.is_active,
+                    "is_staff": target.is_staff,
+                    "is_superuser": target.is_superuser,
+                },
+                "admin": {
+                    "id": requester.pk,
+                    "email": requester.email,
+                    "role": requester_role,
+                },
+            },
+        )
 
 
 # =============================================================================

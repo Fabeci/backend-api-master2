@@ -206,3 +206,27 @@ class RolePermissionOverride(models.Model):
 
     def __str__(self):
         return f"{self.role}: {self.resource}.{self.action} = {self.allowed}"
+
+
+# === Audit des connexions « en tant que » (impersonation admin) ===
+class ImpersonationLog(models.Model):
+    """Trace chaque bascule Admin → autre compte (support / recette)."""
+    admin = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="impersonations_effectuees",
+    )
+    target = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="impersonations_subies",
+    )
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Connexion en tant que"
+        verbose_name_plural = "Connexions en tant que"
+
+    def __str__(self):
+        return f"{self.admin} → {self.target} ({self.created_at:%Y-%m-%d %H:%M})"

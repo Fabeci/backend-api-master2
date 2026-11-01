@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     ChangePasswordAPIView,
     LogoutAPIView,
+    ImpersonateUserAPIView,
     PasswordResetAPIView,
     PasswordResetConfirmAPIView,
     RegisterAPIView,
@@ -42,6 +43,7 @@ urlpatterns = [
     path('verify-email/', VerifyEmailAPIView.as_view(), name='verify_email'),
     path('resend-code/', ResendCodeAPIView.as_view(), name='resend_code'),
     path('logout/', LogoutAPIView.as_view(), name='logout'),
+    path('impersonation/<int:user_id>/', ImpersonateUserAPIView.as_view(), name='impersonate-user'),
     path('change-password/', ChangePasswordAPIView.as_view(), name='change-password'),
 
 
